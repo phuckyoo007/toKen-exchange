@@ -12,7 +12,7 @@ const FONTS_DIR = path.join(PUBLIC_DIR, "fonts");
 const IMG_DIR = path.join(PUBLIC_DIR, "img");
 const PORT = process.env.PORT || 3000;
 
-const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js"];
+const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "manifest.json"];
 const LIB_FILES = [
 "buy-config.js", "crypto-utils.js", "fee-config.js", "i18n.js",
 "identicon.js", "networks.js", "polymarket.js", "prices.js",
@@ -21,7 +21,10 @@ const LIB_FILES = [
 ];
 const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];
 const FONT_FILES = ["fredoka-400.woff2", "fredoka-500.woff2", "fredoka-600.woff2", "fredoka-700.woff2"];
-const IMG_FILES = ["bg-scene.jpg", "spinner-coin.png", "splash.jpg"];
+const IMG_FILES = [
+"bg-scene.jpg", "spinner-coin.png", "splash.jpg",
+"apple-touch-icon.png", "icon-192.png", "icon-512.png", "favicon-32.png",
+];
 
 function copyIfExists(srcName, destDir) {
 const src = path.join(ROOT, srcName);

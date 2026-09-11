@@ -1,0 +1,22 @@
+{
+  "name": "Token Exchange",
+  "short_name": "Token Exchange",
+  "description": "Self-custody multi-chain wallet, as a standalone website. Your keys are encrypted in your own browser and never leave your device.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050810",
+  "theme_color": "#d4af37",
+  "icons": [
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
