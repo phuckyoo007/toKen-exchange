@@ -793,22 +793,29 @@ body.tm-web-wallet #app {
   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
 }
 /* The extension pins the splash to the popup window's own top-left corner
-   (position: fixed; inset: 0) since the popup window IS 360x600. Here it's
-   repositioned to sit right on top of the #app card instead of the whole
-   browser viewport. */
+   (position: fixed; inset: 0) since the popup window IS 360x600. On the
+   standalone web wallet this used to sit right on top of the #app card
+   (a small 390x640 rounded rectangle) instead, at any window size wider
+   than 460px -- leaving visible page background on either side, like a
+   phone screenshot floating on a desk. Now the splash's central image
+   always fills the entire browser viewport edge-to-edge, on any screen
+   size, rather than being boxed into that card -- only the splash itself
+   changes here; the rest of the app (buttons, forms, lists) keeps its
+   narrower card layout below, since that content is laid out for a
+   phone-width column and would look broken stretched edge-to-edge on a
+   wide desktop window. */
 body.tm-web-wallet #splash-screen {
-  position: absolute;
-  inset: auto;
-  top: 32px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 390px;
-  height: 640px;
-  max-width: calc(100% - 24px);
-  border-radius: 20px;
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  transform: none;
+  width: 100%;
+  height: 100vh;
+  max-width: 100%;
+  border-radius: 0;
 }
 @media (max-width: 460px) {
   body.tm-web-wallet { padding: 0; }
   body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
-  body.tm-web-wallet #splash-screen { top: 0; width: 100%; height: 100vh; max-width: 100%; border-radius: 0; }
 }

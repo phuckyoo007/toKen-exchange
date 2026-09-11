@@ -1,208 +1,47 @@
-diff --git a/app.js b/app.js
-index 49260da..20e99db 100644
---- a/app.js
-+++ b/app.js
-@@ -334,6 +334,7 @@ $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScre
- $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
- $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
- $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
-+$("btn-goto-sell").addEventListener("click", () => { hideError("sell-error"); showScreen("screen-sell"); });
- $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
- 
- // ---------------------------------------------------------------- TOKENS
-@@ -665,6 +666,17 @@ $("btn-buy-open").addEventListener("click", () => {
-   }
- });
- 
-+// ---------------------------------------------------------------- SELL
-+$("btn-sell-open").addEventListener("click", () => {
-+  hideError("sell-error");
-+  try {
-+    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
-+    chrome.tabs.create({ url });
-+  } catch (e) {
-+    showError("sell-error", e.message);
-+  }
-+});
-+
- // ---------------------------------------------------------------- SETTINGS
- $("btn-add-account").addEventListener("click", async () => {
-   try {
-diff --git a/buy-config.js b/buy-config.js
-index 14de25c..bf54dbe 100644
---- a/buy-config.js
-+++ b/buy-config.js
-@@ -98,5 +98,10 @@ if (typeof self !== "undefined") {
-     isBuyConfigured,
-     buildBuyUrl,
-     NETWORK_MOONPAY_CURRENCY_CODE,
-+    // Exposed so lib/sell-config.js can reuse the same publishable key --
-+    // MoonPay issues one key per account that works for both the on-ramp
-+    // (buy) and off-ramp (sell) widgets, so there's no reason to make the
-+    // developer paste it in twice and risk the two drifting apart.
-+    MOONPAY_PUBLISHABLE_API_KEY,
-   };
+diff --git a/app.css b/app.css
+index a4fcad7..51e8d4d 100644
+--- a/app.css
++++ b/app.css
+@@ -793,22 +793,29 @@ body.tm-web-wallet #app {
+   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
  }
-diff --git a/en.js b/en.js
-index 8ecc989..5d2359a 100644
---- a/en.js
-+++ b/en.js
-@@ -14,6 +14,7 @@
-     "common.send": "Send",
-     "common.swap": "Swap",
-     "common.buy": "Buy",
-+    "common.sell": "Sell",
-     "common.livePrices": "Live prices",
-     "common.seeAll": "See all",
-     "common.reject": "Reject",
-@@ -91,6 +92,12 @@
-     "buy.description2Html": "MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:",
-     "buy.continueBtn": "Continue to MoonPay",
- 
-+    "sell.title": "Sell for cash",
-+    "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
-+    "sell.description2": "MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
-+    "sell.description3Html": "Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.",
-+    "sell.continueBtn": "Continue to MoonPay",
-+
-     "support.title": "Help & support",
-     "support.description": "Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.",
-     "support.inputPlaceholder": "Type a question...",
-@@ -139,9 +146,25 @@
-     "settings.currencyLabel": "Display currency",
-     "settings.viewSeedBtn": "View recovery phrase",
-     "settings.helpBtn": "Help & support",
-+    "settings.feedbackBtn": "Request a feature",
-     "settings.lockBtn": "Lock wallet",
-     "settings.resetBtn": "Reset wallet",
- 
-+    "feedback.title": "Feature requests",
-+    "feedback.subtitle": "See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.",
-+    "feedback.titlePlaceholder": "Short title (e.g. \"Dark mode\")",
-+    "feedback.descPlaceholder": "A bit more detail (optional)",
-+    "feedback.submitBtn": "Post request",
-+    "feedback.submittingStatus": "Posting...",
-+    "feedback.submittedStatus": "Thanks! Your request is live below.",
-+    "feedback.listTitle": "REQUESTS",
-+    "feedback.empty": "No requests yet -- be the first!",
-+    "feedback.loadError": "Couldn't load requests. Try again in a moment.",
-+    "feedback.titleRequired": "Give it a short title first.",
-+    "feedback.upvoteBtn": "Upvote",
-+    "feedback.upvotedBtn": "Upvoted",
-+    "feedback.contactLine": "Prefer email? Reach us at msandersod@gmail.com",
-+
-     "importKey.title": "Import private key",
-     "importKey.placeholder": "0x private key",
- 
-diff --git a/index.html b/index.html
-index e954bd6..704c9be 100644
---- a/index.html
-+++ b/index.html
-@@ -247,6 +247,7 @@
-       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
-       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
-       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
-+      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
-     </div>
-     <div class="prices-card">
-       <div class="prices-card-header">
-@@ -334,6 +335,17 @@
-     <p id="buy-error" class="error hidden"></p>
-   </section>
- 
-+  <!-- SELL -->
-+  <section id="screen-sell" class="screen hidden">
-+    <h2 data-i18n="sell.title">Sell for cash</h2>
-+    <p class="muted" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
-+    <p class="muted" data-i18n="sell.description2">MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
-+    <p class="muted" data-i18n-html="sell.description3Html">Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.</p>
-+    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
-+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-+    <p id="sell-error" class="error hidden"></p>
-+  </section>
-+
-   <!-- SUPPORT -->
-   <section id="screen-support" class="screen hidden">
-     <h2 data-i18n="support.title">Help &amp; support</h2>
-@@ -430,6 +442,7 @@
-     <button id="btn-goto-contacts" class="secondary" data-i18n="settings.contactsBtn">Address book</button>
-     <button id="btn-view-seed" class="secondary" data-i18n="settings.viewSeedBtn">View recovery phrase</button>
-     <button id="btn-goto-support-settings" class="secondary" data-i18n="settings.helpBtn">Help &amp; support</button>
-+    <button id="btn-goto-feedback" class="secondary" data-i18n="settings.feedbackBtn">Request a feature</button>
-     <div class="language-picker">
-       <label data-i18n="common.languageLabel">Language</label>
-       <select id="language-select-settings" class="language-select"></select>
-@@ -443,6 +456,21 @@
-     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-   </section>
- 
-+  <section id="screen-feedback" class="screen hidden">
-+    <h2 data-i18n="feedback.title">Feature requests</h2>
-+    <p class="muted" data-i18n="feedback.subtitle">See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.</p>
-+    <input type="text" id="feedback-title-input" maxlength="140" data-i18n-placeholder="feedback.titlePlaceholder" placeholder="Short title (e.g. &quot;Dark mode&quot;)" />
-+    <textarea id="feedback-desc-input" maxlength="2000" rows="3" data-i18n-placeholder="feedback.descPlaceholder" placeholder="A bit more detail (optional)"></textarea>
-+    <button id="btn-feedback-submit" class="primary" data-i18n="feedback.submitBtn">Post request</button>
-+    <p id="feedback-error" class="error hidden"></p>
-+    <p id="feedback-status" class="hint hidden"></p>
-+    <div class="tokens-header"><span class="tokens-title" data-i18n="feedback.listTitle">REQUESTS</span></div>
-+    <div id="feedback-list"></div>
-+    <p id="feedback-empty" class="muted hidden" data-i18n="feedback.empty">No requests yet -- be the first!</p>
-+    <p class="muted" data-i18n="feedback.contactLine">Prefer email? Reach us at msandersod@gmail.com</p>
-+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
-+  </section>
-+
-   <section id="screen-contacts" class="screen hidden">
-     <h2 data-i18n="contacts.title">Address book</h2>
-     <p id="contacts-picker-hint" class="muted hidden" data-i18n="contacts.pickerHint">Tap a contact to fill it in as the recipient.</p>
-@@ -581,6 +609,7 @@
- <script src="lib/prices.js"></script>
- <script src="lib/polymarket.js"></script>
- <script src="lib/buy-config.js"></script>
-+<script src="lib/sell-config.js"></script>
- <script src="lib/i18n/en.js"></script>
- <script src="lib/i18n/ar.js"></script>
- <script src="lib/i18n/zh.js"></script>
-@@ -602,5 +631,6 @@
- <script src="shim.js"></script>
- <script src="wallet-engine.js"></script>
- <script src="app.js"></script>
-+<script src="lib/feature-requests.js"></script>
- </body>
- </html>
-diff --git a/server.js b/server.js
-index af795e0..64815cf 100644
---- a/server.js
-+++ b/server.js
-@@ -2,6 +2,7 @@ const http = require("http");
- const path = require("path");
- const fs = require("fs");
- const handler = require("serve-handler");
-+const { handleFeatureRequestsApi } = require("./feature-requests-api");
- 
- const ROOT = __dirname;
- const PUBLIC_DIR = path.join(ROOT, "public");
-@@ -14,8 +15,8 @@ const PORT = process.env.PORT || 3000;
- 
- const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "manifest.json"];
- const LIB_FILES = [
--"buy-config.js", "crypto-utils.js", "fee-config.js", "i18n.js",
--"identicon.js", "networks.js", "polymarket.js", "prices.js",
-+"buy-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
-+"identicon.js", "networks.js", "polymarket.js", "prices.js", "sell-config.js",
- "sanctions-list.js", "support-config.js", "swap.js", "wallet.js",
- "walletconnect-config.js",
- ];
-@@ -69,9 +70,10 @@ console.log("Vendor files copied into", VENDOR_DIR);
- function main() {
- layoutPublicDir();
- copyVendorFiles();
--const server = http.createServer((req, res) =>
--handler(req, res, { public: PUBLIC_DIR })
--);
-+const server = http.createServer((req, res) => {
-+if (handleFeatureRequestsApi(req, res)) return;
-+handler(req, res, { public: PUBLIC_DIR });
-+});
- server.listen(PORT, () => console.log("Serving on port " + PORT));
+ /* The extension pins the splash to the popup window's own top-left corner
+-   (position: fixed; inset: 0) since the popup window IS 360x600. Here it's
+-   repositioned to sit right on top of the #app card instead of the whole
+-   browser viewport. */
++   (position: fixed; inset: 0) since the popup window IS 360x600. On the
++   standalone web wallet this used to sit right on top of the #app card
++   (a small 390x640 rounded rectangle) instead, at any window size wider
++   than 460px -- leaving visible page background on either side, like a
++   phone screenshot floating on a desk. Now the splash's central image
++   always fills the entire browser viewport edge-to-edge, on any screen
++   size, rather than being boxed into that card -- only the splash itself
++   changes here; the rest of the app (buttons, forms, lists) keeps its
++   narrower card layout below, since that content is laid out for a
++   phone-width column and would look broken stretched edge-to-edge on a
++   wide desktop window. */
+ body.tm-web-wallet #splash-screen {
+-  position: absolute;
+-  inset: auto;
+-  top: 32px;
+-  left: 50%;
+-  transform: translateX(-50%);
+-  width: 390px;
+-  height: 640px;
+-  max-width: calc(100% - 24px);
+-  border-radius: 20px;
++  position: fixed;
++  inset: 0;
++  top: 0;
++  left: 0;
++  transform: none;
++  width: 100%;
++  height: 100vh;
++  max-width: 100%;
++  border-radius: 0;
  }
- 
+ @media (max-width: 460px) {
+   body.tm-web-wallet { padding: 0; }
+   body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
+-  body.tm-web-wallet #splash-screen { top: 0; width: 100%; height: 100vh; max-width: 100%; border-radius: 0; }
+ }
