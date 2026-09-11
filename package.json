@@ -1,0 +1,12 @@
+{
+  "name": "token-exchange-web-wallet-host",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "extract-zip": "^2.0.1",
+    "serve-handler": "^6.1.6"
+  }
+}
