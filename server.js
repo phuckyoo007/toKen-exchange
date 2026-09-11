@@ -2,6 +2,7 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const handler = require("serve-handler");
+const { handleFeatureRequestsApi } = require("./feature-requests-api");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -14,8 +15,8 @@ const PORT = process.env.PORT || 3000;
 
 const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "manifest.json"];
 const LIB_FILES = [
-"buy-config.js", "crypto-utils.js", "fee-config.js", "i18n.js",
-"identicon.js", "networks.js", "polymarket.js", "prices.js",
+"buy-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
+"identicon.js", "networks.js", "polymarket.js", "prices.js", "sell-config.js",
 "sanctions-list.js", "support-config.js", "swap.js", "wallet.js",
 "walletconnect-config.js",
 ];
@@ -69,9 +70,10 @@ console.log("Vendor files copied into", VENDOR_DIR);
 function main() {
 layoutPublicDir();
 copyVendorFiles();
-const server = http.createServer((req, res) =>
-handler(req, res, { public: PUBLIC_DIR })
-);
+const server = http.createServer((req, res) => {
+if (handleFeatureRequestsApi(req, res)) return;
+handler(req, res, { public: PUBLIC_DIR });
+});
 server.listen(PORT, () => console.log("Serving on port " + PORT));
 }
 

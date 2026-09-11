@@ -247,6 +247,7 @@
       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
+      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
     </div>
     <div class="prices-card">
       <div class="prices-card-header">
@@ -332,6 +333,17 @@
     <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="buy-error" class="error hidden"></p>
+  </section>
+
+  <!-- SELL -->
+  <section id="screen-sell" class="screen hidden">
+    <h2 data-i18n="sell.title">Sell for cash</h2>
+    <p class="muted" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
+    <p class="muted" data-i18n="sell.description2">MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
+    <p class="muted" data-i18n-html="sell.description3Html">Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.</p>
+    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="sell-error" class="error hidden"></p>
   </section>
 
   <!-- SUPPORT -->
@@ -430,6 +442,7 @@
     <button id="btn-goto-contacts" class="secondary" data-i18n="settings.contactsBtn">Address book</button>
     <button id="btn-view-seed" class="secondary" data-i18n="settings.viewSeedBtn">View recovery phrase</button>
     <button id="btn-goto-support-settings" class="secondary" data-i18n="settings.helpBtn">Help &amp; support</button>
+    <button id="btn-goto-feedback" class="secondary" data-i18n="settings.feedbackBtn">Request a feature</button>
     <div class="language-picker">
       <label data-i18n="common.languageLabel">Language</label>
       <select id="language-select-settings" class="language-select"></select>
@@ -441,6 +454,21 @@
     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <section id="screen-feedback" class="screen hidden">
+    <h2 data-i18n="feedback.title">Feature requests</h2>
+    <p class="muted" data-i18n="feedback.subtitle">See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.</p>
+    <input type="text" id="feedback-title-input" maxlength="140" data-i18n-placeholder="feedback.titlePlaceholder" placeholder="Short title (e.g. &quot;Dark mode&quot;)" />
+    <textarea id="feedback-desc-input" maxlength="2000" rows="3" data-i18n-placeholder="feedback.descPlaceholder" placeholder="A bit more detail (optional)"></textarea>
+    <button id="btn-feedback-submit" class="primary" data-i18n="feedback.submitBtn">Post request</button>
+    <p id="feedback-error" class="error hidden"></p>
+    <p id="feedback-status" class="hint hidden"></p>
+    <div class="tokens-header"><span class="tokens-title" data-i18n="feedback.listTitle">REQUESTS</span></div>
+    <div id="feedback-list"></div>
+    <p id="feedback-empty" class="muted hidden" data-i18n="feedback.empty">No requests yet -- be the first!</p>
+    <p class="muted" data-i18n="feedback.contactLine">Prefer email? Reach us at msandersod@gmail.com</p>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
   </section>
 
   <section id="screen-contacts" class="screen hidden">
@@ -581,6 +609,7 @@
 <script src="lib/prices.js"></script>
 <script src="lib/polymarket.js"></script>
 <script src="lib/buy-config.js"></script>
+<script src="lib/sell-config.js"></script>
 <script src="lib/i18n/en.js"></script>
 <script src="lib/i18n/ar.js"></script>
 <script src="lib/i18n/zh.js"></script>
@@ -602,5 +631,6 @@
 <script src="shim.js"></script>
 <script src="wallet-engine.js"></script>
 <script src="app.js"></script>
+<script src="lib/feature-requests.js"></script>
 </body>
 </html>

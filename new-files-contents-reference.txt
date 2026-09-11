@@ -1,0 +1,425 @@
+diff --git a/feature-requests-api.js b/feature-requests-api.js
+new file
+--- new file: feature-requests-api.js ---
+// feature-requests-api.js
+// Minimal, dependency-free backend for the public "feature request board"
+// (see lib/feature-requests.js for the client side). No accounts, no
+// auth -- anyone can post or upvote, same as a public suggestion box.
+// Storage is a flat JSON file rather than a real database: traffic here
+// is expected to be light, and this keeps the whole feature to two small
+// files with nothing new to provision.
+//
+// IMPORTANT: on Railway (or most hosts) the filesystem a service writes
+// to is wiped on every redeploy unless a persistent volume is mounted at
+// DATA_DIR. Until one is attached, requests/upvotes will reset whenever
+// this service redeploys. Set the DATA_DIR env var to a mounted volume's
+// path to persist across deploys.
+
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const DATA_FILE = path.join(DATA_DIR, "feature-requests.json");
+
+const MAX_TITLE_LEN = 140;
+const MAX_DESC_LEN = 2000;
+const MAX_REQUESTS_STORED = 2000;
+
+// Very small per-IP throttle to deter spam -- not a real rate limiter,
+// just enough friction to stop a naive script. Resets on redeploy along
+// with everything else in memory.
+const submitTimestamps = new Map(); // ip -> [timestamps]
+const upvoteTimestamps = new Map();
+const SUBMIT_LIMIT = 5;
+const UPVOTE_LIMIT = 30;
+const WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function withinLimit(map, ip, limit) {
+  const now = Date.now();
+  const times = (map.get(ip) || []).filter((t) => now - t < WINDOW_MS);
+  if (times.length >= limit) {
+    map.set(ip, times);
+    return false;
+  }
+  times.push(now);
+  map.set(ip, times);
+  return true;
+}
+
+function loadRequests() {
+  try {
+    const raw = fs.readFileSync(DATA_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+let requests = loadRequests();
+
+function persist() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(requests));
+  } catch (e) {
+    console.warn("Could not persist feature-requests.json:", e.message);
+  }
+}
+
+function sanitize(str, maxLen) {
+  return String(str || "")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // strip control chars, keep \t\n\r
+    .trim()
+    .slice(0, maxLen);
+}
+
+function clientIp(req) {
+  const fwd = req.headers["x-forwarded-for"];
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.socket.remoteAddress || "unknown";
+}
+
+function readJsonBody(req, maxBytes, cb) {
+  let body = "";
+  let tooLarge = false;
+  req.on("data", (chunk) => {
+    body += chunk;
+    if (body.length > maxBytes) {
+      tooLarge = true;
+      req.destroy();
+    }
+  });
+  req.on("end", () => {
+    if (tooLarge) return cb(new Error("payload too large"));
+    try {
+      cb(null, body ? JSON.parse(body) : {});
+    } catch (e) {
+      cb(new Error("invalid JSON"));
+    }
+  });
+  req.on("error", (e) => cb(e));
+}
+
+function sendJson(res, status, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
+// Returns true if the request was handled here (caller should not fall
+// through to the static file handler); false otherwise.
+function handleFeatureRequestsApi(req, res) {
+  const url = req.url.split("?")[0];
+
+  if (url === "/api/feature-requests" && req.method === "GET") {
+    sendJson(res, 200, { requests });
+    return true;
+  }
+
+  if (url === "/api/feature-requests" && req.method === "POST") {
+    const ip = clientIp(req);
+    if (!withinLimit(submitTimestamps, ip, SUBMIT_LIMIT)) {
+      sendJson(res, 429, { error: "Too many requests posted recently. Try again later." });
+      return true;
+    }
+    readJsonBody(req, 10 * 1024, (err, data) => {
+      if (err) {
+        sendJson(res, 400, { error: err.message });
+        return;
+      }
+      const title = sanitize(data.title, MAX_TITLE_LEN);
+      const description = sanitize(data.description, MAX_DESC_LEN);
+      if (!title) {
+        sendJson(res, 400, { error: "Title is required." });
+        return;
+      }
+      const entry = {
+        id: crypto.randomUUID(),
+        title,
+        description,
+        votes: 0,
+        createdAt: Date.now(),
+      };
+      requests.push(entry);
+      if (requests.length > MAX_REQUESTS_STORED) {
+        // Drop the oldest, lowest-signal entries first rather than
+        // growing the file forever.
+        requests.sort((a, b) => b.votes - a.votes || b.createdAt - a.createdAt);
+        requests = requests.slice(0, MAX_REQUESTS_STORED);
+      }
+      persist();
+      sendJson(res, 201, entry);
+    });
+    return true;
+  }
+
+  const upvoteMatch = url.match(/^\/api\/feature-requests\/([^/]+)\/upvote$/);
+  if (upvoteMatch && req.method === "POST") {
+    const ip = clientIp(req);
+    if (!withinLimit(upvoteTimestamps, ip, UPVOTE_LIMIT)) {
+      sendJson(res, 429, { error: "Too many upvotes recently. Try again later." });
+      return true;
+    }
+    const id = upvoteMatch[1];
+    const entry = requests.find((r) => r.id === id);
+    if (!entry) {
+      sendJson(res, 404, { error: "Not found." });
+      return true;
+    }
+    entry.votes += 1;
+    persist();
+    sendJson(res, 200, entry);
+    return true;
+  }
+
+  return false;
+}
+
+module.exports = { handleFeatureRequestsApi };
+
+--- new file: feature-requests.js ---
+// lib/feature-requests.js
+// A small public "feature request board" -- lets any user post an idea or
+// complaint and upvote other people's, so the ones people actually want
+// float to the top. Backed by a couple of tiny JSON endpoints in server.js
+// (see api/feature-requests.js on the server side); nothing here touches
+// wallet keys, balances, or any chain -- it's just a feedback list.
+//
+// Loaded after app.js, so $()/showScreen()/TM_I18N are already available.
+
+const TM_FEEDBACK_UPVOTED_KEY = "tm_feedback_upvoted_ids";
+
+function tmFeedbackGetUpvoted() {
+  try {
+    const raw = localStorage.getItem(TM_FEEDBACK_UPVOTED_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function tmFeedbackMarkUpvoted(id) {
+  try {
+    const ids = tmFeedbackGetUpvoted();
+    if (!ids.includes(id)) {
+      ids.push(id);
+      localStorage.setItem(TM_FEEDBACK_UPVOTED_KEY, JSON.stringify(ids));
+    }
+  } catch (e) {
+    // localStorage unavailable (private mode, etc.) -- upvote still
+    // happens server-side, the button just won't remember it was clicked.
+  }
+}
+
+async function tmFeedbackFetchList() {
+  const res = await fetch("/api/feature-requests");
+  if (!res.ok) throw new Error("request failed: " + res.status);
+  const data = await res.json();
+  return Array.isArray(data.requests) ? data.requests : [];
+}
+
+async function tmFeedbackSubmit(title, description) {
+  const res = await fetch("/api/feature-requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, description }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || "request failed: " + res.status);
+  }
+  return res.json();
+}
+
+async function tmFeedbackUpvote(id) {
+  const res = await fetch(`/api/feature-requests/${encodeURIComponent(id)}/upvote`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("request failed: " + res.status);
+  return res.json();
+}
+
+function tmFeedbackRenderList(requests) {
+  const root = $("feedback-list");
+  root.innerHTML = "";
+  $("feedback-empty").classList.toggle("hidden", requests.length > 0);
+  const upvoted = tmFeedbackGetUpvoted();
+
+  requests
+    .slice()
+    .sort((a, b) => (b.votes - a.votes) || (b.createdAt - a.createdAt))
+    .forEach((r) => {
+      const row = document.createElement("div");
+      row.className = "activity-entry";
+
+      const body = document.createElement("div");
+      body.className = "activity-body";
+      const main = document.createElement("div");
+      main.className = "activity-main";
+      main.textContent = r.title;
+      body.appendChild(main);
+      if (r.description) {
+        const sub = document.createElement("div");
+        sub.className = "activity-sub";
+        sub.textContent = r.description;
+        body.appendChild(sub);
+      }
+
+      const voteWrap = document.createElement("div");
+      voteWrap.style.display = "flex";
+      voteWrap.style.flexDirection = "column";
+      voteWrap.style.alignItems = "center";
+      voteWrap.style.gap = "2px";
+
+      const alreadyUpvoted = upvoted.includes(r.id);
+      const voteBtn = document.createElement("button");
+      voteBtn.className = "secondary small";
+      voteBtn.textContent = `▲ ${r.votes}`;
+      voteBtn.title = TM_I18N.t(alreadyUpvoted ? "feedback.upvotedBtn" : "feedback.upvoteBtn");
+      voteBtn.disabled = alreadyUpvoted;
+      voteBtn.onclick = async () => {
+        voteBtn.disabled = true;
+        try {
+          const updated = await tmFeedbackUpvote(r.id);
+          tmFeedbackMarkUpvoted(r.id);
+          voteBtn.textContent = `▲ ${updated.votes}`;
+        } catch (e) {
+          voteBtn.disabled = false;
+        }
+      };
+      voteWrap.appendChild(voteBtn);
+
+      row.appendChild(body);
+      row.appendChild(voteWrap);
+      root.appendChild(row);
+    });
+}
+
+async function tmFeedbackRefresh() {
+  hideError("feedback-error");
+  try {
+    const requests = await tmFeedbackFetchList();
+    tmFeedbackRenderList(requests);
+  } catch (e) {
+    showError("feedback-error", TM_I18N.t("feedback.loadError"));
+  }
+}
+
+function openFeedback() {
+  showScreen("screen-feedback");
+  $("feedback-status").classList.add("hidden");
+  tmFeedbackRefresh();
+}
+
+$("btn-goto-feedback").addEventListener("click", openFeedback);
+
+$("btn-feedback-submit").addEventListener("click", async () => {
+  hideError("feedback-error");
+  $("feedback-status").classList.add("hidden");
+  const title = $("feedback-title-input").value.trim();
+  const description = $("feedback-desc-input").value.trim();
+  if (!title) {
+    showError("feedback-error", TM_I18N.t("feedback.titleRequired"));
+    return;
+  }
+  $("btn-feedback-submit").disabled = true;
+  $("feedback-status").textContent = TM_I18N.t("feedback.submittingStatus");
+  $("feedback-status").classList.remove("hidden");
+  try {
+    const created = await tmFeedbackSubmit(title, description);
+    tmFeedbackMarkUpvoted(created.id); // can't un-vote your own post
+    $("feedback-title-input").value = "";
+    $("feedback-desc-input").value = "";
+    $("feedback-status").textContent = TM_I18N.t("feedback.submittedStatus");
+    await tmFeedbackRefresh();
+  } catch (e) {
+    $("feedback-status").classList.add("hidden");
+    showError("feedback-error", e.message);
+  } finally {
+    $("btn-feedback-submit").disabled = false;
+  }
+});
+
+--- new file: sell-config.js ---
+// lib/sell-config.js
+// "Sell crypto for cash" off-ramp integration, via MoonPay's hosted sell
+// widget -- the mirror of lib/buy-config.js's on-ramp integration. Load
+// buy-config.js before this file (see index.html); this reuses its
+// publishable key and its NETWORK_MOONPAY_CURRENCY_CODE mapping rather than
+// duplicating either.
+//
+// WHY THIS OPENS A NEW TAB INSTEAD OF EMBEDDING THE WIDGET
+// Same reasons as Buy: this app's CSP doesn't allow loading a third-party
+// script, and (for the Chrome extension build of this codebase) the Web
+// Store listing was submitted on the basis that nothing here fetches
+// remote code at runtime. See lib/buy-config.js for the full explanation.
+//
+// HOW SELLING ACTUALLY WORKS HERE
+// MoonPay's sell widget quotes a cash payout for an amount of crypto, then
+// gives you a MoonPay-controlled deposit address to send that crypto to --
+// once it arrives on-chain, MoonPay converts it and pays out to your linked
+// bank account/card. This wallet can't automate that on-chain send for you
+// (doing so would mean either shipping a secret key client-side to
+// pre-fill/sign the widget URL, or silently sending funds off-device
+// without the user reviewing the destination first -- both are worse than
+// one extra manual step): the widget shows you the deposit address and
+// amount, and you paste that address into this wallet's own Send screen
+// yourself, the same way you would send to any other address.
+//
+// SANDBOX VS PRODUCTION DOMAIN
+// Unlike a lot of hosted widgets, MoonPay's sell widget lives on a
+// different hostname per environment -- sell-sandbox.moonpay.com for a
+// pk_test_ key, sell.moonpay.com for a pk_live_ key (confirmed against
+// MoonPay's own "Off-ramp: URL integration" docs, Sept 2026). Picking the
+// domain from the key prefix means this keeps working automatically the
+// day the placeholder pk_test_ key in buy-config.js is swapped for a real
+// pk_live_ one -- nothing here needs to change by hand.
+const MOONPAY_SELL_WIDGET_BASE_URL_SANDBOX = "https://sell-sandbox.moonpay.com/";
+const MOONPAY_SELL_WIDGET_BASE_URL_LIVE = "https://sell.moonpay.com/";
+
+function moonpaySellApiKey() {
+  return (self.TM_BUY_CONFIG && self.TM_BUY_CONFIG.MOONPAY_PUBLISHABLE_API_KEY) || "";
+}
+
+function isSellConfigured() {
+  return !!moonpaySellApiKey();
+}
+
+function sellWidgetBaseUrl(apiKey) {
+  return apiKey.startsWith("pk_live_")
+    ? MOONPAY_SELL_WIDGET_BASE_URL_LIVE
+    : MOONPAY_SELL_WIDGET_BASE_URL_SANDBOX;
+}
+
+// Builds the URL to open in a new tab for the given network key (see
+// lib/networks.js) and the wallet's current display currency (see app.js'
+// currentCurrency, e.g. "usd"). Throws if no publishable key has been
+// configured yet.
+function buildSellUrl(networkKey, quoteCurrency) {
+  const apiKey = moonpaySellApiKey();
+  if (!apiKey) {
+    throw new Error(
+      "Sell isn't set up yet -- add your MoonPay publishable API key to lib/buy-config.js first (Sell reuses the same key -- see the comment at the top of that file)."
+    );
+  }
+  const params = new URLSearchParams();
+  params.set("apiKey", apiKey);
+  const baseCurrencyCode =
+    self.TM_BUY_CONFIG && self.TM_BUY_CONFIG.NETWORK_MOONPAY_CURRENCY_CODE[networkKey];
+  if (baseCurrencyCode) params.set("baseCurrencyCode", baseCurrencyCode);
+  if (quoteCurrency) params.set("quoteCurrencyCode", quoteCurrency);
+  return `${sellWidgetBaseUrl(apiKey)}?${params.toString()}`;
+}
+
+if (typeof self !== "undefined") {
+  self.TM_SELL_CONFIG = {
+    isSellConfigured,
+    buildSellUrl,
+  };
+}

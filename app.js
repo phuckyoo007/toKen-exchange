@@ -334,6 +334,7 @@ $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScre
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
 $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
+$("btn-goto-sell").addEventListener("click", () => { hideError("sell-error"); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
 
 // ---------------------------------------------------------------- TOKENS
@@ -662,6 +663,17 @@ $("btn-buy-open").addEventListener("click", () => {
     chrome.tabs.create({ url });
   } catch (e) {
     showError("buy-error", e.message);
+  }
+});
+
+// ---------------------------------------------------------------- SELL
+$("btn-sell-open").addEventListener("click", () => {
+  hideError("sell-error");
+  try {
+    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
+    chrome.tabs.create({ url });
+  } catch (e) {
+    showError("sell-error", e.message);
   }
 });
 

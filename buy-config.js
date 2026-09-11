@@ -98,5 +98,10 @@ if (typeof self !== "undefined") {
     isBuyConfigured,
     buildBuyUrl,
     NETWORK_MOONPAY_CURRENCY_CODE,
+    // Exposed so lib/sell-config.js can reuse the same publishable key --
+    // MoonPay issues one key per account that works for both the on-ramp
+    // (buy) and off-ramp (sell) widgets, so there's no reason to make the
+    // developer paste it in twice and risk the two drifting apart.
+    MOONPAY_PUBLISHABLE_API_KEY,
   };
 }
