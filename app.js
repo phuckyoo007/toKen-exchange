@@ -1171,6 +1171,26 @@ function activateSplashHome() {
   });
 }
 
+// Before a wallet exists (or while still locked), there's no real
+// balance/activity/send data yet for the tab bar to route into -- but the
+// splash art is still nicer to land on than an instant jump to a plain
+// form. This keeps the same branded bar up as the landing view without
+// the auto-fade-after-900ms behavior; every tab (not just Home) simply
+// reveals whatever's underneath (onboarding or unlock), since that's the
+// only place to go from here.
+let splashLandingActivated = false;
+function activateSplashLanding() {
+if (splashHomeActivated || splashLandingActivated) return;
+splashLandingActivated = true;
+clearSplashAutoTimers();
+const el = $("splash-screen");
+if (el) el.classList.add("splash-home");
+["splash-tab-home", "splash-tab-assets", "splash-tab-activity", "splash-tab-send"].forEach((id) => {
+const tab = $(id);
+if (tab) tab.addEventListener("click", () => hideSplash());
+});
+}
+
 // ---------------------------------------------------------------- ACTIVITY
 // A small, honest local log -- not a real blockchain history (that would
 // need an explorer/indexer API and its own set of tradeoffs), just a
