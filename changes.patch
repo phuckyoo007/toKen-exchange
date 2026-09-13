@@ -1,47 +1,616 @@
-diff --git a/app.css b/app.css
-index a4fcad7..51e8d4d 100644
---- a/app.css
-+++ b/app.css
-@@ -793,22 +793,29 @@ body.tm-web-wallet #app {
+--- app.css ---
+--- /dev/fd/63	2026-09-13 08:38:04.999556538 +0000
++++ app.css	2026-09-13 08:37:27.349147358 +0000
+@@ -87,14 +87,13 @@
+ 
+ /* ---------------- full-bleed arcade-cabinet scene ----------------
+    A fixed backdrop -- the user's own AI-generated "jackpot" reference
+-   art -- sitting behind the whole popup on every screen, standing in
+-   for the header-only SVG logo's cabinet. A dark scrim gradient is
+-   baked into the same layer: strong enough near the top to reveal the
+-   art's own slot-machine assembly, then quickly opaque enough that
+-   real screen content (headings, inputs, buttons) stays fully
+-   readable over it lower down. #app itself is transparent so this
+-   shows through; individual cards/inputs keep their own solid
+-   dark fills for contrast. */
++   art -- sitting behind the whole popup on every screen. A dark scrim
++   gradient is baked into the same layer: strong enough near the top to
++   reveal the art's own slot-machine assembly (blending into the header
++   logo above it), then quickly opaque enough that real screen content
++   (headings, inputs, buttons) stays fully readable over it lower down.
++   #app itself is transparent so this shows through; individual
++   cards/inputs keep their own solid dark fills for contrast. */
+ #bg-scene {
+   position: fixed;
+   inset: 0;
+@@ -122,8 +121,12 @@
+ /* ---------------- splash screen ----------------
+    Shown for a brief moment every time the popup opens, before the
+    onboarding/unlock/main screen underneath -- the MetaMask-fox-style
+-   "brand moment" the user asked for. Sits above #app and fades out
+-   once the real starting screen is ready. */
++   "brand moment" the user asked for. Sits above #app and comes down
++   once the real starting screen is ready.
++   Deliberately NOT animated (no opacity transition): a fade would pass
++   through a half-see-through frame first, which is exactly the
++   "translucent, does nothing" glitch reported when tapping a tab
++   before a wallet exists. A hard cut avoids that state entirely. */
+ #splash-screen {
+   position: fixed;
+   inset: 0;
+@@ -135,7 +138,6 @@
+   display: flex;
+   align-items: center;
+   justify-content: center;
+-  transition: opacity 0.4s ease;
+ }
+ #splash-screen img {
+   position: absolute;
+@@ -169,6 +171,9 @@
+   opacity: 0;
+   pointer-events: none;
+ }
++/* Only relevant to the framed web-wallet layout (see below) -- hidden
++   by default so it has no effect in the extension popup context. */
++#splash-tagline { display: none; }
+ #splash-spinner {
+   position: absolute;
+   bottom: 100px;
+@@ -296,19 +301,17 @@
+ }
+ 
+ /* ---------------- header ----------------
+-   The header no longer draws its own logo art: the full-bleed
+-   #bg-scene behind it already shows the "TOKEN EXCHANGE" slot-machine
+-   cabinet at the very top of every screen (it's the top of the same
+-   reference image), so #brand-logo/#app-header just reserve the
+-   matching amount of vertical space and let the network badge sit
+-   just under the cabinet, over the scene. */
++   #app is transparent (see #app above), so the backdrop's own baked-in
++   "TOKEN EXCHANGE" title and coin reels show through the header,
++   uninterrupted -- the circular badge logo now lives down in the
++   footer instead (see below), so this just reserves enough height to
++   reveal that art before real screen content starts. */
+ #app-header {
+   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
+   min-height: 246px;
+   padding: 9px 12px 10px;
+   flex-shrink: 0;
+ }
+-#brand-logo { display: none; }
+ #network-badge {
+   font-family: var(--font-body);
+   font-weight: 600;
+@@ -339,14 +342,25 @@
+ }
+ .hidden { display: none !important; }
+ 
+-/* ---------------- footer ---------------- */
++/* ---------------- footer ----------------
++   The circular "TOKEN EXCHANGE" badge (the same image used as the app
++   icon) now sits down here at the bottom of every screen instead of up
++   in the header, where it fought with the backdrop's own baked-in
++   title. Small and out of the way of the actual "non-custodial"
++   messaging it sits above. */
+ #app-footer {
+-  display: flex; align-items: center; justify-content: center; gap: 6px;
+-  padding: 7px 16px; border-top: 1px solid var(--line);
++  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
++  padding: 10px 16px 12px; border-top: 1px solid var(--line);
+   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
+   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
+   flex-shrink: 0;
+ }
++#app-footer #brand-logo {
++  display: block; width: 56px; height: 56px;
++  border-radius: 50%;
++  box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(221, 172, 77, 0.25);
++}
++#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
+ #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
+ 
+ h2 {
+@@ -455,6 +469,22 @@
+   display: flex; align-items: center; gap: 8px;
+ }
+ 
++/* ---------------- send confirm / cancel-window card ----------------
++   Shown after "Send" is tapped and before the transaction actually goes
++   out, while the (configurable, cancellable) delay counts down. Sits
++   right where the Send button was, so nothing about the layout jumps. */
++.send-confirm-card {
++  margin-top: 10px; padding: 12px; border-radius: 10px;
++  background: var(--bg-inset); border: 1px solid var(--line-strong);
++  display: flex; flex-direction: column; gap: 8px;
++}
++.send-confirm-card .warn,
++.send-confirm-card .error { margin: 0; }
++.send-confirm-summary {
++  margin: 0; font-size: 13px; color: var(--text);
++  font-family: var(--font-mono); word-break: break-all;
++}
++
+ /* The one shared "you're waiting on something" cue (see coinSpinnerHtml()
+    in popup.js) -- small enough to sit inline next to a loading label
+    wherever one is needed, reusing the same image and spin as the startup
+@@ -720,8 +750,9 @@
+ .support-input-row button { flex-shrink: 0; }
+ 
+ /* ---------------- language picker ---------------- */
+-.language-picker { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
++.language-picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
+ .language-picker label { margin: 0; flex-shrink: 0; }
++.language-picker > p.muted { flex: 1 0 100%; margin: 2px 0 0; font-size: 11px; line-height: 1.4; }
+ .language-picker select {
+   width: auto; min-width: 0; flex: 1; max-width: 62%;
+   border-radius: 999px; padding: 9px 16px;
+@@ -792,28 +823,46 @@
+   overflow: hidden;
    box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
  }
- /* The extension pins the splash to the popup window's own top-left corner
--   (position: fixed; inset: 0) since the popup window IS 360x600. Here it's
--   repositioned to sit right on top of the #app card instead of the whole
--   browser viewport. */
-+   (position: fixed; inset: 0) since the popup window IS 360x600. On the
-+   standalone web wallet this used to sit right on top of the #app card
-+   (a small 390x640 rounded rectangle) instead, at any window size wider
-+   than 460px -- leaving visible page background on either side, like a
-+   phone screenshot floating on a desk. Now the splash's central image
-+   always fills the entire browser viewport edge-to-edge, on any screen
-+   size, rather than being boxed into that card -- only the splash itself
-+   changes here; the rest of the app (buttons, forms, lists) keeps its
-+   narrower card layout below, since that content is laid out for a
-+   phone-width column and would look broken stretched edge-to-edge on a
-+   wide desktop window. */
+-/* The extension pins the splash to the popup window's own top-left corner
+-   (position: fixed; inset: 0) since the popup window IS 360x600. On the
+-   standalone web wallet this used to sit right on top of the #app card
+-   (a small 390x640 rounded rectangle) instead, at any window size wider
+-   than 460px -- leaving visible page background on either side, like a
+-   phone screenshot floating on a desk. Now the splash's central image
+-   always fills the entire browser viewport edge-to-edge, on any screen
+-   size, rather than being boxed into that card -- only the splash itself
+-   changes here; the rest of the app (buttons, forms, lists) keeps its
+-   narrower card layout below, since that content is laid out for a
+-   phone-width column and would look broken stretched edge-to-edge on a
+-   wide desktop window. */
++/* Back to the framed-card look on a wide window: the splash sits right
++   on top of where the #app card will be (same 390x640 rounded
++   rectangle, gold-bordered like a phone screenshot floating on a dark
++   desk) instead of stretching edge-to-edge, with the "non-custodial"
++   tagline floating just below it on the page background. On an actual
++   phone-width screen (the media query below) it goes back to filling
++   the whole viewport, same as #app does there -- there's no "desk"
++   around it to show on a real phone screen anyway. */
  body.tm-web-wallet #splash-screen {
--  position: absolute;
--  inset: auto;
--  top: 32px;
--  left: 50%;
--  transform: translateX(-50%);
--  width: 390px;
--  height: 640px;
--  max-width: calc(100% - 24px);
--  border-radius: 20px;
-+  position: fixed;
-+  inset: 0;
-+  top: 0;
-+  left: 0;
-+  transform: none;
-+  width: 100%;
-+  height: 100vh;
-+  max-width: 100%;
-+  border-radius: 0;
+   position: fixed;
+-  inset: 0;
+-  top: 0;
+-  left: 0;
+-  transform: none;
+-  width: 100%;
+-  height: 100vh;
+-  max-width: 100%;
+-  border-radius: 0;
++  top: 50%;
++  left: 50%;
++  right: auto;
++  bottom: auto;
++  transform: translate(-50%, -50%);
++  width: 390px;
++  height: 640px;
++  max-width: calc(100% - 24px);
++  max-height: calc(100vh - 24px);
++  border-radius: 20px;
++  border: 2px solid var(--gold-deep);
++  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
++}
++body.tm-web-wallet #splash-tagline {
++  display: flex; align-items: center; justify-content: center; gap: 6px;
++  position: fixed; z-index: 999;
++  left: 50%; top: calc(50% + 320px + 18px);
++  transform: translateX(-50%);
++  color: var(--text-faint); font-size: 12px; letter-spacing: 0.02em;
++  white-space: nowrap;
++}
++body.tm-web-wallet #splash-tagline .footer-lock { color: var(--gold-deep); font-size: 12px; }
++@media (max-width: 460px) {
++  body.tm-web-wallet #splash-screen {
++    top: 0; left: 0; transform: none;
++    width: 100%; height: 100%;
++    max-width: 100%; max-height: 100%;
++    border-radius: 0; border: none;
++  }
++  body.tm-web-wallet #splash-tagline { display: none; }
  }
  @media (max-width: 460px) {
    body.tm-web-wallet { padding: 0; }
-   body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
--  body.tm-web-wallet #splash-screen { top: 0; width: 100%; height: 100vh; max-width: 100%; border-radius: 0; }
+--- app.js ---
+--- /dev/fd/63	2026-09-13 08:38:05.001149596 +0000
++++ app.js	2026-09-13 08:35:47.437141419 +0000
+@@ -749,6 +749,96 @@
+   $("send-token-address").classList.toggle("hidden", e.target.value !== "token");
+ });
+ 
++// Send delay / cancel window -- see Settings. Every send made from this
++// screen is held for this many seconds (with a visible countdown and a
++// Cancel button) before it's actually signed and broadcast, so a
++// fat-fingered address or a send you change your mind about can still be
++// stopped. It's a UI-level safety net for sends made *through this app*
++// only -- it can't do anything about a key or recovery phrase that's
++// already been exposed outside Token Exchange, since anyone holding
++// those can sign and broadcast directly, bypassing this screen entirely.
++const TM_SEND_DELAY_KEY = "tm_send_delay_seconds";
++let currentSendDelaySeconds = 30;
++let pendingSendTimer = null; // { intervalId, secondsLeft, cancelled }
++
++function loadSendDelay() {
++  return new Promise((resolve) => {
++    chrome.storage.local.get([TM_SEND_DELAY_KEY], (res) => {
++      const stored = res[TM_SEND_DELAY_KEY];
++      currentSendDelaySeconds = typeof stored === "number" ? stored : 30;
++      resolve();
++    });
++  });
++}
++
++function populateSendDelaySelect() {
++  const sel = $("send-delay-select");
++  sel.value = String(currentSendDelaySeconds);
++  sel.addEventListener("change", (e) => {
++    currentSendDelaySeconds = Number(e.target.value) || 0;
++    chrome.storage.local.set({ [TM_SEND_DELAY_KEY]: currentSendDelaySeconds });
++  });
++}
++
++// "Known address" = already in the address book, or already sent to from
++// this device -- used only to show a heads-up in the confirm step, never
++// to block anything.
++async function isKnownAddress(address) {
++  const target = address.toLowerCase();
++  const contacts = await getContacts();
++  if (contacts.some((c) => (c.address || "").toLowerCase() === target)) return true;
++  const activity = await new Promise((resolve) => {
++    chrome.storage.local.get([TM_ACTIVITY_KEY], (res) => resolve(Array.isArray(res[TM_ACTIVITY_KEY]) ? res[TM_ACTIVITY_KEY] : []));
++  });
++  return activity.some((a) => (a.to || "").toLowerCase() === target);
++}
++
++function resetSendConfirmUi() {
++  if (pendingSendTimer) {
++    clearInterval(pendingSendTimer.intervalId);
++    pendingSendTimer = null;
++  }
++  $("send-confirm-card").classList.add("hidden");
++  $("send-confirm-new-address-warning").classList.add("hidden");
++  $("btn-send-submit").disabled = false;
++  $("send-to").disabled = false;
++  $("send-amount").disabled = false;
++  $("send-asset-select").disabled = false;
++}
++
++// Cancels any in-progress countdown if the user navigates away from the
++// Send screen before it fires (back button, a nav icon, anything else) --
++// leaving early should never leave a send silently ticking down unseen.
++const _origShowScreenForSend = showScreen;
++showScreen = function (id) {
++  if (pendingSendTimer && id !== "screen-send") resetSendConfirmUi();
++  return _origShowScreenForSend(id);
++};
++
++async function executeSend({ to, amountStr, isNative, tokenAddress }) {
++  let res;
++  if (isNative) {
++    const amountWei = ethers.utils.parseEther(amountStr || "0");
++    res = await sendMsg("TM_SEND_NATIVE", { to, amountWei: amountWei.toString() });
++  } else {
++    const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
++    const amountWei = ethers.utils.parseUnits(amountStr || "0", info.decimals);
++    res = await sendMsg("TM_SEND_TOKEN", { to, tokenAddress, amountWei: amountWei.toString() });
++  }
++  $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
++  $("send-status").classList.remove("hidden");
++  const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
++  recordActivity({ amount: amountStr, asset: sentAsset, to, txHash: res.txHash });
++  await refreshBalance();
++}
++
++$("btn-send-cancel").addEventListener("click", () => {
++  resetSendConfirmUi();
++  hideError("send-error");
++  $("send-status").textContent = TM_I18N.t("send.cancelledStatus");
++  $("send-status").classList.remove("hidden");
++});
++
+ $("btn-send-submit").addEventListener("click", async () => {
+   hideError("send-error");
+   $("send-status").classList.add("hidden");
+@@ -756,22 +846,45 @@
+     const to = $("send-to").value.trim();
+     const amountStr = $("send-amount").value.trim();
+     if (!ethers.utils.isAddress(to)) throw new Error(TM_I18N.t("send.invalidRecipient"));
+-    let res;
+-    if ($("send-asset-select").value === "native") {
+-      const amountWei = ethers.utils.parseEther(amountStr || "0");
+-      res = await sendMsg("TM_SEND_NATIVE", { to, amountWei: amountWei.toString() });
+-    } else {
+-      const tokenAddress = $("send-token-address").value.trim();
+-      if (!ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
+-      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
+-      const amountWei = ethers.utils.parseUnits(amountStr || "0", info.decimals);
+-      res = await sendMsg("TM_SEND_TOKEN", { to, tokenAddress, amountWei: amountWei.toString() });
++    const isNative = $("send-asset-select").value === "native";
++    const tokenAddress = isNative ? null : $("send-token-address").value.trim();
++    if (!isNative && !ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
++
++    if (!currentSendDelaySeconds) {
++      // Delay turned off in Settings -- send immediately, same as before.
++      await executeSend({ to, amountStr, isNative, tokenAddress });
++      return;
+     }
+-    $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
+-    $("send-status").classList.remove("hidden");
+-    const sentAsset = $("send-asset-select").value === "native" ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
+-    recordActivity({ amount: amountStr, asset: sentAsset, to, txHash: res.txHash });
+-    await refreshBalance();
++
++    const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
++    const known = await isKnownAddress(to);
++
++    $("btn-send-submit").disabled = true;
++    $("send-to").disabled = true;
++    $("send-amount").disabled = true;
++    $("send-asset-select").disabled = true;
++    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to });
++    $("send-confirm-new-address-warning").classList.toggle("hidden", known);
++    $("send-confirm-card").classList.remove("hidden");
++
++    let secondsLeft = currentSendDelaySeconds;
++    $("send-confirm-intro").textContent = TM_I18N.t("send.confirmIntro", { seconds: secondsLeft });
++    const intervalId = setInterval(async () => {
++      secondsLeft -= 1;
++      if (secondsLeft <= 0) {
++        clearInterval(intervalId);
++        pendingSendTimer = null;
++        resetSendConfirmUi();
++        try {
++          await executeSend({ to, amountStr, isNative, tokenAddress });
++        } catch (e) {
++          showError("send-error", e.message);
++        }
++        return;
++      }
++      $("send-confirm-intro").textContent = TM_I18N.t("send.confirmIntro", { seconds: secondsLeft });
++    }, 1000);
++    pendingSendTimer = { intervalId };
+   } catch (e) {
+     showError("send-error", e.message);
+   }
+@@ -1144,6 +1257,8 @@
+   el.dataset.hidden = "1";
+   clearSplashAutoTimers();
+   el.classList.add("splash-hide");
++  const tagline = $("splash-tagline");
++  if (tagline) tagline.remove();
+   setTimeout(() => el.remove(), 450);
  }
+ // Safety net: never let a startup error leave the splash covering the
+@@ -1462,6 +1577,8 @@
+   await loadWatchlist();
+   await loadCurrency();
+   populateCurrencySelect();
++  await loadSendDelay();
++  populateSendDelaySelect();
+ 
+   const params = new URLSearchParams(location.search);
+   if (params.get("mode") === "approve") {
+--- en.js ---
+--- /dev/fd/63	2026-09-13 08:38:05.005149596 +0000
++++ en.js	2026-09-13 07:43:54.976956405 +0000
+@@ -121,6 +121,11 @@
+     "send.invalidRecipient": "Enter a valid recipient address.",
+     "send.invalidTokenAddress": "Enter a valid token contract address.",
+     "send.sentStatus": "Sent! Tx hash: {txHash}",
++    "send.confirmIntro": "Sending in {seconds}s -- you can still cancel.",
++    "send.confirmSummary": "{amount} {asset} to {to}",
++    "send.newAddressWarning": "You haven't sent to this address from this device before -- double check it's correct.",
++    "send.cancelBtn": "Cancel send",
++    "send.cancelledStatus": "Send cancelled -- nothing was sent.",
+ 
+     "swap.unsupportedWarning": "Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings → Networks first.",
+     "swap.fromLabel": "From",
+@@ -147,6 +152,12 @@
+     "settings.viewSeedBtn": "View recovery phrase",
+     "settings.helpBtn": "Help & support",
+     "settings.feedbackBtn": "Request a feature",
++    "settings.sendDelayLabel": "Send delay (cancel window)",
++    "settings.sendDelayHint": "Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.",
++    "settings.sendDelayOff": "Off (send immediately)",
++    "settings.sendDelay15": "15 seconds",
++    "settings.sendDelay30": "30 seconds (recommended)",
++    "settings.sendDelay60": "60 seconds",
+     "settings.lockBtn": "Lock wallet",
+     "settings.resetBtn": "Reset wallet",
+ 
+--- index.html ---
+--- /dev/fd/63	2026-09-13 08:38:05.009189008 +0000
++++ index.html	2026-09-13 08:35:40.461141004 +0000
+@@ -18,7 +18,10 @@
+ <body class="tm-web-wallet">
+ <div id="bg-scene"></div>
+ <div id="splash-screen">
+-  <img src="img/splash.jpg" alt="Token Exchange" />
++  <picture>
++    <source srcset="img/splash-light.jpg" media="(prefers-color-scheme: light)" />
++    <img src="img/splash.jpg" alt="Token Exchange" />
++  </picture>
+   <div id="splash-brand">TOKEN EXCHANGE</div>
+   <div id="splash-spinner"><img src="img/spinner-coin.png" alt="" /></div>
+   <div id="splash-tabbar">
+@@ -40,118 +43,13 @@
+     </button>
+   </div>
+ </div>
++<div id="splash-tagline">
++  <span class="footer-lock">&#128274;</span>
++  <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
++</div>
+ <div id="app">
+ 
+   <header id="app-header">
+-    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange">
+-      <defs>
+-        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
+-          <stop offset="0%" stop-color="#fff3c4"/>
+-          <stop offset="30%" stop-color="#f4c430"/>
+-          <stop offset="65%" stop-color="#caa02a"/>
+-          <stop offset="100%" stop-color="#8a6a10"/>
+-        </linearGradient>
+-        <linearGradient id="gGoldEdge" x1="0" y1="0" x2="0" y2="1">
+-          <stop offset="0%" stop-color="#fffbe6"/>
+-          <stop offset="100%" stop-color="#6b4e08"/>
+-        </linearGradient>
+-        <radialGradient id="gCoinB" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#ffb74d"/>
+-          <stop offset="100%" stop-color="#d9770a"/>
+-        </radialGradient>
+-        <radialGradient id="gCoinE" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#c7d3ee"/>
+-          <stop offset="100%" stop-color="#5f6ea3"/>
+-        </radialGradient>
+-        <radialGradient id="gCoinT" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#7fe0b8"/>
+-          <stop offset="100%" stop-color="#1a9c74"/>
+-        </radialGradient>
+-        <radialGradient id="gLeverPink" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#ffc2e2"/>
+-          <stop offset="50%" stop-color="#ff4fa3"/>
+-          <stop offset="100%" stop-color="#c2136b"/>
+-        </radialGradient>
+-        <linearGradient id="gLeverStem" x1="0" y1="0" x2="0" y2="1">
+-          <stop offset="0%" stop-color="#ff9bcb"/>
+-          <stop offset="100%" stop-color="#a30f5e"/>
+-        </linearGradient>
+-        <clipPath id="reelClip1"><rect x="70" y="46" width="52" height="40" rx="3"/></clipPath>
+-        <clipPath id="reelClip2"><rect x="134" y="46" width="52" height="40" rx="3"/></clipPath>
+-        <clipPath id="reelClip3"><rect x="198" y="46" width="52" height="40" rx="3"/></clipPath>
+-        <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1">
+-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+-          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
+-          <stop offset="36%" stop-color="#ffffff" stop-opacity="0"/>
+-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+-        </linearGradient>
+-        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+-          <feGaussianBlur stdDeviation="3.2"/>
+-        </filter>
+-      </defs>
+-
+-      <!-- outer cabinet -->
+-      <rect x="2" y="2" width="316" height="104" rx="16" fill="url(#gGold)" stroke="url(#gGoldEdge)" stroke-width="3"/>
+-      <rect x="9" y="9" width="302" height="90" rx="12" fill="none" stroke="#7a5a10" stroke-width="1.5" opacity="0.6"/>
+-
+-      <!-- corner flourishes, evoking cast-iron scrollwork -->
+-      <g stroke="#7a5a10" stroke-width="1.5" fill="none" opacity="0.55">
+-        <path d="M14 22 Q22 14 30 22"/>
+-        <path d="M290 22 Q298 14 306 22"/>
+-      </g>
+-
+-      <!-- marquee title -->
+-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
+-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
+-
+-      <!-- glass display housing -->
+-      <rect x="64" y="40" width="192" height="52" rx="6" fill="#0c0f16" stroke="#3a2c05" stroke-width="2"/>
+-
+-      <!-- reel 1: Bitcoin symbol -->
+-      <g clip-path="url(#reelClip1)">
+-        <rect x="70" y="46" width="52" height="40" fill="#12141c"/>
+-        <circle cx="96" cy="30" r="15" fill="url(#gCoinB)" opacity="0.55"/>
+-        <circle cx="96" cy="66" r="21" fill="#ffb74d" opacity="0.5" filter="url(#softGlow)"/>
+-        <circle cx="96" cy="66" r="17" fill="url(#gCoinB)"/>
+-        <text x="96" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#3a1d00">&#8383;</text>
+-        <circle cx="96" cy="102" r="15" fill="url(#gCoinB)" opacity="0.55"/>
+-      </g>
+-
+-      <!-- reel 2: Ethereum symbol -->
+-      <g clip-path="url(#reelClip2)">
+-        <rect x="134" y="46" width="52" height="40" fill="#12141c"/>
+-        <circle cx="160" cy="30" r="15" fill="url(#gCoinE)" opacity="0.55"/>
+-        <circle cx="160" cy="66" r="21" fill="#8fa3e0" opacity="0.45" filter="url(#softGlow)"/>
+-        <circle cx="160" cy="66" r="17" fill="url(#gCoinE)"/>
+-        <text x="160" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#1c2340">&#926;</text>
+-        <circle cx="160" cy="102" r="15" fill="url(#gCoinE)" opacity="0.55"/>
+-      </g>
+-
+-      <!-- reel 3: Tether symbol -->
+-      <g clip-path="url(#reelClip3)">
+-        <rect x="198" y="46" width="52" height="40" fill="#12141c"/>
+-        <circle cx="224" cy="30" r="15" fill="url(#gCoinT)" opacity="0.55"/>
+-        <circle cx="224" cy="66" r="21" fill="#4fe0ad" opacity="0.45" filter="url(#softGlow)"/>
+-        <circle cx="224" cy="66" r="17" fill="url(#gCoinT)"/>
+-        <text x="224" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#063d2b">&#8366;</text>
+-        <circle cx="224" cy="102" r="15" fill="url(#gCoinT)" opacity="0.55"/>
+-      </g>
+-
+-      <!-- reel divider lines -->
+-      <line x1="122" y1="40" x2="122" y2="92" stroke="#3a2c05" stroke-width="2"/>
+-      <line x1="186" y1="40" x2="186" y2="92" stroke="#3a2c05" stroke-width="2"/>
+-
+-      <!-- glass pane shine, sells "clear plastic screen" -->
+-      <rect x="64" y="40" width="192" height="52" rx="6" fill="url(#glassShine)"/>
+-      <rect x="64" y="40" width="192" height="52" rx="6" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="1"/>
+-
+-      <!-- side lever -->
+-      <rect x="298" y="30" width="6" height="34" rx="3" fill="url(#gLeverStem)"/>
+-      <circle cx="301" cy="26" r="9" fill="url(#gLeverPink)" stroke="#8a0f52" stroke-width="1.5"/>
+-
+-      <!-- base plate -->
+-      <text x="160" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#5c4208" letter-spacing="3" opacity="0.85">EST. VAULT NO. 0500</text>
+-    </svg>
+     <div id="network-badge" class="hidden"></div>
+   </header>
+ 
+@@ -379,6 +277,12 @@
+     <label data-i18n="send.amountLabel">Amount</label>
+     <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+     <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
++    <div id="send-confirm-card" class="send-confirm-card hidden">
++      <p id="send-confirm-intro" class="warn"></p>
++      <p id="send-confirm-summary" class="send-confirm-summary"></p>
++      <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
++      <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
++    </div>
+     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+     <p id="send-status" class="hint hidden"></p>
+     <p id="send-error" class="error hidden"></p>
+@@ -451,6 +355,16 @@
+       <label data-i18n="settings.currencyLabel">Display currency</label>
+       <select id="currency-select-settings" class="currency-select"></select>
+     </div>
++    <div class="language-picker">
++      <label data-i18n="settings.sendDelayLabel">Send delay (cancel window)</label>
++      <select id="send-delay-select" class="language-select">
++        <option value="0" data-i18n="settings.sendDelayOff">Off (send immediately)</option>
++        <option value="15" data-i18n="settings.sendDelay15">15 seconds</option>
++        <option value="30" data-i18n="settings.sendDelay30">30 seconds (recommended)</option>
++        <option value="60" data-i18n="settings.sendDelay60">60 seconds</option>
++      </select>
++      <p class="muted" data-i18n="settings.sendDelayHint">Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.</p>
++    </div>
+     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
+     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
+     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+@@ -597,8 +511,11 @@
+   </section>
+ 
+   <footer id="app-footer">
+-    <span class="footer-lock">&#128274;</span>
+-    <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
++    <img id="brand-logo" src="img/icon-512.png" alt="Token Exchange" />
++    <div class="footer-tagline">
++      <span class="footer-lock">&#128274;</span>
++      <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
++    </div>
+   </footer>
+ 
+ </div>
+--- server.js ---
+--- /dev/fd/63	2026-09-13 08:38:05.012120574 +0000
++++ server.js	2026-09-13 08:02:42.489023428 +0000
+@@ -23,7 +23,7 @@
+ const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];
+ const FONT_FILES = ["fredoka-400.woff2", "fredoka-500.woff2", "fredoka-600.woff2", "fredoka-700.woff2"];
+ const IMG_FILES = [
+-"bg-scene.jpg", "spinner-coin.png", "splash.jpg",
++"bg-scene.jpg", "spinner-coin.png", "splash.jpg", "splash-light.jpg",
+ "apple-touch-icon.png", "icon-192.png", "icon-512.png", "favicon-32.png",
+ ];
+ 
+--- (binary, no text diff, unchanged from last delivery) ---
+splash-light.jpg, apple-touch-icon.png, icon-192.png, icon-512.png, favicon-32.png

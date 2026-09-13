@@ -749,6 +749,96 @@ $("send-asset-select").addEventListener("change", (e) => {
   $("send-token-address").classList.toggle("hidden", e.target.value !== "token");
 });
 
+// Send delay / cancel window -- see Settings. Every send made from this
+// screen is held for this many seconds (with a visible countdown and a
+// Cancel button) before it's actually signed and broadcast, so a
+// fat-fingered address or a send you change your mind about can still be
+// stopped. It's a UI-level safety net for sends made *through this app*
+// only -- it can't do anything about a key or recovery phrase that's
+// already been exposed outside Token Exchange, since anyone holding
+// those can sign and broadcast directly, bypassing this screen entirely.
+const TM_SEND_DELAY_KEY = "tm_send_delay_seconds";
+let currentSendDelaySeconds = 30;
+let pendingSendTimer = null; // { intervalId, secondsLeft, cancelled }
+
+function loadSendDelay() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([TM_SEND_DELAY_KEY], (res) => {
+      const stored = res[TM_SEND_DELAY_KEY];
+      currentSendDelaySeconds = typeof stored === "number" ? stored : 30;
+      resolve();
+    });
+  });
+}
+
+function populateSendDelaySelect() {
+  const sel = $("send-delay-select");
+  sel.value = String(currentSendDelaySeconds);
+  sel.addEventListener("change", (e) => {
+    currentSendDelaySeconds = Number(e.target.value) || 0;
+    chrome.storage.local.set({ [TM_SEND_DELAY_KEY]: currentSendDelaySeconds });
+  });
+}
+
+// "Known address" = already in the address book, or already sent to from
+// this device -- used only to show a heads-up in the confirm step, never
+// to block anything.
+async function isKnownAddress(address) {
+  const target = address.toLowerCase();
+  const contacts = await getContacts();
+  if (contacts.some((c) => (c.address || "").toLowerCase() === target)) return true;
+  const activity = await new Promise((resolve) => {
+    chrome.storage.local.get([TM_ACTIVITY_KEY], (res) => resolve(Array.isArray(res[TM_ACTIVITY_KEY]) ? res[TM_ACTIVITY_KEY] : []));
+  });
+  return activity.some((a) => (a.to || "").toLowerCase() === target);
+}
+
+function resetSendConfirmUi() {
+  if (pendingSendTimer) {
+    clearInterval(pendingSendTimer.intervalId);
+    pendingSendTimer = null;
+  }
+  $("send-confirm-card").classList.add("hidden");
+  $("send-confirm-new-address-warning").classList.add("hidden");
+  $("btn-send-submit").disabled = false;
+  $("send-to").disabled = false;
+  $("send-amount").disabled = false;
+  $("send-asset-select").disabled = false;
+}
+
+// Cancels any in-progress countdown if the user navigates away from the
+// Send screen before it fires (back button, a nav icon, anything else) --
+// leaving early should never leave a send silently ticking down unseen.
+const _origShowScreenForSend = showScreen;
+showScreen = function (id) {
+  if (pendingSendTimer && id !== "screen-send") resetSendConfirmUi();
+  return _origShowScreenForSend(id);
+};
+
+async function executeSend({ to, amountStr, isNative, tokenAddress }) {
+  let res;
+  if (isNative) {
+    const amountWei = ethers.utils.parseEther(amountStr || "0");
+    res = await sendMsg("TM_SEND_NATIVE", { to, amountWei: amountWei.toString() });
+  } else {
+    const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
+    const amountWei = ethers.utils.parseUnits(amountStr || "0", info.decimals);
+    res = await sendMsg("TM_SEND_TOKEN", { to, tokenAddress, amountWei: amountWei.toString() });
+  }
+  $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
+  $("send-status").classList.remove("hidden");
+  const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
+  recordActivity({ amount: amountStr, asset: sentAsset, to, txHash: res.txHash });
+  await refreshBalance();
+}
+
+$("btn-send-cancel").addEventListener("click", () => {
+  resetSendConfirmUi();
+  hideError("send-error");
+  $("send-status").textContent = TM_I18N.t("send.cancelledStatus");
+  $("send-status").classList.remove("hidden");
+});
+
 $("btn-send-submit").addEventListener("click", async () => {
   hideError("send-error");
   $("send-status").classList.add("hidden");
@@ -756,22 +846,45 @@ $("btn-send-submit").addEventListener("click", async () => {
     const to = $("send-to").value.trim();
     const amountStr = $("send-amount").value.trim();
     if (!ethers.utils.isAddress(to)) throw new Error(TM_I18N.t("send.invalidRecipient"));
-    let res;
-    if ($("send-asset-select").value === "native") {
-      const amountWei = ethers.utils.parseEther(amountStr || "0");
-      res = await sendMsg("TM_SEND_NATIVE", { to, amountWei: amountWei.toString() });
-    } else {
-      const tokenAddress = $("send-token-address").value.trim();
-      if (!ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
-      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
-      const amountWei = ethers.utils.parseUnits(amountStr || "0", info.decimals);
-      res = await sendMsg("TM_SEND_TOKEN", { to, tokenAddress, amountWei: amountWei.toString() });
+    const isNative = $("send-asset-select").value === "native";
+    const tokenAddress = isNative ? null : $("send-token-address").value.trim();
+    if (!isNative && !ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
+
+    if (!currentSendDelaySeconds) {
+      // Delay turned off in Settings -- send immediately, same as before.
+      await executeSend({ to, amountStr, isNative, tokenAddress });
+      return;
     }
-    $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
-    $("send-status").classList.remove("hidden");
-    const sentAsset = $("send-asset-select").value === "native" ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
-    recordActivity({ amount: amountStr, asset: sentAsset, to, txHash: res.txHash });
-    await refreshBalance();
+
+    const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
+    const known = await isKnownAddress(to);
+
+    $("btn-send-submit").disabled = true;
+    $("send-to").disabled = true;
+    $("send-amount").disabled = true;
+    $("send-asset-select").disabled = true;
+    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to });
+    $("send-confirm-new-address-warning").classList.toggle("hidden", known);
+    $("send-confirm-card").classList.remove("hidden");
+
+    let secondsLeft = currentSendDelaySeconds;
+    $("send-confirm-intro").textContent = TM_I18N.t("send.confirmIntro", { seconds: secondsLeft });
+    const intervalId = setInterval(async () => {
+      secondsLeft -= 1;
+      if (secondsLeft <= 0) {
+        clearInterval(intervalId);
+        pendingSendTimer = null;
+        resetSendConfirmUi();
+        try {
+          await executeSend({ to, amountStr, isNative, tokenAddress });
+        } catch (e) {
+          showError("send-error", e.message);
+        }
+        return;
+      }
+      $("send-confirm-intro").textContent = TM_I18N.t("send.confirmIntro", { seconds: secondsLeft });
+    }, 1000);
+    pendingSendTimer = { intervalId };
   } catch (e) {
     showError("send-error", e.message);
   }
@@ -1144,6 +1257,8 @@ function hideSplash() {
   el.dataset.hidden = "1";
   clearSplashAutoTimers();
   el.classList.add("splash-hide");
+  const tagline = $("splash-tagline");
+  if (tagline) tagline.remove();
   setTimeout(() => el.remove(), 450);
 }
 // Safety net: never let a startup error leave the splash covering the
@@ -1462,6 +1577,8 @@ function renderActivity() {
   await loadWatchlist();
   await loadCurrency();
   populateCurrencySelect();
+  await loadSendDelay();
+  populateSendDelaySelect();
 
   const params = new URLSearchParams(location.search);
   if (params.get("mode") === "approve") {

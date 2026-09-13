@@ -23,7 +23,7 @@ const LIB_FILES = [
 const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];
 const FONT_FILES = ["fredoka-400.woff2", "fredoka-500.woff2", "fredoka-600.woff2", "fredoka-700.woff2"];
 const IMG_FILES = [
-"bg-scene.jpg", "spinner-coin.png", "splash.jpg",
+"bg-scene.jpg", "spinner-coin.png", "splash.jpg", "splash-light.jpg",
 "apple-touch-icon.png", "icon-192.png", "icon-512.png", "favicon-32.png",
 ];
 
