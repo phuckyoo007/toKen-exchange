@@ -466,6 +466,17 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   border-left: 3px solid var(--gold-deep);
   padding: 9px 11px; border-radius: 7px;
 }
+/* Same slot-machine top-strip treatment as the card panels above (see
+   .prices-card / .tokens-section), applied to just this one .warn box --
+   not .warn generally, so the smaller warning callouts elsewhere (create
+   password, send confirmation, etc.) stay their plain solid selves. */
+.onboarding-intro-card {
+  position: relative;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 44px, #2a2110 100%),
+    url(img/bg-scene.jpg) center top / cover no-repeat;
+  padding-top: 44px;
+}
 .hint {
   color: var(--success); font-size: 12px; line-height: 1.5;
   background: #142822; border: 1px solid #234a3d;
@@ -610,9 +621,19 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .actions-row button { flex: 1; }
 .swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 
+/* A strip of the slot-machine artwork (the same source as #bg-scene)
+   across the top of a card, fading into the card's own solid fill by
+   44px down -- a small decorative callback to the backdrop, without
+   making any part of the card itself see-through. Real content starts
+   below the reserved padding, never overlapping the art. */
 .tokens-section {
-  margin-top: 4px; background: var(--bg-inset); border: 1px solid var(--line);
-  border-radius: 10px; padding: 10px;
+  margin-top: 4px;
+  position: relative;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
+    url(img/bg-scene.jpg) center top / cover no-repeat;
+  border: 1px solid var(--line);
+  border-radius: 10px; padding: 44px 10px 10px;
 }
 .tokens-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .tokens-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
@@ -679,8 +700,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    reuse .price-row/.price-name/etc. above so the two views stay visually
    consistent. */
 .prices-card {
-  background: var(--bg-inset); border: 1px solid var(--line);
-  border-radius: 10px; padding: 10px; margin-bottom: 10px;
+  position: relative;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
+    url(img/bg-scene.jpg) center top / cover no-repeat;
+  border: 1px solid var(--line);
+  border-radius: 10px; padding: 44px 10px 10px; margin-bottom: 10px;
 }
 .prices-card-header {
   display: flex; align-items: center; justify-content: space-between;

@@ -1,5 +1,5 @@
 diff --git a/app.css b/app.css
-index a4fcad7..48b95eb 100644
+index a4fcad7..7fc250d 100644
 --- a/app.css
 +++ b/app.css
 @@ -87,14 +87,13 @@ body {
@@ -138,7 +138,25 @@ index a4fcad7..48b95eb 100644
  #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
  
  h2 {
-@@ -455,6 +474,22 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
+@@ -447,6 +466,17 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
+   border-left: 3px solid var(--gold-deep);
+   padding: 9px 11px; border-radius: 7px;
+ }
++/* Same slot-machine top-strip treatment as the card panels above (see
++   .prices-card / .tokens-section), applied to just this one .warn box --
++   not .warn generally, so the smaller warning callouts elsewhere (create
++   password, send confirmation, etc.) stay their plain solid selves. */
++.onboarding-intro-card {
++  position: relative;
++  background:
++    linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 44px, #2a2110 100%),
++    url(img/bg-scene.jpg) center top / cover no-repeat;
++  padding-top: 44px;
++}
+ .hint {
+   color: var(--success); font-size: 12px; line-height: 1.5;
+   background: #142822; border: 1px solid #234a3d;
+@@ -455,6 +485,22 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    display: flex; align-items: center; gap: 8px;
  }
  
@@ -161,7 +179,44 @@ index a4fcad7..48b95eb 100644
  /* The one shared "you're waiting on something" cue (see coinSpinnerHtml()
     in popup.js) -- small enough to sit inline next to a loading label
     wherever one is needed, reusing the same image and spin as the startup
-@@ -720,8 +755,9 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
+@@ -575,9 +621,19 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
+ .actions-row button { flex: 1; }
+ .swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+ 
++/* A strip of the slot-machine artwork (the same source as #bg-scene)
++   across the top of a card, fading into the card's own solid fill by
++   44px down -- a small decorative callback to the backdrop, without
++   making any part of the card itself see-through. Real content starts
++   below the reserved padding, never overlapping the art. */
+ .tokens-section {
+-  margin-top: 4px; background: var(--bg-inset); border: 1px solid var(--line);
+-  border-radius: 10px; padding: 10px;
++  margin-top: 4px;
++  position: relative;
++  background:
++    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
++    url(img/bg-scene.jpg) center top / cover no-repeat;
++  border: 1px solid var(--line);
++  border-radius: 10px; padding: 44px 10px 10px;
+ }
+ .tokens-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+ .tokens-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+@@ -644,8 +700,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
+    reuse .price-row/.price-name/etc. above so the two views stay visually
+    consistent. */
+ .prices-card {
+-  background: var(--bg-inset); border: 1px solid var(--line);
+-  border-radius: 10px; padding: 10px; margin-bottom: 10px;
++  position: relative;
++  background:
++    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
++    url(img/bg-scene.jpg) center top / cover no-repeat;
++  border: 1px solid var(--line);
++  border-radius: 10px; padding: 44px 10px 10px; margin-bottom: 10px;
+ }
+ .prices-card-header {
+   display: flex; align-items: center; justify-content: space-between;
+@@ -720,8 +780,9 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
  .support-input-row button { flex-shrink: 0; }
  
  /* ---------------- language picker ---------------- */
@@ -172,7 +227,7 @@ index a4fcad7..48b95eb 100644
  .language-picker select {
    width: auto; min-width: 0; flex: 1; max-width: 62%;
    border-radius: 999px; padding: 9px 16px;
-@@ -792,23 +828,48 @@ body.tm-web-wallet #app {
+@@ -792,23 +853,48 @@ body.tm-web-wallet #app {
    overflow: hidden;
    box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
  }
@@ -230,3 +285,264 @@ index a4fcad7..48b95eb 100644
    body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
 -  body.tm-web-wallet #splash-screen { top: 0; width: 100%; height: 100vh; max-width: 100%; border-radius: 0; }
  }
+diff --git a/index.html b/index.html
+index e954bd6..b9f2adc 100644
+--- a/index.html
++++ b/index.html
+@@ -18,7 +18,10 @@
+ <body class="tm-web-wallet">
+ <div id="bg-scene"></div>
+ <div id="splash-screen">
+-  <img src="img/splash.jpg" alt="Token Exchange" />
++  <picture>
++    <source srcset="img/splash-light.jpg" media="(prefers-color-scheme: light)" />
++    <img src="img/splash.jpg" alt="Token Exchange" />
++  </picture>
+   <div id="splash-brand">TOKEN EXCHANGE</div>
+   <div id="splash-spinner"><img src="img/spinner-coin.png" alt="" /></div>
+   <div id="splash-tabbar">
+@@ -40,118 +43,13 @@
+     </button>
+   </div>
+ </div>
++<div id="splash-tagline">
++  <span class="footer-lock">&#128274;</span>
++  <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
++</div>
+ <div id="app">
+ 
+   <header id="app-header">
+-    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange">
+-      <defs>
+-        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
+-          <stop offset="0%" stop-color="#fff3c4"/>
+-          <stop offset="30%" stop-color="#f4c430"/>
+-          <stop offset="65%" stop-color="#caa02a"/>
+-          <stop offset="100%" stop-color="#8a6a10"/>
+-        </linearGradient>
+-        <linearGradient id="gGoldEdge" x1="0" y1="0" x2="0" y2="1">
+-          <stop offset="0%" stop-color="#fffbe6"/>
+-          <stop offset="100%" stop-color="#6b4e08"/>
+-        </linearGradient>
+-        <radialGradient id="gCoinB" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#ffb74d"/>
+-          <stop offset="100%" stop-color="#d9770a"/>
+-        </radialGradient>
+-        <radialGradient id="gCoinE" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#c7d3ee"/>
+-          <stop offset="100%" stop-color="#5f6ea3"/>
+-        </radialGradient>
+-        <radialGradient id="gCoinT" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#7fe0b8"/>
+-          <stop offset="100%" stop-color="#1a9c74"/>
+-        </radialGradient>
+-        <radialGradient id="gLeverPink" cx="35%" cy="30%" r="75%">
+-          <stop offset="0%" stop-color="#ffc2e2"/>
+-          <stop offset="50%" stop-color="#ff4fa3"/>
+-          <stop offset="100%" stop-color="#c2136b"/>
+-        </radialGradient>
+-        <linearGradient id="gLeverStem" x1="0" y1="0" x2="0" y2="1">
+-          <stop offset="0%" stop-color="#ff9bcb"/>
+-          <stop offset="100%" stop-color="#a30f5e"/>
+-        </linearGradient>
+-        <clipPath id="reelClip1"><rect x="70" y="46" width="52" height="40" rx="3"/></clipPath>
+-        <clipPath id="reelClip2"><rect x="134" y="46" width="52" height="40" rx="3"/></clipPath>
+-        <clipPath id="reelClip3"><rect x="198" y="46" width="52" height="40" rx="3"/></clipPath>
+-        <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1">
+-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+-          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
+-          <stop offset="36%" stop-color="#ffffff" stop-opacity="0"/>
+-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+-        </linearGradient>
+-        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+-          <feGaussianBlur stdDeviation="3.2"/>
+-        </filter>
+-      </defs>
+-
+-      <!-- outer cabinet -->
+-      <rect x="2" y="2" width="316" height="104" rx="16" fill="url(#gGold)" stroke="url(#gGoldEdge)" stroke-width="3"/>
+-      <rect x="9" y="9" width="302" height="90" rx="12" fill="none" stroke="#7a5a10" stroke-width="1.5" opacity="0.6"/>
+-
+-      <!-- corner flourishes, evoking cast-iron scrollwork -->
+-      <g stroke="#7a5a10" stroke-width="1.5" fill="none" opacity="0.55">
+-        <path d="M14 22 Q22 14 30 22"/>
+-        <path d="M290 22 Q298 14 306 22"/>
+-      </g>
+-
+-      <!-- marquee title -->
+-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
+-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
+-
+-      <!-- glass display housing -->
+-      <rect x="64" y="40" width="192" height="52" rx="6" fill="#0c0f16" stroke="#3a2c05" stroke-width="2"/>
+-
+-      <!-- reel 1: Bitcoin symbol -->
+-      <g clip-path="url(#reelClip1)">
+-        <rect x="70" y="46" width="52" height="40" fill="#12141c"/>
+-        <circle cx="96" cy="30" r="15" fill="url(#gCoinB)" opacity="0.55"/>
+-        <circle cx="96" cy="66" r="21" fill="#ffb74d" opacity="0.5" filter="url(#softGlow)"/>
+-        <circle cx="96" cy="66" r="17" fill="url(#gCoinB)"/>
+-        <text x="96" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#3a1d00">&#8383;</text>
+-        <circle cx="96" cy="102" r="15" fill="url(#gCoinB)" opacity="0.55"/>
+-      </g>
+-
+-      <!-- reel 2: Ethereum symbol -->
+-      <g clip-path="url(#reelClip2)">
+-        <rect x="134" y="46" width="52" height="40" fill="#12141c"/>
+-        <circle cx="160" cy="30" r="15" fill="url(#gCoinE)" opacity="0.55"/>
+-        <circle cx="160" cy="66" r="21" fill="#8fa3e0" opacity="0.45" filter="url(#softGlow)"/>
+-        <circle cx="160" cy="66" r="17" fill="url(#gCoinE)"/>
+-        <text x="160" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#1c2340">&#926;</text>
+-        <circle cx="160" cy="102" r="15" fill="url(#gCoinE)" opacity="0.55"/>
+-      </g>
+-
+-      <!-- reel 3: Tether symbol -->
+-      <g clip-path="url(#reelClip3)">
+-        <rect x="198" y="46" width="52" height="40" fill="#12141c"/>
+-        <circle cx="224" cy="30" r="15" fill="url(#gCoinT)" opacity="0.55"/>
+-        <circle cx="224" cy="66" r="21" fill="#4fe0ad" opacity="0.45" filter="url(#softGlow)"/>
+-        <circle cx="224" cy="66" r="17" fill="url(#gCoinT)"/>
+-        <text x="224" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#063d2b">&#8366;</text>
+-        <circle cx="224" cy="102" r="15" fill="url(#gCoinT)" opacity="0.55"/>
+-      </g>
+-
+-      <!-- reel divider lines -->
+-      <line x1="122" y1="40" x2="122" y2="92" stroke="#3a2c05" stroke-width="2"/>
+-      <line x1="186" y1="40" x2="186" y2="92" stroke="#3a2c05" stroke-width="2"/>
+-
+-      <!-- glass pane shine, sells "clear plastic screen" -->
+-      <rect x="64" y="40" width="192" height="52" rx="6" fill="url(#glassShine)"/>
+-      <rect x="64" y="40" width="192" height="52" rx="6" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="1"/>
+-
+-      <!-- side lever -->
+-      <rect x="298" y="30" width="6" height="34" rx="3" fill="url(#gLeverStem)"/>
+-      <circle cx="301" cy="26" r="9" fill="url(#gLeverPink)" stroke="#8a0f52" stroke-width="1.5"/>
+-
+-      <!-- base plate -->
+-      <text x="160" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#5c4208" letter-spacing="3" opacity="0.85">EST. VAULT NO. 0500</text>
+-    </svg>
+     <div id="network-badge" class="hidden"></div>
+   </header>
+ 
+@@ -163,7 +61,7 @@
+     </div>
+     <h2 data-i18n="onboarding.title">Welcome</h2>
+     <p class="muted" data-i18n="onboarding.subtitle">Set up your wallet to get started.</p>
+-    <div class="warn" style="text-align:left; margin: 10px 0;">
++    <div class="warn onboarding-intro-card" style="text-align:left; margin: 10px 0;">
+       This is the standalone <strong>website</strong> version of Token Exchange. It
+       encrypts your wallet and stores it only in this browser (nowhere else) --
+       but a website is an easier target for phishing/DNS/lookalike-domain tricks
+@@ -247,6 +145,7 @@
+       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
+       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
+       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
++      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
+     </div>
+     <div class="prices-card">
+       <div class="prices-card-header">
+@@ -334,6 +233,17 @@
+     <p id="buy-error" class="error hidden"></p>
+   </section>
+ 
++  <!-- SELL -->
++  <section id="screen-sell" class="screen hidden">
++    <h2 data-i18n="sell.title">Sell for cash</h2>
++    <p class="muted" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
++    <p class="muted" data-i18n="sell.description2">MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
++    <p class="muted" data-i18n-html="sell.description3Html">Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.</p>
++    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
++    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
++    <p id="sell-error" class="error hidden"></p>
++  </section>
++
+   <!-- SUPPORT -->
+   <section id="screen-support" class="screen hidden">
+     <h2 data-i18n="support.title">Help &amp; support</h2>
+@@ -367,6 +277,12 @@
+     <label data-i18n="send.amountLabel">Amount</label>
+     <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+     <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
++    <div id="send-confirm-card" class="send-confirm-card hidden">
++      <p id="send-confirm-intro" class="warn"></p>
++      <p id="send-confirm-summary" class="send-confirm-summary"></p>
++      <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
++      <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
++    </div>
+     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+     <p id="send-status" class="hint hidden"></p>
+     <p id="send-error" class="error hidden"></p>
+@@ -430,6 +346,7 @@
+     <button id="btn-goto-contacts" class="secondary" data-i18n="settings.contactsBtn">Address book</button>
+     <button id="btn-view-seed" class="secondary" data-i18n="settings.viewSeedBtn">View recovery phrase</button>
+     <button id="btn-goto-support-settings" class="secondary" data-i18n="settings.helpBtn">Help &amp; support</button>
++    <button id="btn-goto-feedback" class="secondary" data-i18n="settings.feedbackBtn">Request a feature</button>
+     <div class="language-picker">
+       <label data-i18n="common.languageLabel">Language</label>
+       <select id="language-select-settings" class="language-select"></select>
+@@ -438,11 +355,36 @@
+       <label data-i18n="settings.currencyLabel">Display currency</label>
+       <select id="currency-select-settings" class="currency-select"></select>
+     </div>
++    <div class="language-picker">
++      <label data-i18n="settings.sendDelayLabel">Send delay (cancel window)</label>
++      <select id="send-delay-select" class="language-select">
++        <option value="0" data-i18n="settings.sendDelayOff">Off (send immediately)</option>
++        <option value="15" data-i18n="settings.sendDelay15">15 seconds</option>
++        <option value="30" data-i18n="settings.sendDelay30">30 seconds (recommended)</option>
++        <option value="60" data-i18n="settings.sendDelay60">60 seconds</option>
++      </select>
++      <p class="muted" data-i18n="settings.sendDelayHint">Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.</p>
++    </div>
+     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
+     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
+     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+   </section>
+ 
++  <section id="screen-feedback" class="screen hidden">
++    <h2 data-i18n="feedback.title">Feature requests</h2>
++    <p class="muted" data-i18n="feedback.subtitle">See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.</p>
++    <input type="text" id="feedback-title-input" maxlength="140" data-i18n-placeholder="feedback.titlePlaceholder" placeholder="Short title (e.g. &quot;Dark mode&quot;)" />
++    <textarea id="feedback-desc-input" maxlength="2000" rows="3" data-i18n-placeholder="feedback.descPlaceholder" placeholder="A bit more detail (optional)"></textarea>
++    <button id="btn-feedback-submit" class="primary" data-i18n="feedback.submitBtn">Post request</button>
++    <p id="feedback-error" class="error hidden"></p>
++    <p id="feedback-status" class="hint hidden"></p>
++    <div class="tokens-header"><span class="tokens-title" data-i18n="feedback.listTitle">REQUESTS</span></div>
++    <div id="feedback-list"></div>
++    <p id="feedback-empty" class="muted hidden" data-i18n="feedback.empty">No requests yet -- be the first!</p>
++    <p class="muted" data-i18n="feedback.contactLine">Prefer email? Reach us at msandersod@gmail.com</p>
++    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
++  </section>
++
+   <section id="screen-contacts" class="screen hidden">
+     <h2 data-i18n="contacts.title">Address book</h2>
+     <p id="contacts-picker-hint" class="muted hidden" data-i18n="contacts.pickerHint">Tap a contact to fill it in as the recipient.</p>
+@@ -569,8 +511,11 @@
+   </section>
+ 
+   <footer id="app-footer">
+-    <span class="footer-lock">&#128274;</span>
+-    <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
++    <img id="brand-logo" src="img/icon-512.png" alt="Token Exchange" />
++    <div class="footer-tagline">
++      <span class="footer-lock">&#128274;</span>
++      <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
++    </div>
+   </footer>
+ 
+ </div>
+@@ -581,6 +526,7 @@
+ <script src="lib/prices.js"></script>
+ <script src="lib/polymarket.js"></script>
+ <script src="lib/buy-config.js"></script>
++<script src="lib/sell-config.js"></script>
+ <script src="lib/i18n/en.js"></script>
+ <script src="lib/i18n/ar.js"></script>
+ <script src="lib/i18n/zh.js"></script>
+@@ -602,5 +548,6 @@
+ <script src="shim.js"></script>
+ <script src="wallet-engine.js"></script>
+ <script src="app.js"></script>
++<script src="lib/feature-requests.js"></script>
+ </body>
+ </html>
