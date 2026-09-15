@@ -87,13 +87,14 @@ body {
 
 /* ---------------- full-bleed arcade-cabinet scene ----------------
    A fixed backdrop -- the user's own AI-generated "jackpot" reference
-   art -- sitting behind the whole popup on every screen. A dark scrim
-   gradient is baked into the same layer: strong enough near the top to
-   reveal the art's own slot-machine assembly (blending into the header
-   logo above it), then quickly opaque enough that real screen content
-   (headings, inputs, buttons) stays fully readable over it lower down.
-   #app itself is transparent so this shows through; individual
-   cards/inputs keep their own solid dark fills for contrast. */
+   art -- sitting behind the whole popup on every screen, standing in
+   for the header-only SVG logo's cabinet. A dark scrim gradient is
+   baked into the same layer: strong enough near the top to reveal the
+   art's own slot-machine assembly, then quickly opaque enough that
+   real screen content (headings, inputs, buttons) stays fully
+   readable over it lower down. #app itself is transparent so this
+   shows through; individual cards/inputs keep their own solid
+   dark fills for contrast. */
 #bg-scene {
   position: fixed;
   inset: 0;
@@ -115,23 +116,14 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 480px;
-  /* Fully opaque -- no part of the app card lets the #bg-scene backdrop
-     show through anymore. The backdrop art is still visible around the
-     outside of this card on wide/desktop viewports (see the framed
-     look below), but nothing inside it -- header included -- is
-     see-through in any way. */
-  background: var(--bg);
+  background: transparent;
 }
 
 /* ---------------- splash screen ----------------
    Shown for a brief moment every time the popup opens, before the
    onboarding/unlock/main screen underneath -- the MetaMask-fox-style
-   "brand moment" the user asked for. Sits above #app and comes down
-   once the real starting screen is ready.
-   Deliberately NOT animated (no opacity transition): a fade would pass
-   through a half-see-through frame first, which is exactly the
-   "translucent, does nothing" glitch reported when tapping a tab
-   before a wallet exists. A hard cut avoids that state entirely. */
+   "brand moment" the user asked for. Sits above #app and fades out
+   once the real starting screen is ready. */
 #splash-screen {
   position: fixed;
   inset: 0;
@@ -143,6 +135,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.4s ease;
 }
 #splash-screen img {
   position: absolute;
@@ -176,9 +169,6 @@ body {
   opacity: 0;
   pointer-events: none;
 }
-/* Only relevant to the framed web-wallet layout (see below) -- hidden
-   by default so it has no effect in the extension popup context. */
-#splash-tagline { display: none; }
 #splash-spinner {
   position: absolute;
   bottom: 100px;
@@ -306,16 +296,19 @@ body {
 }
 
 /* ---------------- header ----------------
-   #app is now fully opaque (see #app above) -- nothing behind it shows
-   through anymore, including here. This no longer reserves space for
-   the backdrop's baked-in title, so it's sized to just its own content
-   (the network pill); the circular badge logo lives down in the
-   footer instead (see below). */
+   The header no longer draws its own logo art: the full-bleed
+   #bg-scene behind it already shows the "TOKEN EXCHANGE" slot-machine
+   cabinet at the very top of every screen (it's the top of the same
+   reference image), so #brand-logo/#app-header just reserve the
+   matching amount of vertical space and let the network badge sit
+   just under the cabinet, over the scene. */
 #app-header {
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
-  padding: 12px 12px 10px;
+  min-height: 246px;
+  padding: 9px 12px 10px;
   flex-shrink: 0;
 }
+#brand-logo { display: none; }
 #network-badge {
   font-family: var(--font-body);
   font-weight: 600;
@@ -338,34 +331,22 @@ body {
 /* ---------------- layout ---------------- */
 .screen {
   padding: 18px 16px; flex: 1; display: flex; flex-direction: column; gap: 11px;
-  /* Deliberately NOT animated (no opacity fade-in): a fade briefly shows
-     every card at partial opacity, letting the backdrop bleed through
-     underneath -- the same "goes translucent" problem fixed on the splash
-     screen, but on every single screen change/button click instead. Cards
-     now render at full opacity immediately, matching the solid look they
-     have once settled. */
+  animation: screenFadeIn 0.18s ease;
+}
+@keyframes screenFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .hidden { display: none !important; }
 
-/* ---------------- footer ----------------
-   The circular "TOKEN EXCHANGE" badge (the same image used as the app
-   icon) now sits down here at the bottom of every screen instead of up
-   in the header, where it fought with the backdrop's own baked-in
-   title. Small and out of the way of the actual "non-custodial"
-   messaging it sits above. */
+/* ---------------- footer ---------------- */
 #app-footer {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  padding: 10px 16px 12px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 16px; border-top: 1px solid var(--line);
   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
   flex-shrink: 0;
 }
-#app-footer #brand-logo {
-  display: block; width: 56px; height: 56px;
-  border-radius: 50%;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(221, 172, 77, 0.25);
-}
-#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
 
 h2 {
@@ -472,22 +453,6 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   border-left: 3px solid var(--success);
   padding: 9px 11px; border-radius: 7px;
   display: flex; align-items: center; gap: 8px;
-}
-
-/* ---------------- send confirm / cancel-window card ----------------
-   Shown after "Send" is tapped and before the transaction actually goes
-   out, while the (configurable, cancellable) delay counts down. Sits
-   right where the Send button was, so nothing about the layout jumps. */
-.send-confirm-card {
-  margin-top: 10px; padding: 12px; border-radius: 10px;
-  background: var(--bg-inset); border: 1px solid var(--line-strong);
-  display: flex; flex-direction: column; gap: 8px;
-}
-.send-confirm-card .warn,
-.send-confirm-card .error { margin: 0; }
-.send-confirm-summary {
-  margin: 0; font-size: 13px; color: var(--text);
-  font-family: var(--font-mono); word-break: break-all;
 }
 
 /* The one shared "you're waiting on something" cue (see coinSpinnerHtml()
@@ -755,9 +720,8 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
 .support-input-row button { flex-shrink: 0; }
 
 /* ---------------- language picker ---------------- */
-.language-picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
+.language-picker { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
 .language-picker label { margin: 0; flex-shrink: 0; }
-.language-picker > p.muted { flex: 1 0 100%; margin: 2px 0 0; font-size: 11px; line-height: 1.4; }
 .language-picker select {
   width: auto; min-width: 0; flex: 1; max-width: 62%;
   border-radius: 999px; padding: 9px 16px;
@@ -796,80 +760,3 @@ html[dir="rtl"] input[type="text"],
 html[dir="rtl"] input[type="password"],
 html[dir="rtl"] textarea { text-align: right; }
 html[dir="rtl"] .mono { direction: ltr; unicode-bidi: embed; text-align: right; } /* addresses/hex stay LTR internally */
-
-/* ============================================================
-   Web-wallet-only layout overrides
-   Everything above this point is unchanged from the extension's own
-   popup.css. The extension's <body> is sized to exactly fill a fixed
-   Chrome popup window (360x480, capped at 600 tall with internal
-   scrolling). This standalone page runs in a normal, resizable browser
-   tab instead, so the same app is presented as a centered fixed-width
-   card floating over the full-bleed background art, rather than
-   stretched edge-to-edge or capped at popup height. Scoped to
-   body.tm-web-wallet so it only ever applies here.
-   ============================================================ */
-html { background: #08070a; }
-body.tm-web-wallet {
-  position: relative;
-  width: auto;
-  max-height: none;
-  min-height: 100vh;
-  overflow-y: visible;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 32px 12px;
-}
-body.tm-web-wallet #app {
-  width: 390px;
-  max-width: 100%;
-  min-height: 640px;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
-}
-/* Back to the framed-card look on a wide window: the splash sits right
-   on top of where the #app card will be (same 390x640 rounded
-   rectangle, gold-bordered like a phone screenshot floating on a dark
-   desk) instead of stretching edge-to-edge, with the "non-custodial"
-   tagline floating just below it on the page background. On an actual
-   phone-width screen (the media query below) it goes back to filling
-   the whole viewport, same as #app does there -- there's no "desk"
-   around it to show on a real phone screen anyway. */
-body.tm-web-wallet #splash-screen {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  right: auto;
-  bottom: auto;
-  transform: translate(-50%, -50%);
-  width: 390px;
-  height: 640px;
-  max-width: calc(100% - 24px);
-  max-height: calc(100vh - 24px);
-  border-radius: 20px;
-  border: 2px solid var(--gold-deep);
-  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
-}
-body.tm-web-wallet #splash-tagline {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  position: fixed; z-index: 999;
-  left: 50%; top: calc(50% + 320px + 18px);
-  transform: translateX(-50%);
-  color: var(--text-faint); font-size: 12px; letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-body.tm-web-wallet #splash-tagline .footer-lock { color: var(--gold-deep); font-size: 12px; }
-@media (max-width: 460px) {
-  body.tm-web-wallet #splash-screen {
-    top: 0; left: 0; transform: none;
-    width: 100%; height: 100%;
-    max-width: 100%; max-height: 100%;
-    border-radius: 0; border: none;
-  }
-  body.tm-web-wallet #splash-tagline { display: none; }
-}
-@media (max-width: 460px) {
-  body.tm-web-wallet { padding: 0; }
-  body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
-}
