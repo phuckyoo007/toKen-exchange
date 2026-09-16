@@ -41,6 +41,32 @@ function formatCurrency(amount) {
   return `${currencySymbol()}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// ---------------------------------------------------------------- PORTFOLIO TOTAL
+// The main screen's hero number used to be just the native coin's USD
+// value. MetaMask and Coinbase Wallet both lead with a combined value
+// across everything the account holds, so this adds the native balance's
+// USD value to all tracked tokens' USD values and shows that combined
+// figure as the lead number, with the native amount still visible
+// underneath (see .balance-native-row). Native pricing and token pricing
+// are two separate best-effort fetches that already run independently
+// (refreshBalanceUsd / refreshTokens) -- each reports its own subtotal
+// here and whichever finishes updates the combined total, so a slow or
+// failed CoinGecko call for one half never blocks the other from showing.
+// portfolioGen guards against a stale, slower fetch from a *previous*
+// account/network overwriting a newer one after a fast switch.
+let portfolioGen = 0;
+let portfolioNativeUsd = null; // number | null (null = native price unavailable)
+let portfolioTokensUsd = null; // number | null (null = tracked-token fetch failed; 0 = fetched, none priced)
+
+function renderPortfolioTotal() {
+  if (portfolioNativeUsd == null && portfolioTokensUsd == null) return showUsdUnavailable();
+  const total = (portfolioNativeUsd || 0) + (portfolioTokensUsd || 0);
+  document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
+  $("balance-usd").textContent = formatCurrency(total);
+  $("balance-usd").classList.remove("hidden");
+  if ($("balance-usd-label")) $("balance-usd-label").classList.remove("hidden");
+}
+
 // ---------------------------------------------------------------- NETWORK COLORS
 // Each chain's own brand color, the same small colored dot MetaMask (and
 // basically every other multi-chain wallet) shows next to a network's
@@ -90,10 +116,47 @@ function tokenIconColor(symbol) {
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   return `hsl(${h % 360}, 55%, 46%)`;
 }
-function tokenIconHtml(symbol) {
+// A real logo (when one is known) is layered on top of the colored-initial
+// circle rather than replacing it -- the initials stay in the DOM as a
+// built-in fallback, and if the image 404s or the host is unreachable, its
+// onerror just removes the <img>, revealing the initials underneath with
+// no flash of a broken-image icon. imageUrl is either a URL this app built
+// itself from trusted, fixed pieces (see trustWalletLogoUrl below) or came
+// back from CoinGecko's own /coins/markets response (see prices.js) -- not
+// arbitrary third-party metadata -- so no extra sanitization is needed
+// beyond the existing HTML-attribute escaping.
+function tokenIconHtml(symbol, imageUrl) {
   const s = String(symbol || "?").trim();
   const initials = escapeHtml((s.slice(0, 2) || "?").toUpperCase());
-  return `<span class="token-icon" style="background:${tokenIconColor(s)}">${initials}</span>`;
+  const img = imageUrl
+    ? `<img class="token-icon-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" onerror="this.remove()" />`
+    : "";
+  return `<span class="token-icon" style="background:${tokenIconColor(s)}">${initials}${img}</span>`;
+}
+
+// Trust Wallet's public, keyless asset repository -- the same free source
+// many wallets pull ERC-20 logos from by contract address, no API key or
+// backend needed (consistent with the rest of this app). A wrong/missing
+// mapping or an unlisted token just means tokenIconHtml's onerror fallback
+// kicks in -- never a broken image or a failed render.
+const TRUST_WALLET_CHAIN_FOLDER = {
+  ethereum: "ethereum",
+  base: "base",
+  polygon: "polygon",
+  bsc: "smartchain",
+  arbitrum: "arbitrum",
+  optimism: "optimism",
+};
+function trustWalletLogoUrl(networkKey, address) {
+  const folder = TRUST_WALLET_CHAIN_FOLDER[networkKey];
+  if (!folder || !address) return null;
+  let checksummed;
+  try {
+    checksummed = ethers.utils.getAddress(address);
+  } catch (e) {
+    return null;
+  }
+  return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${checksummed}/logo.png`;
 }
 
 function escapeHtml(str) {
@@ -237,9 +300,16 @@ async function refreshMain() {
   // the native amount underneath fills in once the RPC call resolves.
   $("balance-usd").innerHTML = `<img class="balance-coin-spinner" src="img/spinner-coin.png" alt="" />`;
   $("balance-usd").classList.remove("hidden");
+  if ($("balance-usd-label")) $("balance-usd-label").classList.add("hidden"); // shown once renderPortfolioTotal has a real number
   $("balance-amount").textContent = "";
   $("balance-symbol").textContent = "";
   document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
+  // Fresh generation for the combined portfolio total (see PORTFOLIO TOTAL
+  // above) -- an account/network switch invalidates any total still being
+  // computed for the previous one.
+  portfolioGen++;
+  portfolioNativeUsd = null;
+  portfolioTokensUsd = null;
   refreshBalance();
   refreshTokens(); // not awaited -- same reasoning as the balance above
   refreshNfts(); // not awaited -- same reasoning as the balance above
@@ -258,12 +328,12 @@ async function refreshBalance() {
     refreshBalanceUsd(); // not awaited -- a slow/rate-limited price API shouldn't block the balance display
   } catch (e) {
     $("balance-amount").textContent = "--";
-    // No native amount to base a USD estimate on either -- fall back to
-    // showing that "--" as the lead number instead of leaving the
-    // balance box looking empty.
-    $("balance-usd").innerHTML = "";
-    $("balance-usd").classList.add("hidden");
-    document.querySelector(".balance-native-row").classList.add("balance-lead-fallback");
+    // No native amount to base a USD estimate on -- but tracked tokens may
+    // still have a value, so let the combined-total renderer decide: it
+    // shows a tokens-only total if one's available, or falls back to "--"
+    // as the lead number (via showUsdUnavailable) if nothing is.
+    portfolioNativeUsd = null;
+    renderPortfolioTotal();
     showError("main-error", TM_I18N.t("main.balanceFetchErrorPrefix") + e.message);
   }
 }
@@ -407,17 +477,29 @@ $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen();
 
 // ---------------------------------------------------------------- TOKENS
 async function refreshTokens() {
+  const myGen = portfolioGen;
   let res;
   try {
     res = await sendMsg("TM_GET_TRACKED_TOKEN_BALANCES");
   } catch (e) {
-    return; // best-effort -- don't let this disrupt the rest of the main screen
+    // best-effort -- don't let this disrupt the rest of the main screen,
+    // but the combined portfolio total (see PORTFOLIO TOTAL above) does
+    // need to know this half is unavailable rather than silently zero.
+    if (myGen === portfolioGen) {
+      portfolioTokensUsd = null;
+      renderPortfolioTotal();
+    }
+    return;
   }
 
   const list = $("tokens-list");
   list.innerHTML = "";
   if (!res.tokens.length) {
     $("tokens-empty").classList.remove("hidden");
+    if (myGen === portfolioGen) {
+      portfolioTokensUsd = 0;
+      renderPortfolioTotal();
+    }
     return;
   }
   $("tokens-empty").classList.add("hidden");
@@ -434,13 +516,15 @@ async function refreshTokens() {
     prices = {};
   }
 
+  let tokensUsdTotal = 0;
   res.tokens.forEach((t) => {
     const row = document.createElement("div");
     row.className = "token-row";
     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
     const priceEntry = prices[t.address.toLowerCase()];
-    const usdText =
-      priceEntry && typeof priceEntry.price === "number" ? formatCurrency(Number(formatted) * priceEntry.price) : "";
+    const usdValue = priceEntry && typeof priceEntry.price === "number" ? Number(formatted) * priceEntry.price : 0;
+    if (usdValue) tokensUsdTotal += usdValue;
+    const usdText = usdValue ? formatCurrency(usdValue) : "";
     const nameEl = document.createElement("span");
     nameEl.className = "token-name muted small";
     nameEl.textContent = t.name || (t.error ? TM_I18N.t("tokens.loadError") : "");
@@ -472,12 +556,17 @@ async function refreshTokens() {
       await refreshTokens();
     });
 
-    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol));
+    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol, trustWalletLogoUrl(currentNetwork && currentNetwork.key, t.address)));
     row.appendChild(mainEl);
     row.appendChild(balEl);
     row.appendChild(removeBtn);
     list.appendChild(row);
   });
+
+  if (myGen === portfolioGen) {
+    portfolioTokensUsd = tokensUsdTotal;
+    renderPortfolioTotal();
+  }
 }
 
 // ---------------------------------------------------------------- NFTS
@@ -669,23 +758,28 @@ function showUsdUnavailable() {
   // popup.css) so the balance box never reads as empty, just native-only.
   $("balance-usd").innerHTML = "";
   $("balance-usd").classList.add("hidden");
+  if ($("balance-usd-label")) $("balance-usd-label").classList.add("hidden");
   document.querySelector(".balance-native-row").classList.add("balance-lead-fallback");
 }
 
 async function refreshBalanceUsd() {
-  if (!currentNetwork) return showUsdUnavailable();
+  const myGen = portfolioGen;
+  if (!currentNetwork) {
+    portfolioNativeUsd = null;
+    return renderPortfolioTotal();
+  }
   try {
     const price = await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
-    if (price == null) return showUsdUnavailable();
+    if (myGen !== portfolioGen) return; // a newer refreshMain() has since started
     const amount = Number($("balance-amount").textContent) || 0;
-    document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
-    $("balance-usd").textContent = formatCurrency(amount * price);
-    $("balance-usd").classList.remove("hidden");
+    portfolioNativeUsd = price == null ? null : amount * price;
   } catch (e) {
     // Price lookups are best-effort -- a rate-limited or unreachable
     // CoinGecko shouldn't disrupt the rest of the wallet UI.
-    showUsdUnavailable();
+    if (myGen !== portfolioGen) return;
+    portfolioNativeUsd = null;
   }
+  renderPortfolioTotal();
 }
 
 // ---------------------------------------------------------------- WATCHLIST
@@ -736,7 +830,7 @@ function renderPriceRow(c) {
   }
   const starred = isWatchlisted(c.symbol);
   row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(c.symbol)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
+    <span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
     <span class="price-right"><button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button><span class="price-usd">${priceText}</span>${changeHtml}</span>
   `;
   row.querySelector(".star-btn").addEventListener("click", (e) => {
@@ -1208,7 +1302,18 @@ async function executeSend({ to, amountStr, isNative, tokenAddress }) {
   $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
   $("send-status").classList.remove("hidden");
   const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
-  recordActivity({ amount: amountStr, asset: sentAsset, to, txHash: res.txHash });
+  // Captured at send time (not looked up again when the Activity list is
+  // rendered) so a later network switch can't make an old entry link to
+  // the wrong chain's explorer -- each entry always points at whichever
+  // network the transaction actually went out on.
+  recordActivity({
+    amount: amountStr,
+    asset: sentAsset,
+    to,
+    txHash: res.txHash,
+    blockExplorer: (currentNetwork && currentNetwork.blockExplorer) || "",
+    networkName: (currentNetwork && currentNetwork.name) || "",
+  });
   await refreshBalance();
 }
 
@@ -1896,6 +2001,23 @@ $("btn-contact-add").addEventListener("click", async () => {
   renderContacts();
 });
 
+// Builds a block-explorer tx URL from data recorded at send time (see
+// executeSend), the same way MetaMask/Coinbase Wallet make each Activity
+// entry open its transaction on Etherscan (or that chain's equivalent).
+// Both inputs are ultimately app-controlled (this wallet's own networks.js
+// list, or a URL the user themselves typed in when adding a custom
+// network) rather than attacker-supplied, but this still only builds a
+// link for a well-formed http(s) explorer base + a real-looking tx hash --
+// never for anything else -- so a bad/missing value just means no link
+// instead of a broken or unexpected one. Returns null when there's nothing
+// safe to link to (older activity entries recorded before this feature
+// existed won't have blockExplorer/txHash in this shape, for instance).
+function buildExplorerTxUrl(blockExplorer, txHash) {
+  if (!blockExplorer || typeof blockExplorer !== "string" || !/^https:\/\//i.test(blockExplorer)) return null;
+  if (!txHash || typeof txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) return null;
+  return `${blockExplorer.replace(/\/+$/, "")}/tx/${txHash}`;
+}
+
 // record of sends made from this device, kept in chrome.storage.local.
 const TM_ACTIVITY_KEY = "tm_activity";
 const TM_ACTIVITY_MAX = 50;
@@ -1919,8 +2041,19 @@ function renderActivity() {
       return;
     }
     list.forEach((item) => {
-      const card = document.createElement("div");
-      card.className = "activity-entry";
+      const explorerUrl = buildExplorerTxUrl(item.blockExplorer, item.txHash);
+      // A real <a> when there's somewhere to link -- free keyboard access,
+      // "open in new tab", and middle-click, instead of reimplementing all
+      // of that on a plain div. Falls back to a plain div (unchanged from
+      // before) for entries with no usable link.
+      const card = document.createElement(explorerUrl ? "a" : "div");
+      card.className = "activity-entry" + (explorerUrl ? " activity-entry-linked" : "");
+      if (explorerUrl) {
+        card.href = explorerUrl;
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+        card.title = TM_I18N.t("activity.viewOnExplorer");
+      }
 
       // Directional icon -- every entry here is an outgoing send (this log
       // has no incoming/receive tracking yet), shown the same way MetaMask

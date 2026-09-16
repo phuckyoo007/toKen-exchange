@@ -132,6 +132,7 @@
       <button id="btn-settings" class="icon-btn" data-i18n-title="main.settingsTitle" title="Settings">&#9881;</button>
     </div>
     <div class="balance-box">
+      <div id="balance-usd-label" class="balance-usd-label hidden" data-i18n="main.portfolioLabel">Total balance</div>
       <div id="balance-usd" class="hidden"></div>
       <div class="balance-native-row">
         <span id="balance-amount">0</span>
@@ -172,7 +173,10 @@
         <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
       </div>
       <div id="tokens-list" class="tokens-list"></div>
-      <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
+      <div id="tokens-empty" class="empty-state hidden">
+        <span class="empty-state-icon" aria-hidden="true">🪙</span>
+        <p class="muted small" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
+      </div>
     </div>
 
     <div class="tokens-section">
@@ -181,7 +185,10 @@
         <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
       </div>
       <div id="nft-grid" class="nft-grid"></div>
-      <p id="nfts-empty" class="muted small hidden" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
+      <div id="nfts-empty" class="empty-state hidden">
+        <span class="empty-state-icon" aria-hidden="true">🖼️</span>
+        <p class="muted small" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
+      </div>
     </div>
 
     <div class="network-picker">

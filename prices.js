@@ -130,21 +130,58 @@ async function fetchPrices(ids, currency) {
   return { data, currency: vsCurrency };
 }
 
+// Separate small in-memory cache for the price BOARD specifically (kept
+// apart from fetchPrices()'s cache above, and calling a different
+// endpoint) -- CoinGecko's /coins/markets returns price, 24h change, AND
+// each coin's own logo image in one call, which /simple/price above
+// doesn't provide. Isolating this to its own function/cache means the
+// board's request shape can't affect fetchPrices()'s existing callers
+// (native-coin balance pricing, token pricing, the send-fee USD estimate).
+let priceBoardCache = { fetchedAt: 0, cacheKey: "", data: null };
+
+async function fetchPriceBoardMarkets(ids, currency) {
+  const vsCurrency = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const idsKey = [...new Set(ids)].sort().join(",");
+  const cacheKey = `${idsKey}|${vsCurrency}`;
+  const now = Date.now();
+  if (priceBoardCache.data && priceBoardCache.cacheKey === cacheKey && now - priceBoardCache.fetchedAt < CACHE_TTL_MS) {
+    return priceBoardCache.data;
+  }
+  const url = `${COINGECKO_BASE}/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&price_change_percentage=24h`;
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (e) {
+    throw new Error("Couldn't reach CoinGecko for live prices. Check your internet connection.");
+  }
+  if (!res.ok) {
+    throw new Error(`CoinGecko price request failed (HTTP ${res.status}).`);
+  }
+  const rows = await res.json();
+  const byId = {};
+  (Array.isArray(rows) ? rows : []).forEach((r) => {
+    byId[r.id] = r;
+  });
+  priceBoardCache = { fetchedAt: now, cacheKey, data: byId };
+  return byId;
+}
+
 // Returns the fixed PRICE_BOARD list, each entry filled in with its live
-// price (in the given display currency, USD by default) and 24h change
-// (null if CoinGecko didn't return that coin, e.g. a request that partially
-// fails).
+// price (in the given display currency, USD by default), 24h change, and a
+// real logo image URL straight from CoinGecko (null for any of these if
+// CoinGecko didn't return that coin, e.g. a request that partially fails).
 async function getPriceBoard(currency) {
   const ids = PRICE_BOARD.map((c) => COINGECKO_IDS[c.symbol]);
-  const { data, currency: vsCurrency } = await fetchPrices(ids, currency);
+  const byId = await fetchPriceBoardMarkets(ids, currency);
   return PRICE_BOARD.map((c) => {
     const id = COINGECKO_IDS[c.symbol];
-    const entry = data[id];
+    const entry = byId[id];
     return {
       symbol: c.symbol,
       name: c.name,
-      price: entry ? entry[vsCurrency] : null,
-      change24h: entry ? entry[`${vsCurrency}_24h_change`] : null,
+      price: entry ? entry.current_price : null,
+      change24h: entry && typeof entry.price_change_percentage_24h === "number" ? entry.price_change_percentage_24h : null,
+      image: entry ? entry.image : null,
     };
   });
 }

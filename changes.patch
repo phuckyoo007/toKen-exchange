@@ -1,1119 +1,646 @@
 diff --git a/app.css b/app.css
-index 7fc250d..b189a94 100644
+index b189a94..b0ae75b 100644
 --- a/app.css
 +++ b/app.css
-@@ -231,6 +231,46 @@ body {
-     transparent 100%);
+@@ -297,6 +297,19 @@ body {
+   padding: 10px 12px; border-radius: 12px;
+   background: var(--bg-raised); border: 1px solid var(--line);
  }
- #splash-screen.splash-home #splash-tabbar { display: flex; }
-+
-+/* Before any wallet exists yet (screen-onboarding) or while one exists but
-+   is locked (screen-unlock), the splash still lingers instead of
-+   auto-fading -- see activateSplashLanding() -- but showing the
-+   Home/Assets/Activity/Send bar here makes no sense: those are existing-
-+   wallet features and there's nothing to tap that actually starts
-+   onboarding or unlocking. This swaps that bar for one plain "tap to
-+   continue" hint, and the whole splash becomes a single big tap target
-+   (see activateSplashLanding()), so a first-time visitor isn't left
-+   guessing which nav icon dismisses a screen that never explained itself. */
-+#splash-screen.splash-landing #splash-spinner { display: none; }
-+#splash-screen.splash-landing #splash-tabbar { display: none; }
-+#splash-screen.splash-landing { cursor: pointer; }
-+#splash-continue-hint {
-+  display: none;
-+  position: absolute;
-+  left: 0; right: 0; bottom: 0;
-+  z-index: 1;
-+  /* Same 132px min-height and gradient shape as #splash-tabbar above --
-+     this still has to fully cover the artwork's own baked-in tab-bar
-+     ghost (~45-95px up from the bottom) even though no real buttons
-+     render here in landing mode. */
-+  min-height: 132px;
-+  align-items: center;
-+  justify-content: center;
-+  padding: 10px 10px calc(24px + env(safe-area-inset-bottom, 0px));
-+  background: linear-gradient(to top,
-+    rgba(9, 11, 17, 0.99) 0%,
-+    rgba(9, 11, 17, 0.99) 68%,
-+    rgba(9, 11, 17, 0.9) 82%,
-+    rgba(9, 11, 17, 0.4) 94%,
-+    transparent 100%);
-+  color: var(--gold-bright);
-+  font-family: var(--font-display);
-+  font-weight: 700;
-+  font-size: 13px;
-+  letter-spacing: 0.04em;
-+  text-transform: uppercase;
++/* Entries with a real block-explorer link (see buildExplorerTxUrl in
++   app.js) render as an <a>, not a div -- reset its default link styling
++   back to looking like the rest of the list, then add just enough of a
++   hover/focus cue plus a small external-link glyph to signal it's
++   clickable, the same way MetaMask/Coinbase Wallet's activity rows do. */
++a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
++.activity-entry-linked:hover, .activity-entry-linked:focus-visible {
++  border-color: var(--gold-deep); background: var(--bg-hover);
 +}
-+#splash-screen.splash-landing #splash-continue-hint { display: flex; }
- .splash-tab {
-   flex: 1;
-   display: flex;
-@@ -663,6 +703,42 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
++.activity-entry-linked::after {
++  content: "↗"; flex-shrink: 0; align-self: flex-start;
++  font-size: 12px; color: var(--text-faint); margin-left: 2px;
++}
+ /* Every logged entry is currently an outgoing send -- a small circular
+    badge with an up-right arrow, the same visual shorthand MetaMask's own
+    activity feed uses to mark a send at a glance. */
+@@ -378,12 +391,30 @@ body {
+ /* ---------------- layout ---------------- */
+ .screen {
+   padding: 18px 16px; flex: 1; display: flex; flex-direction: column; gap: 11px;
+-  /* Deliberately NOT animated (no opacity fade-in): a fade briefly shows
+-     every card at partial opacity, letting the backdrop bleed through
+-     underneath -- the same "goes translucent" problem fixed on the splash
+-     screen, but on every single screen change/button click instead. Cards
+-     now render at full opacity immediately, matching the solid look they
+-     have once settled. */
++  /* Deliberately NOT opacity-animated: a fade briefly shows every card at
++     partial opacity, letting the backdrop bleed through underneath -- the
++     same "goes translucent" problem fixed on the splash screen, but on
++     every single screen change/button click instead. Cards render at full
++     opacity immediately, matching the solid look they have once settled.
++     A screen still gets a small transform-only entrance below, which
++     never touches opacity so it can't reintroduce that bug -- it just
++     keeps navigation from feeling like an instant, jarring cut. */
++}
++/* Runs once each time a screen goes from .hidden (display:none, so no
++   animation applies) to shown -- CSS starts a fresh animation whenever an
++   element newly matches a rule with an animation-name, which is exactly
++   the show/hide toggle showScreen() already does, so no JS changes were
++   needed to trigger this. Transform + a hair of scale only, same as a
++   native app's push/pop transition -- opacity is never touched. */
++@keyframes screenEnter {
++  from { transform: translateY(6px) scale(0.985); }
++  to { transform: translateY(0) scale(1); }
++}
++.screen:not(.hidden) {
++  animation: screenEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
++}
++@media (prefers-reduced-motion: reduce) {
++  .screen:not(.hidden) { animation: none; }
  }
- .token-remove-btn:hover { color: var(--danger); }
+ .hidden { display: none !important; }
  
-+/* NFTs are shown as image thumbnails rather than balance rows -- a small
-+   grid instead of .tokens-list's stacked rows -- but the outer
-+   .tokens-section/.tokens-header/.tokens-title classes are reused as-is so
-+   this section matches the Tokens card above it exactly (same backdrop
-+   strip, same header style). */
-+.nft-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-+.nft-grid:not(:empty) { margin-bottom: 2px; }
-+.nft-card {
+@@ -616,6 +647,16 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
+    USD estimate to show (CoinGecko unreachable/rate-limited), the native
+    row itself takes over the lead styling via .balance-lead-fallback
+    below, so the balance box never reads as empty. */
++/* Small caption above the hero number, clarifying that it's now a combined
++   total across the native balance + all tracked tokens, not just one
++   coin's value -- hidden whenever the fallback (.balance-lead-fallback)
++   takes over, since "Total balance" reads oddly labeling a lone native
++   amount. */
++.balance-usd-label {
++  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
++  color: var(--text-muted);
++  margin-bottom: 2px;
++}
+ #balance-usd {
+   font-family: var(--font-display); font-weight: 700;
+   font-size: 30px; letter-spacing: 0.01em;
+@@ -680,17 +721,44 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
+ .tokens-list { display: flex; flex-direction: column; gap: 6px; }
+ .tokens-list:not(:empty) { margin-bottom: 2px; }
+ #tokens-empty { margin: 2px 0 0; }
++/* Friendlier empty states for the Tokens/NFTs sections -- a small icon
++   above the existing muted hint text, instead of just a bare line, so an
++   empty section reads as "nothing added yet" rather than "something's
++   missing/broken". Purely decorative (aria-hidden) since the text below
++   already says the same thing to a screen reader. */
++.empty-state {
++  display: flex; flex-direction: column; align-items: center;
++  text-align: center; gap: 4px;
++  padding: 10px 6px 4px;
++}
++.empty-state-icon {
++  font-size: 26px; line-height: 1;
++  opacity: 0.75;
++  filter: grayscale(0.15);
++}
++.empty-state p { margin: 0; }
+ .token-row {
+   display: flex; align-items: center; gap: 8px;
+   background: var(--bg-raised); border: 1px solid var(--line);
+   border-radius: 8px; padding: 8px 10px; font-size: 13px;
+ }
+ .token-icon {
 +  position: relative;
-+  background: var(--bg-raised); border: 1px solid var(--line);
-+  border-radius: 8px; padding: 6px; text-align: center;
+   display: flex; align-items: center; justify-content: center;
+   flex-shrink: 0;
+   width: 28px; height: 28px; border-radius: 50%;
+   font-size: 10px; font-weight: 800; letter-spacing: -0.02em;
+   color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.35);
++  overflow: hidden;
 +}
-+.nft-thumb {
-+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
-+  border-radius: 6px; background: var(--bg-inset);
-+  display: block; margin-bottom: 4px;
-+}
-+.nft-thumb-fallback {
-+  width: 100%; aspect-ratio: 1 / 1; border-radius: 6px;
-+  background: var(--bg-inset); display: flex; align-items: center; justify-content: center;
-+  color: var(--text-faint); font-size: 10px; margin-bottom: 4px;
-+}
-+.nft-name {
-+  display: block; font-size: 11px; color: var(--text);
-+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-+}
-+.nft-id { display: block; font-size: 9.5px; color: var(--text-faint); font-family: var(--font-mono); }
-+.nft-remove-btn {
-+  position: absolute; top: 2px; right: 2px;
-+  width: 18px; height: 18px; border-radius: 50%;
-+  background: rgba(9, 11, 17, 0.75); border: 1px solid var(--line);
-+  color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer;
-+  display: flex; align-items: center; justify-content: center; padding: 0;
-+}
-+.nft-remove-btn:hover { color: var(--danger); }
-+
- .prices-list {
-   display: flex; flex-direction: column; gap: 6px;
-   background: var(--bg-inset); border: 1px solid var(--line);
++/* A real logo, when one loads, sits on top of the colored initials rather
++   than replacing them in the DOM -- see tokenIconHtml() in app.js. Sized to
++   fill whatever size .token-icon is at each call site (28px here, smaller
++   in .price-left/.prices-card-list below) rather than a fixed size. */
++.token-icon-img {
++  position: absolute; inset: 0;
++  width: 100%; height: 100%;
++  border-radius: 50%; object-fit: cover;
+ }
+ .token-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+ .token-symbol { font-weight: 600; color: var(--text); }
 diff --git a/app.js b/app.js
-index 7644037..e1c69a7 100644
+index e1c69a7..560ea36 100644
 --- a/app.js
 +++ b/app.js
-@@ -195,6 +195,7 @@ $("btn-goto-support-unlock").addEventListener("click", () => openSupport("screen
+@@ -41,6 +41,32 @@ function formatCurrency(amount) {
+   return `${currencySymbol()}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+ }
  
- // ---------------------------------------------------------------- MAIN
- async function refreshMain() {
-+  armAutoLock(); // every path that reaches the main screen is an unlocked session
-   currentStatus = await sendMsg("TM_GET_STATUS");
-   const netRes = await sendMsg("TM_GET_NETWORKS");
-   currentNetworks = netRes.networks;
-@@ -241,6 +242,7 @@ async function refreshMain() {
++// ---------------------------------------------------------------- PORTFOLIO TOTAL
++// The main screen's hero number used to be just the native coin's USD
++// value. MetaMask and Coinbase Wallet both lead with a combined value
++// across everything the account holds, so this adds the native balance's
++// USD value to all tracked tokens' USD values and shows that combined
++// figure as the lead number, with the native amount still visible
++// underneath (see .balance-native-row). Native pricing and token pricing
++// are two separate best-effort fetches that already run independently
++// (refreshBalanceUsd / refreshTokens) -- each reports its own subtotal
++// here and whichever finishes updates the combined total, so a slow or
++// failed CoinGecko call for one half never blocks the other from showing.
++// portfolioGen guards against a stale, slower fetch from a *previous*
++// account/network overwriting a newer one after a fast switch.
++let portfolioGen = 0;
++let portfolioNativeUsd = null; // number | null (null = native price unavailable)
++let portfolioTokensUsd = null; // number | null (null = tracked-token fetch failed; 0 = fetched, none priced)
++
++function renderPortfolioTotal() {
++  if (portfolioNativeUsd == null && portfolioTokensUsd == null) return showUsdUnavailable();
++  const total = (portfolioNativeUsd || 0) + (portfolioTokensUsd || 0);
++  document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
++  $("balance-usd").textContent = formatCurrency(total);
++  $("balance-usd").classList.remove("hidden");
++  if ($("balance-usd-label")) $("balance-usd-label").classList.remove("hidden");
++}
++
+ // ---------------------------------------------------------------- NETWORK COLORS
+ // Each chain's own brand color, the same small colored dot MetaMask (and
+ // basically every other multi-chain wallet) shows next to a network's
+@@ -90,10 +116,47 @@ function tokenIconColor(symbol) {
+   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+   return `hsl(${h % 360}, 55%, 46%)`;
+ }
+-function tokenIconHtml(symbol) {
++// A real logo (when one is known) is layered on top of the colored-initial
++// circle rather than replacing it -- the initials stay in the DOM as a
++// built-in fallback, and if the image 404s or the host is unreachable, its
++// onerror just removes the <img>, revealing the initials underneath with
++// no flash of a broken-image icon. imageUrl is either a URL this app built
++// itself from trusted, fixed pieces (see trustWalletLogoUrl below) or came
++// back from CoinGecko's own /coins/markets response (see prices.js) -- not
++// arbitrary third-party metadata -- so no extra sanitization is needed
++// beyond the existing HTML-attribute escaping.
++function tokenIconHtml(symbol, imageUrl) {
+   const s = String(symbol || "?").trim();
+   const initials = escapeHtml((s.slice(0, 2) || "?").toUpperCase());
+-  return `<span class="token-icon" style="background:${tokenIconColor(s)}">${initials}</span>`;
++  const img = imageUrl
++    ? `<img class="token-icon-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" onerror="this.remove()" />`
++    : "";
++  return `<span class="token-icon" style="background:${tokenIconColor(s)}">${initials}${img}</span>`;
++}
++
++// Trust Wallet's public, keyless asset repository -- the same free source
++// many wallets pull ERC-20 logos from by contract address, no API key or
++// backend needed (consistent with the rest of this app). A wrong/missing
++// mapping or an unlisted token just means tokenIconHtml's onerror fallback
++// kicks in -- never a broken image or a failed render.
++const TRUST_WALLET_CHAIN_FOLDER = {
++  ethereum: "ethereum",
++  base: "base",
++  polygon: "polygon",
++  bsc: "smartchain",
++  arbitrum: "arbitrum",
++  optimism: "optimism",
++};
++function trustWalletLogoUrl(networkKey, address) {
++  const folder = TRUST_WALLET_CHAIN_FOLDER[networkKey];
++  if (!folder || !address) return null;
++  let checksummed;
++  try {
++    checksummed = ethers.utils.getAddress(address);
++  } catch (e) {
++    return null;
++  }
++  return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${checksummed}/logo.png`;
+ }
+ 
+ function escapeHtml(str) {
+@@ -237,9 +300,16 @@ async function refreshMain() {
+   // the native amount underneath fills in once the RPC call resolves.
+   $("balance-usd").innerHTML = `<img class="balance-coin-spinner" src="img/spinner-coin.png" alt="" />`;
+   $("balance-usd").classList.remove("hidden");
++  if ($("balance-usd-label")) $("balance-usd-label").classList.add("hidden"); // shown once renderPortfolioTotal has a real number
+   $("balance-amount").textContent = "";
+   $("balance-symbol").textContent = "";
    document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
++  // Fresh generation for the combined portfolio total (see PORTFOLIO TOTAL
++  // above) -- an account/network switch invalidates any total still being
++  // computed for the previous one.
++  portfolioGen++;
++  portfolioNativeUsd = null;
++  portfolioTokensUsd = null;
    refreshBalance();
    refreshTokens(); // not awaited -- same reasoning as the balance above
-+  refreshNfts(); // not awaited -- same reasoning as the balance above
-   refreshMainPricesCard(); // not awaited -- same reasoning as the balance above
-   refreshMainPredictionsCard(); // not awaited -- same reasoning as the balance above
- }
-@@ -283,15 +285,81 @@ function updateAccountIdenticon(address) {
- }
- 
- const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
-+// A loose "this looks like a name, not an address" check -- good enough to
-+// decide whether to attempt an ENS lookup at all. The lookup itself (see
-+// TM_RESOLVE_NAME in wallet-engine.js) is what actually confirms it.
-+const NAME_LIKE_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
-+
-+// Resolving "vitalik.eth" (or any other ENS name) to an address, the same
-+// convenience MetaMask and Coinbase Wallet offer -- this app previously
-+// required pasting a raw 0x address every time. Only ever resolved via
-+// ethers' own provider.resolveName() (mainnet has a known ENS registry;
-+// other chains predictably come back empty and the field just behaves as
-+// an address field, same as before). The resolved address is always shown
-+// before it's used for anything -- never sent to silently on trust in the
-+// name alone.
-+let resolvedNameKey = null; // the exact input text this resolution is for
-+let resolvedNameAddress = null;
-+let sendToResolveToken = 0;
-+let sendToResolveTimer = null;
-+
-+function currentSendToAddress() {
-+  const val = $("send-to").value.trim();
-+  if (ADDRESS_RE.test(val)) return val;
-+  if (resolvedNameAddress && resolvedNameKey === val) return resolvedNameAddress;
-+  return null;
-+}
-+
-+async function resolveSendToName(name) {
-+  const myToken = ++sendToResolveToken;
-+  $("send-to-resolved").classList.remove("hidden");
-+  $("send-to-resolved").textContent = TM_I18N.t("send.resolvingName", { name });
-+  try {
-+    const res = await sendMsg("TM_RESOLVE_NAME", { name });
-+    if (myToken !== sendToResolveToken) return;
-+    if (res.address) {
-+      resolvedNameKey = name;
-+      resolvedNameAddress = res.address;
-+      $("send-to-resolved").textContent = TM_I18N.t("send.resolvedName", { address: res.address });
-+      $("send-to-identicon").innerHTML = TM_IDENTICON.svgFor(res.address, 24);
-+      $("send-to-identicon").classList.remove("hidden");
-+    } else {
-+      resolvedNameKey = null;
-+      resolvedNameAddress = null;
-+      $("send-to-resolved").textContent = TM_I18N.t("send.nameNotFound", { name });
-+    }
-+  } catch (e) {
-+    if (myToken !== sendToResolveToken) return;
-+    resolvedNameKey = null;
-+    resolvedNameAddress = null;
-+    $("send-to-resolved").textContent = TM_I18N.t("send.nameResolutionUnsupported");
-+  } finally {
-+    if (myToken === sendToResolveToken) refreshSendFeePreview();
-+  }
-+}
-+
- $("send-to").addEventListener("input", (e) => {
-   const el = $("send-to-identicon");
-   const val = e.target.value.trim();
-+  resolvedNameKey = null;
-+  resolvedNameAddress = null;
-+  clearTimeout(sendToResolveTimer);
-+  sendToResolveToken++; // invalidate any in-flight lookup for the previous value
-+
-   if (ADDRESS_RE.test(val)) {
-     el.innerHTML = TM_IDENTICON.svgFor(val, 24);
-     el.classList.remove("hidden");
-+    $("send-to-resolved").classList.add("hidden");
-+    $("send-to-resolved").textContent = "";
-+  } else if (NAME_LIKE_RE.test(val)) {
-+    el.classList.add("hidden");
-+    el.innerHTML = "";
-+    sendToResolveTimer = setTimeout(() => resolveSendToName(val), 500);
-   } else {
-     el.classList.add("hidden");
-     el.innerHTML = "";
-+    $("send-to-resolved").classList.add("hidden");
-+    $("send-to-resolved").textContent = "";
+   refreshNfts(); // not awaited -- same reasoning as the balance above
+@@ -258,12 +328,12 @@ async function refreshBalance() {
+     refreshBalanceUsd(); // not awaited -- a slow/rate-limited price API shouldn't block the balance display
+   } catch (e) {
+     $("balance-amount").textContent = "--";
+-    // No native amount to base a USD estimate on either -- fall back to
+-    // showing that "--" as the lead number instead of leaving the
+-    // balance box looking empty.
+-    $("balance-usd").innerHTML = "";
+-    $("balance-usd").classList.add("hidden");
+-    document.querySelector(".balance-native-row").classList.add("balance-lead-fallback");
++    // No native amount to base a USD estimate on -- but tracked tokens may
++    // still have a value, so let the combined-total renderer decide: it
++    // shows a tokens-only total if one's available, or falls back to "--"
++    // as the lead number (via showUsdUnavailable) if nothing is.
++    portfolioNativeUsd = null;
++    renderPortfolioTotal();
+     showError("main-error", TM_I18N.t("main.balanceFetchErrorPrefix") + e.message);
    }
- });
- 
-@@ -329,7 +397,7 @@ $("btn-toggle-qr").addEventListener("click", () => {
- });
- 
- $("btn-settings").addEventListener("click", () => showScreen("screen-settings"));
--$("btn-goto-send").addEventListener("click", () => showScreen("screen-send"));
-+$("btn-goto-send").addEventListener("click", () => { showScreen("screen-send"); refreshSendFeePreview(); });
- $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
- $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
- $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
-@@ -412,6 +480,143 @@ async function refreshTokens() {
-   });
  }
+@@ -407,17 +477,29 @@ $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen();
  
-+// ---------------------------------------------------------------- NFTS
-+// Manually added the same way tokens are (contract address, here plus a
-+// token ID) rather than auto-detected -- there's no indexer/API-key
-+// service wired into this app to enumerate "everything this address
-+// owns," and adding one would break the keyless, no-backend approach every
-+// other feature here uses. Artwork/name come from the collection's own
-+// metadata (see wallet-engine.js's sanitizeNftImageUrl/fetchNftMetadataJson)
-+// and are rendered strictly as an <img src> + textContent -- never
-+// innerHTML -- since that metadata is written by whoever deployed the NFT
-+// contract, not by this app.
-+async function refreshNfts() {
-+  let res;
-+  try {
-+    res = await sendMsg("TM_GET_TRACKED_NFTS");
-+  } catch (e) {
-+    return; // best-effort -- don't let this disrupt the rest of the main screen
-+  }
-+
-+  const grid = $("nft-grid");
-+  grid.innerHTML = "";
-+  if (!res.nfts.length) {
-+    $("nfts-empty").classList.remove("hidden");
-+    return;
-+  }
-+  $("nfts-empty").classList.add("hidden");
-+
-+  res.nfts.forEach((n) => {
-+    const card = document.createElement("div");
-+    card.className = "nft-card";
-+
-+    if (n.image) {
-+      const img = document.createElement("img");
-+      img.className = "nft-thumb";
-+      img.src = n.image; // already scheme-checked server-side (http(s) or image data: URI only)
-+      img.alt = "";
-+      img.loading = "lazy";
-+      // A broken/unreachable image link falls back to the same placeholder
-+      // a metadata fetch failure gets, instead of showing a broken-image icon.
-+      img.addEventListener("error", () => {
-+        img.replaceWith(nftThumbFallback());
-+      });
-+      card.appendChild(img);
-+    } else {
-+      card.appendChild(nftThumbFallback());
-+    }
-+
-+    const nameEl = document.createElement("span");
-+    nameEl.className = "nft-name";
-+    nameEl.textContent = n.name || (n.error ? TM_I18N.t("nfts.loadError") : `#${n.tokenId}`);
-+    card.appendChild(nameEl);
-+
-+    const idEl = document.createElement("span");
-+    idEl.className = "nft-id";
-+    idEl.textContent = `#${n.tokenId}`;
-+    card.appendChild(idEl);
-+
-+    const removeBtn = document.createElement("button");
-+    removeBtn.className = "nft-remove-btn";
-+    removeBtn.title = TM_I18N.t("nfts.removeTitle");
-+    removeBtn.textContent = "×";
-+    removeBtn.addEventListener("click", async () => {
-+      await sendMsg("TM_REMOVE_TRACKED_NFT", { contractAddress: n.contractAddress, tokenId: n.tokenId });
-+      await refreshNfts();
-+    });
-+    card.appendChild(removeBtn);
-+
-+    grid.appendChild(card);
-+  });
-+}
-+
-+function nftThumbFallback() {
-+  const el = document.createElement("div");
-+  el.className = "nft-thumb-fallback";
-+  el.textContent = "?";
-+  return el;
-+}
-+
-+function resetAddNftScreen() {
-+  hideError("add-nft-error");
-+  $("add-nft-address").value = "";
-+  $("add-nft-token-id").value = "";
-+  $("add-nft-preview").classList.add("hidden");
-+  $("add-nft-preview-image").classList.add("hidden");
-+  $("add-nft-preview-image").src = "";
-+  $("add-nft-meta-warning").classList.add("hidden");
-+  delete $("add-nft-preview").dataset.address;
-+}
-+
-+$("btn-goto-add-nft").addEventListener("click", () => { resetAddNftScreen(); showScreen("screen-add-nft"); });
-+
-+$("btn-nft-lookup").addEventListener("click", async () => {
-+  hideError("add-nft-error");
-+  $("add-nft-preview").classList.add("hidden");
-+  try {
-+    const address = $("add-nft-address").value.trim();
-+    const tokenId = $("add-nft-token-id").value.trim();
-+    if (!ethers.utils.isAddress(address)) throw new Error(TM_I18N.t("addNft.invalidAddress"));
-+    if (!/^\d+$/.test(tokenId)) throw new Error(TM_I18N.t("addNft.invalidTokenId"));
-+    const info = await sendMsg("TM_LOOKUP_NFT", { contractAddress: address, tokenId });
-+
-+    const preview = $("add-nft-preview");
-+    $("add-nft-name").textContent = info.name || TM_I18N.t("addNft.noName");
-+    $("add-nft-standard").textContent = info.standard === "erc1155" ? "ERC-1155" : "ERC-721";
-+    if (info.image) {
-+      $("add-nft-preview-image").src = info.image;
-+      $("add-nft-preview-image").classList.remove("hidden");
-+    } else {
-+      $("add-nft-preview-image").classList.add("hidden");
-+    }
-+    $("add-nft-meta-warning").classList.toggle("hidden", !info.metaError);
-+    preview.dataset.address = address;
-+    preview.dataset.tokenId = tokenId;
-+    preview.dataset.standard = info.standard;
-+    preview.dataset.name = info.name || "";
-+    preview.classList.remove("hidden");
-+  } catch (e) {
-+    showError("add-nft-error", e.message);
-+  }
-+});
-+
-+$("btn-nft-confirm-add").addEventListener("click", async () => {
-+  hideError("add-nft-error");
-+  try {
-+    const d = $("add-nft-preview").dataset;
-+    await sendMsg("TM_ADD_TRACKED_NFT", {
-+      contractAddress: d.address,
-+      tokenId: d.tokenId,
-+      standard: d.standard,
-+      name: d.name,
-+    });
-+    await refreshNfts();
-+    showScreen("screen-main");
-+  } catch (e) {
-+    showError("add-nft-error", e.message);
-+  }
-+});
-+
- function resetAddTokenScreen() {
-   hideError("add-token-error");
-   $("add-token-address").value = "";
-@@ -693,6 +898,7 @@ $("btn-goto-walletconnect").addEventListener("click", () => {
- $("btn-view-seed").addEventListener("click", () => showScreen("screen-view-seed"));
- $("btn-goto-support-settings").addEventListener("click", () => openSupport("screen-settings"));
- $("btn-lock").addEventListener("click", async () => {
-+  disarmAutoLock();
-   await sendMsg("TM_LOCK", {});
-   showScreen("screen-unlock");
- });
-@@ -747,8 +953,95 @@ $("btn-view-seed-submit").addEventListener("click", async () => {
- // ---------------------------------------------------------------- SEND
- $("send-asset-select").addEventListener("change", (e) => {
-   $("send-token-address").classList.toggle("hidden", e.target.value !== "token");
-+  refreshSendFeePreview();
- });
- 
-+// Estimated network fee, shown on the form itself before the user even
-+// taps Send -- and echoed into the confirm card below -- the same "you'll
-+// pay about this much in gas" preview MetaMask and Coinbase Wallet both
-+// show up front. This app never surfaced any fee estimate before. Always
-+// paid in the chain's native currency, whether the transfer itself is
-+// native or a token.
-+let sendFeePreviewToken = 0; // guards against a slow, stale estimate landing after a newer one
-+let lastSendFeeWei = null;
-+let sendFeePreviewTimer = null;
-+
-+function clearSendFeePreview() {
-+  lastSendFeeWei = null;
-+  $("send-fee-preview").classList.add("hidden");
-+  $("send-fee-preview").textContent = "";
-+}
-+
-+async function estimateSendFeeNow() {
-+  const to = currentSendToAddress(); // raw address, or a name already resolved to one -- never the unresolved name text
-+  const amountStr = $("send-amount").value.trim();
-+  const isNative = $("send-asset-select").value === "native";
-+  const tokenAddress = isNative ? null : $("send-token-address").value.trim();
-+
-+  if (!to || !amountStr || Number(amountStr) <= 0) {
-+    clearSendFeePreview();
-+    return;
-+  }
-+  if (!isNative && !ethers.utils.isAddress(tokenAddress)) {
-+    clearSendFeePreview();
-+    return;
-+  }
-+
-+  const myToken = ++sendFeePreviewToken;
-+  $("send-fee-preview").classList.remove("hidden");
-+  $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateLoading");
-+
-+  try {
-+    let amountWei;
-+    if (isNative) {
-+      amountWei = ethers.utils.parseEther(amountStr);
-+    } else {
-+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
-+      amountWei = ethers.utils.parseUnits(amountStr, info.decimals);
-+    }
-+    const res = await sendMsg("TM_ESTIMATE_SEND_FEE", {
-+      to,
-+      amountWei: amountWei.toString(),
-+      tokenAddress: isNative ? null : tokenAddress,
-+    });
-+    if (myToken !== sendFeePreviewToken) return; // a newer estimate has since started
-+
-+    lastSendFeeWei = res.feeWei;
-+    const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
-+    const feeFormatted = Number(ethers.utils.formatEther(res.feeWei)).toPrecision(3).replace(/\.?0+$/, "");
-+
-+    let usdText = null;
-+    try {
-+      const price = await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
-+      if (price != null) usdText = formatCurrency(Number(ethers.utils.formatEther(res.feeWei)) * price);
-+    } catch (e) {
-+      // Best-effort only -- the native-amount fee line below still stands on its own.
-+    }
-+    if (myToken !== sendFeePreviewToken) return;
-+
-+    $("send-fee-preview").textContent = usdText
-+      ? TM_I18N.t("send.feeEstimate", { fee: feeFormatted, symbol, usd: usdText })
-+      : TM_I18N.t("send.feeEstimateNoUsd", { fee: feeFormatted, symbol });
-+  } catch (e) {
-+    if (myToken !== sendFeePreviewToken) return;
-+    // Common and expected -- e.g. the amount exceeds the balance, or the
-+    // RPC is briefly unavailable. Never block sending on this: the real fee
-+    // is still confirmed by the wallet before anything is signed.
-+    lastSendFeeWei = null;
-+    $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateUnavailable");
-+  }
-+}
-+
-+// Debounced so a fast typist doesn't fire an RPC call per keystroke.
-+function refreshSendFeePreview() {
-+  clearTimeout(sendFeePreviewTimer);
-+  sendFeePreviewTimer = setTimeout(estimateSendFeeNow, 500);
-+}
-+
-+$("send-to").addEventListener("input", refreshSendFeePreview);
-+$("send-amount").addEventListener("input", refreshSendFeePreview);
-+$("send-token-address").addEventListener("input", refreshSendFeePreview);
-+
- // Send delay / cancel window -- see Settings. Every send made from this
- // screen is held for this many seconds (with a visible countdown and a
- // Cancel button) before it's actually signed and broadcast, so a
-@@ -780,6 +1073,93 @@ function populateSendDelaySelect() {
-   });
- }
- 
-+// ---------------------------------------------------------------- AUTO-LOCK
-+// unlockedSecret (see wallet-engine.js) lives in this same page's memory for
-+// as long as the tab stays open -- there's no separate background process
-+// here to time it out the way a real browser extension's service worker
-+// could. This is the page-level equivalent: after N minutes with no click,
-+// tap, or keystroke anywhere in the app, lock exactly the way the "Lock
-+// wallet" button does. 5 minutes by default (matching MetaMask's own
-+// out-of-the-box auto-lock timer), fully configurable in Settings.
-+const TM_AUTO_LOCK_KEY = "tm_auto_lock_minutes";
-+let currentAutoLockMinutes = 5;
-+let autoLockTimerId = null;
-+let autoLockArmed = false; // only true once a real wallet session is unlocked
-+let autoLockLastReset = 0;
-+
-+function loadAutoLockMinutes() {
-+  return new Promise((resolve) => {
-+    chrome.storage.local.get([TM_AUTO_LOCK_KEY], (res) => {
-+      const stored = res[TM_AUTO_LOCK_KEY];
-+      currentAutoLockMinutes = typeof stored === "number" ? stored : 5;
-+      resolve();
-+    });
-+  });
-+}
-+
-+function populateAutoLockSelect() {
-+  const sel = $("auto-lock-select");
-+  sel.value = String(currentAutoLockMinutes);
-+  sel.addEventListener("change", (e) => {
-+    currentAutoLockMinutes = Number(e.target.value) || 0;
-+    chrome.storage.local.set({ [TM_AUTO_LOCK_KEY]: currentAutoLockMinutes });
-+    resetAutoLockTimer();
-+  });
-+}
-+
-+function clearAutoLockTimer() {
-+  if (autoLockTimerId) {
-+    clearTimeout(autoLockTimerId);
-+    autoLockTimerId = null;
-+  }
-+}
-+
-+function resetAutoLockTimer() {
-+  clearAutoLockTimer();
-+  if (!autoLockArmed || !currentAutoLockMinutes) return;
-+  autoLockTimerId = setTimeout(async () => {
-+    autoLockArmed = false;
-+    try {
-+      await sendMsg("TM_LOCK", {});
-+    } catch (e) {
-+      // Already locked, or the page is mid-navigation -- either way there's
-+      // nothing left to protect, so just make sure the UI reflects it.
-+    }
-+    resetSendConfirmUi();
-+    showScreen("screen-unlock");
-+  }, currentAutoLockMinutes * 60 * 1000);
-+}
-+
-+// Arms (or re-arms) the idle timer. Called every time the app reaches an
-+// unlocked, authenticated state (see refreshMain()) -- cheap and idempotent,
-+// so calling it again on every account/network switch is fine.
-+function armAutoLock() {
-+  autoLockArmed = true;
-+  resetAutoLockTimer();
-+}
-+
-+function disarmAutoLock() {
-+  autoLockArmed = false;
-+  clearAutoLockTimer();
-+}
-+
-+// Any real user activity resets the countdown. Throttled to roughly once
-+// every 2 seconds so a stream of mousemove events doesn't churn
-+// clearTimeout/setTimeout on every pixel of movement.
-+["click", "keydown", "touchstart", "scroll", "mousemove"].forEach((evt) => {
-+  document.addEventListener(
-+    evt,
-+    () => {
-+      if (!autoLockArmed) return;
-+      const now = Date.now();
-+      if (now - autoLockLastReset < 2000) return;
-+      autoLockLastReset = now;
-+      resetAutoLockTimer();
-+    },
-+    { passive: true }
-+  );
-+});
-+
- // "Known address" = already in the address book, or already sent to from
- // this device -- used only to show a heads-up in the confirm step, never
- // to block anything.
-@@ -843,9 +1223,10 @@ $("btn-send-submit").addEventListener("click", async () => {
-   hideError("send-error");
-   $("send-status").classList.add("hidden");
+ // ---------------------------------------------------------------- TOKENS
+ async function refreshTokens() {
++  const myGen = portfolioGen;
+   let res;
    try {
--    const to = $("send-to").value.trim();
-+    const typedTo = $("send-to").value.trim();
-+    const to = currentSendToAddress(); // resolves a name to its looked-up address; never sends to unresolved name text
-+    if (!to) throw new Error(TM_I18N.t("send.invalidRecipient"));
-     const amountStr = $("send-amount").value.trim();
--    if (!ethers.utils.isAddress(to)) throw new Error(TM_I18N.t("send.invalidRecipient"));
-     const isNative = $("send-asset-select").value === "native";
-     const tokenAddress = isNative ? null : $("send-token-address").value.trim();
-     if (!isNative && !ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
-@@ -863,7 +1244,18 @@ $("btn-send-submit").addEventListener("click", async () => {
-     $("send-to").disabled = true;
-     $("send-amount").disabled = true;
-     $("send-asset-select").disabled = true;
--    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to });
-+    // When a name was typed, show the resolved address alongside it -- the
-+    // countdown/confirm step is exactly where that should be double-checked.
-+    const displayTo = typedTo !== to ? `${typedTo} (${to})` : to;
-+    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to: displayTo });
-+    if (lastSendFeeWei) {
-+      const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
-+      const feeFormatted = Number(ethers.utils.formatEther(lastSendFeeWei)).toPrecision(3).replace(/\.?0+$/, "");
-+      $("send-confirm-fee").textContent = TM_I18N.t("send.confirmFeeLine", { fee: feeFormatted, symbol });
-+      $("send-confirm-fee").classList.remove("hidden");
-+    } else {
-+      $("send-confirm-fee").classList.add("hidden");
+     res = await sendMsg("TM_GET_TRACKED_TOKEN_BALANCES");
+   } catch (e) {
+-    return; // best-effort -- don't let this disrupt the rest of the main screen
++    // best-effort -- don't let this disrupt the rest of the main screen,
++    // but the combined portfolio total (see PORTFOLIO TOTAL above) does
++    // need to know this half is unavailable rather than silently zero.
++    if (myGen === portfolioGen) {
++      portfolioTokensUsd = null;
++      renderPortfolioTotal();
 +    }
-     $("send-confirm-new-address-warning").classList.toggle("hidden", known);
-     $("send-confirm-card").classList.remove("hidden");
++    return;
+   }
  
-@@ -1311,11 +1703,14 @@ function activateSplashLanding() {
-   splashLandingActivated = true;
-   clearSplashAutoTimers();
-   const el = $("splash-screen");
--  if (el) el.classList.add("splash-home");
--  ["splash-tab-home", "splash-tab-assets", "splash-tab-activity", "splash-tab-send"].forEach((id) => {
--    const tab = $(id);
--    if (tab) tab.addEventListener("click", () => hideSplash());
--  });
-+  if (!el) return;
-+  // Distinct from splash-home: no wallet exists yet (or it's locked), so
-+  // the Home/Assets/Activity/Send bar doesn't apply here -- see the CSS
-+  // for #splash-screen.splash-landing. The whole splash becomes one big
-+  // "tap to continue" target instead of four nav icons that don't yet
-+  // mean anything.
-+  el.classList.add("splash-landing");
-+  el.addEventListener("click", () => hideSplash());
+   const list = $("tokens-list");
+   list.innerHTML = "";
+   if (!res.tokens.length) {
+     $("tokens-empty").classList.remove("hidden");
++    if (myGen === portfolioGen) {
++      portfolioTokensUsd = 0;
++      renderPortfolioTotal();
++    }
+     return;
+   }
+   $("tokens-empty").classList.add("hidden");
+@@ -434,13 +516,15 @@ async function refreshTokens() {
+     prices = {};
+   }
+ 
++  let tokensUsdTotal = 0;
+   res.tokens.forEach((t) => {
+     const row = document.createElement("div");
+     row.className = "token-row";
+     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
+     const priceEntry = prices[t.address.toLowerCase()];
+-    const usdText =
+-      priceEntry && typeof priceEntry.price === "number" ? formatCurrency(Number(formatted) * priceEntry.price) : "";
++    const usdValue = priceEntry && typeof priceEntry.price === "number" ? Number(formatted) * priceEntry.price : 0;
++    if (usdValue) tokensUsdTotal += usdValue;
++    const usdText = usdValue ? formatCurrency(usdValue) : "";
+     const nameEl = document.createElement("span");
+     nameEl.className = "token-name muted small";
+     nameEl.textContent = t.name || (t.error ? TM_I18N.t("tokens.loadError") : "");
+@@ -472,12 +556,17 @@ async function refreshTokens() {
+       await refreshTokens();
+     });
+ 
+-    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol));
++    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol, trustWalletLogoUrl(currentNetwork && currentNetwork.key, t.address)));
+     row.appendChild(mainEl);
+     row.appendChild(balEl);
+     row.appendChild(removeBtn);
+     list.appendChild(row);
+   });
++
++  if (myGen === portfolioGen) {
++    portfolioTokensUsd = tokensUsdTotal;
++    renderPortfolioTotal();
++  }
  }
  
- // ---------------------------------------------------------------- ACTIVITY
-@@ -1579,6 +1974,8 @@ function renderActivity() {
-   populateCurrencySelect();
-   await loadSendDelay();
-   populateSendDelaySelect();
-+  await loadAutoLockMinutes();
-+  populateAutoLockSelect();
+ // ---------------------------------------------------------------- NFTS
+@@ -669,23 +758,28 @@ function showUsdUnavailable() {
+   // popup.css) so the balance box never reads as empty, just native-only.
+   $("balance-usd").innerHTML = "";
+   $("balance-usd").classList.add("hidden");
++  if ($("balance-usd-label")) $("balance-usd-label").classList.add("hidden");
+   document.querySelector(".balance-native-row").classList.add("balance-lead-fallback");
+ }
  
-   const params = new URLSearchParams(location.search);
-   if (params.get("mode") === "approve") {
-diff --git a/en.js b/en.js
-index 8ecc989..5bdb94d 100644
---- a/en.js
-+++ b/en.js
-@@ -14,6 +14,7 @@
-     "common.send": "Send",
-     "common.swap": "Swap",
-     "common.buy": "Buy",
-+    "common.sell": "Sell",
-     "common.livePrices": "Live prices",
-     "common.seeAll": "See all",
-     "common.reject": "Reject",
-@@ -53,6 +54,9 @@
-     "main.tokensTitle": "Tokens",
-     "main.addTokenBtn": "+ Add token",
-     "main.tokensEmpty": "No tokens added yet -- tap “+ Add token” and enter a contract address to track one.",
-+    "main.nftsTitle": "NFTs",
-+    "main.addNftBtn": "+ Add NFT",
-+    "main.nftsEmpty": "No NFTs added yet -- tap “+ Add NFT” and enter a contract address and token ID to track one.",
-     "main.networkLabel": "Network",
-     "main.balanceFetchErrorPrefix": "Couldn't fetch balance: ",
-     "main.livePricesTitle": "Live Prices",
-@@ -73,6 +77,19 @@
-     "addToken.noName": "(no name)",
-     "addToken.swapUnavailableSuffix": " (swap unavailable)",
+ async function refreshBalanceUsd() {
+-  if (!currentNetwork) return showUsdUnavailable();
++  const myGen = portfolioGen;
++  if (!currentNetwork) {
++    portfolioNativeUsd = null;
++    return renderPortfolioTotal();
++  }
+   try {
+     const price = await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
+-    if (price == null) return showUsdUnavailable();
++    if (myGen !== portfolioGen) return; // a newer refreshMain() has since started
+     const amount = Number($("balance-amount").textContent) || 0;
+-    document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
+-    $("balance-usd").textContent = formatCurrency(amount * price);
+-    $("balance-usd").classList.remove("hidden");
++    portfolioNativeUsd = price == null ? null : amount * price;
+   } catch (e) {
+     // Price lookups are best-effort -- a rate-limited or unreachable
+     // CoinGecko shouldn't disrupt the rest of the wallet UI.
+-    showUsdUnavailable();
++    if (myGen !== portfolioGen) return;
++    portfolioNativeUsd = null;
+   }
++  renderPortfolioTotal();
+ }
  
-+    "nfts.loadError": "Couldn't load",
-+    "nfts.removeTitle": "Remove",
-+    "addNft.title": "Add NFT",
-+    "addNft.description": "Enter the NFT's contract address and token ID on the current network. Works for ERC-721 and ERC-1155 collections. Only add an NFT whose contract address you got from a source you trust -- artwork and names shown here come from the collection's own metadata, which anyone can set to anything.",
-+    "addNft.addressLabel": "NFT contract address",
-+    "addNft.tokenIdLabel": "Token ID",
-+    "addNft.tokenIdPlaceholder": "0",
-+    "addNft.standardLabel": "Standard:",
-+    "addNft.invalidAddress": "Enter a valid contract address.",
-+    "addNft.invalidTokenId": "Enter a valid token ID (a non-negative whole number).",
-+    "addNft.metaWarning": "Couldn't load this NFT's image/name from its metadata URI, but the contract and token ID check out -- you can still add it and try again later.",
-+    "addNft.noName": "(no name)",
+ // ---------------------------------------------------------------- WATCHLIST
+@@ -736,7 +830,7 @@ function renderPriceRow(c) {
+   }
+   const starred = isWatchlisted(c.symbol);
+   row.innerHTML = `
+-    <span class="price-left">${tokenIconHtml(c.symbol)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
++    <span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
+     <span class="price-right"><button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button><span class="price-usd">${priceText}</span>${changeHtml}</span>
+   `;
+   row.querySelector(".star-btn").addEventListener("click", (e) => {
+@@ -1208,7 +1302,18 @@ async function executeSend({ to, amountStr, isNative, tokenAddress }) {
+   $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
+   $("send-status").classList.remove("hidden");
+   const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
+-  recordActivity({ amount: amountStr, asset: sentAsset, to, txHash: res.txHash });
++  // Captured at send time (not looked up again when the Activity list is
++  // rendered) so a later network switch can't make an old entry link to
++  // the wrong chain's explorer -- each entry always points at whichever
++  // network the transaction actually went out on.
++  recordActivity({
++    amount: amountStr,
++    asset: sentAsset,
++    to,
++    txHash: res.txHash,
++    blockExplorer: (currentNetwork && currentNetwork.blockExplorer) || "",
++    networkName: (currentNetwork && currentNetwork.name) || "",
++  });
+   await refreshBalance();
+ }
+ 
+@@ -1896,6 +2001,23 @@ $("btn-contact-add").addEventListener("click", async () => {
+   renderContacts();
+ });
+ 
++// Builds a block-explorer tx URL from data recorded at send time (see
++// executeSend), the same way MetaMask/Coinbase Wallet make each Activity
++// entry open its transaction on Etherscan (or that chain's equivalent).
++// Both inputs are ultimately app-controlled (this wallet's own networks.js
++// list, or a URL the user themselves typed in when adding a custom
++// network) rather than attacker-supplied, but this still only builds a
++// link for a well-formed http(s) explorer base + a real-looking tx hash --
++// never for anything else -- so a bad/missing value just means no link
++// instead of a broken or unexpected one. Returns null when there's nothing
++// safe to link to (older activity entries recorded before this feature
++// existed won't have blockExplorer/txHash in this shape, for instance).
++function buildExplorerTxUrl(blockExplorer, txHash) {
++  if (!blockExplorer || typeof blockExplorer !== "string" || !/^https:\/\//i.test(blockExplorer)) return null;
++  if (!txHash || typeof txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) return null;
++  return `${blockExplorer.replace(/\/+$/, "")}/tx/${txHash}`;
++}
 +
-     "prices.description": "Live prices from CoinGecko's public API, in whichever currency you pick in Settings. Purely informational -- nothing about your wallet is sent to look these up.",
-     "prices.loading": "Loading...",
-     "prices.naText": "n/a",
-@@ -91,6 +108,12 @@
-     "buy.description2Html": "MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:",
-     "buy.continueBtn": "Continue to MoonPay",
+ // record of sends made from this device, kept in chrome.storage.local.
+ const TM_ACTIVITY_KEY = "tm_activity";
+ const TM_ACTIVITY_MAX = 50;
+@@ -1919,8 +2041,19 @@ function renderActivity() {
+       return;
+     }
+     list.forEach((item) => {
+-      const card = document.createElement("div");
+-      card.className = "activity-entry";
++      const explorerUrl = buildExplorerTxUrl(item.blockExplorer, item.txHash);
++      // A real <a> when there's somewhere to link -- free keyboard access,
++      // "open in new tab", and middle-click, instead of reimplementing all
++      // of that on a plain div. Falls back to a plain div (unchanged from
++      // before) for entries with no usable link.
++      const card = document.createElement(explorerUrl ? "a" : "div");
++      card.className = "activity-entry" + (explorerUrl ? " activity-entry-linked" : "");
++      if (explorerUrl) {
++        card.href = explorerUrl;
++        card.target = "_blank";
++        card.rel = "noopener noreferrer";
++        card.title = TM_I18N.t("activity.viewOnExplorer");
++      }
  
-+    "sell.title": "Sell for cash",
-+    "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
-+    "sell.description2": "MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
-+    "sell.description3Html": "Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.",
-+    "sell.continueBtn": "Continue to MoonPay",
-+
-     "support.title": "Help & support",
-     "support.description": "Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.",
-     "support.inputPlaceholder": "Type a question...",
-@@ -114,6 +137,21 @@
-     "send.invalidRecipient": "Enter a valid recipient address.",
-     "send.invalidTokenAddress": "Enter a valid token contract address.",
-     "send.sentStatus": "Sent! Tx hash: {txHash}",
-+    "send.confirmIntro": "Sending in {seconds}s -- you can still cancel.",
-+    "send.confirmSummary": "{amount} {asset} to {to}",
-+    "send.newAddressWarning": "You haven't sent to this address from this device before -- double check it's correct.",
-+    "send.cancelBtn": "Cancel send",
-+    "send.cancelledStatus": "Send cancelled -- nothing was sent.",
-+    "send.feeEstimateLoading": "Estimating network fee...",
-+    "send.feeEstimate": "Estimated network fee: ~{fee} {symbol} (~{usd})",
-+    "send.feeEstimateNoUsd": "Estimated network fee: ~{fee} {symbol}",
-+    "send.feeEstimateUnavailable": "Network fee estimate unavailable -- you'll still see the real fee before anything is broadcast.",
-+    "send.confirmFeeLine": "Network fee: ~{fee} {symbol}",
-+    "send.toPlaceholder": "0x... or name.eth",
-+    "send.resolvingName": "Looking up {name}...",
-+    "send.resolvedName": "Resolves to {address}",
-+    "send.nameNotFound": "Couldn't find an address for {name} -- double-check the name, or paste the address directly.",
-+    "send.nameResolutionUnsupported": "Name lookups aren't available on this network -- paste the address directly.",
- 
-     "swap.unsupportedWarning": "Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings → Networks first.",
-     "swap.fromLabel": "From",
-@@ -139,9 +177,39 @@
-     "settings.currencyLabel": "Display currency",
-     "settings.viewSeedBtn": "View recovery phrase",
-     "settings.helpBtn": "Help & support",
-+    "settings.feedbackBtn": "Request a feature",
-+    "settings.sendDelayLabel": "Send delay (cancel window)",
-+    "settings.sendDelayHint": "Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.",
-+
-+    "settings.autoLockLabel": "Auto-lock after inactivity",
-+    "settings.autoLockOff": "Off (never auto-lock)",
-+    "settings.autoLock1": "1 minute",
-+    "settings.autoLock5": "5 minutes (recommended)",
-+    "settings.autoLock15": "15 minutes",
-+    "settings.autoLock30": "30 minutes",
-+    "settings.autoLockHint": "Locks the wallet automatically after this much time with no clicks, taps, or keystrokes here -- since a browser tab you leave open otherwise stays unlocked indefinitely.",
-+    "settings.sendDelayOff": "Off (send immediately)",
-+    "settings.sendDelay15": "15 seconds",
-+    "settings.sendDelay30": "30 seconds (recommended)",
-+    "settings.sendDelay60": "60 seconds",
-     "settings.lockBtn": "Lock wallet",
-     "settings.resetBtn": "Reset wallet",
- 
-+    "feedback.title": "Feature requests",
-+    "feedback.subtitle": "See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.",
-+    "feedback.titlePlaceholder": "Short title (e.g. \"Dark mode\")",
-+    "feedback.descPlaceholder": "A bit more detail (optional)",
-+    "feedback.submitBtn": "Post request",
-+    "feedback.submittingStatus": "Posting...",
-+    "feedback.submittedStatus": "Thanks! Your request is live below.",
-+    "feedback.listTitle": "REQUESTS",
-+    "feedback.empty": "No requests yet -- be the first!",
-+    "feedback.loadError": "Couldn't load requests. Try again in a moment.",
-+    "feedback.titleRequired": "Give it a short title first.",
-+    "feedback.upvoteBtn": "Upvote",
-+    "feedback.upvotedBtn": "Upvoted",
-+    "feedback.contactLine": "Prefer email? Reach us at msandersod@gmail.com",
-+
-     "importKey.title": "Import private key",
-     "importKey.placeholder": "0x private key",
- 
-@@ -204,6 +272,7 @@
-     "home.tabAssets": "Assets",
-     "home.tabActivity": "Activity",
-     "home.tabSend": "Send",
-+    "home.tapToContinue": "Tap to continue",
- 
-     "activity.title": "Activity",
-     "activity.subtitle": "A local record of sends made from this wallet on this device -- nothing here is fetched from a server.",
+       // Directional icon -- every entry here is an outgoing send (this log
+       // has no incoming/receive tracking yet), shown the same way MetaMask
 diff --git a/index.html b/index.html
-index b9f2adc..f4c0d70 100644
+index f4c0d70..662dc9d 100644
 --- a/index.html
 +++ b/index.html
-@@ -42,6 +42,9 @@
-       <span class="splash-tab-label" data-i18n="home.tabSend">Send</span>
-     </button>
-   </div>
-+  <div id="splash-continue-hint">
-+    <span data-i18n="home.tapToContinue">Tap to continue</span>
-+  </div>
- </div>
- <div id="splash-tagline">
-   <span class="footer-lock">&#128274;</span>
-@@ -172,6 +175,15 @@
-       <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
+@@ -132,6 +132,7 @@
+       <button id="btn-settings" class="icon-btn" data-i18n-title="main.settingsTitle" title="Settings">&#9881;</button>
      </div>
- 
-+    <div class="tokens-section">
-+      <div class="tokens-header">
-+        <span class="tokens-title" data-i18n="main.nftsTitle">NFTs</span>
-+        <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
+     <div class="balance-box">
++      <div id="balance-usd-label" class="balance-usd-label hidden" data-i18n="main.portfolioLabel">Total balance</div>
+       <div id="balance-usd" class="hidden"></div>
+       <div class="balance-native-row">
+         <span id="balance-amount">0</span>
+@@ -172,7 +173,10 @@
+         <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
+       </div>
+       <div id="tokens-list" class="tokens-list"></div>
+-      <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
++      <div id="tokens-empty" class="empty-state hidden">
++        <span class="empty-state-icon" aria-hidden="true">🪙</span>
++        <p class="muted small" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
 +      </div>
-+      <div id="nft-grid" class="nft-grid"></div>
-+      <p id="nfts-empty" class="muted small hidden" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
-+    </div>
-+
-     <div class="network-picker">
-       <label data-i18n="main.networkLabel">Network</label>
-       <div class="network-select-row">
-@@ -199,6 +211,26 @@
-     <p id="add-token-error" class="error hidden"></p>
-   </section>
+     </div>
  
-+  <!-- ADD NFT -->
-+  <section id="screen-add-nft" class="screen hidden">
-+    <h2 data-i18n="addNft.title">Add NFT</h2>
-+    <p class="muted" data-i18n="addNft.description">Enter the NFT's contract address and token ID on the current network. Works for ERC-721 and ERC-1155 collections. Only add an NFT whose contract address you got from a source you trust -- artwork and names shown here come from the collection's own metadata, which anyone can set to anything.</p>
-+    <label data-i18n="addNft.addressLabel">NFT contract address</label>
-+    <input type="text" id="add-nft-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
-+    <label data-i18n="addNft.tokenIdLabel">Token ID</label>
-+    <input type="text" id="add-nft-token-id" data-i18n-placeholder="addNft.tokenIdPlaceholder" placeholder="0" />
-+    <button id="btn-nft-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
-+    <div id="add-nft-preview" class="hidden">
-+      <img id="add-nft-preview-image" class="nft-thumb hidden" alt="" style="max-width:120px;" />
-+      <p class="muted"><span data-i18n="addToken.nameLabel">Name:</span> <span id="add-nft-name" class="mono"></span></p>
-+      <p class="muted"><span data-i18n="addNft.standardLabel">Standard:</span> <span id="add-nft-standard" class="mono"></span></p>
-+      <p id="add-nft-meta-warning" class="hint hidden" data-i18n="addNft.metaWarning">Couldn't load this NFT's image/name from its metadata URI, but the contract and token ID check out -- you can still add it and try again later.</p>
-+      <button id="btn-nft-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
-+    </div>
-+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-+    <p id="add-nft-error" class="error hidden"></p>
-+  </section>
-+
-   <!-- PRICES -->
-   <section id="screen-prices" class="screen hidden">
-     <h2 data-i18n="common.livePrices">Live prices</h2>
-@@ -272,14 +304,17 @@
+     <div class="tokens-section">
+@@ -181,7 +185,10 @@
+         <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
+       </div>
+       <div id="nft-grid" class="nft-grid"></div>
+-      <p id="nfts-empty" class="muted small hidden" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
++      <div id="nfts-empty" class="empty-state hidden">
++        <span class="empty-state-icon" aria-hidden="true">🖼️</span>
++        <p class="muted small" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
++      </div>
      </div>
-     <div class="send-to-row">
-       <span id="send-to-identicon" class="account-identicon hidden" aria-hidden="true"></span>
--      <input type="text" id="send-to" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
-+      <input type="text" id="send-to" data-i18n-placeholder="send.toPlaceholder" placeholder="0x... or name.eth" />
-     </div>
-+    <p id="send-to-resolved" class="muted hidden"></p>
-     <label data-i18n="send.amountLabel">Amount</label>
-     <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
-+    <p id="send-fee-preview" class="muted hidden"></p>
-     <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
-     <div id="send-confirm-card" class="send-confirm-card hidden">
-       <p id="send-confirm-intro" class="warn"></p>
-       <p id="send-confirm-summary" class="send-confirm-summary"></p>
-+      <p id="send-confirm-fee" class="muted hidden"></p>
-       <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
-       <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
-     </div>
-@@ -357,7 +392,7 @@
-     </div>
-     <div class="language-picker">
-       <label data-i18n="settings.sendDelayLabel">Send delay (cancel window)</label>
--      <select id="send-delay-select" class="language-select">
-+      <select id="send-delay-select">
-         <option value="0" data-i18n="settings.sendDelayOff">Off (send immediately)</option>
-         <option value="15" data-i18n="settings.sendDelay15">15 seconds</option>
-         <option value="30" data-i18n="settings.sendDelay30">30 seconds (recommended)</option>
-@@ -365,6 +400,17 @@
-       </select>
-       <p class="muted" data-i18n="settings.sendDelayHint">Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.</p>
-     </div>
-+    <div class="language-picker">
-+      <label data-i18n="settings.autoLockLabel">Auto-lock after inactivity</label>
-+      <select id="auto-lock-select">
-+        <option value="0" data-i18n="settings.autoLockOff">Off (never auto-lock)</option>
-+        <option value="1" data-i18n="settings.autoLock1">1 minute</option>
-+        <option value="5" data-i18n="settings.autoLock5">5 minutes (recommended)</option>
-+        <option value="15" data-i18n="settings.autoLock15">15 minutes</option>
-+        <option value="30" data-i18n="settings.autoLock30">30 minutes</option>
-+      </select>
-+      <p class="muted" data-i18n="settings.autoLockHint">Locks the wallet automatically after this much time with no clicks, taps, or keystrokes here -- since a browser tab you leave open otherwise stays unlocked indefinitely.</p>
-+    </div>
-     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
-     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
-     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-diff --git a/wallet-engine.js b/wallet-engine.js
-index 9ecf4cc..23e43b8 100644
---- a/wallet-engine.js
-+++ b/wallet-engine.js
-@@ -57,6 +57,92 @@ async function saveTrackedTokens(chainId, tokens) {
-   await chrome.storage.local.set({ [TRACKED_TOKENS_KEY]: all });
+ 
+     <div class="network-picker">
+diff --git a/en.js b/en.js
+index 5bdb94d..b366999 100644
+--- a/en.js
++++ b/en.js
+@@ -49,6 +49,7 @@
+     "unlock.resetInsteadBtn": "Reset wallet instead",
+ 
+     "main.settingsTitle": "Settings",
++    "main.portfolioLabel": "Total balance",
+     "main.showQrBtn": "Show QR",
+     "main.hideQrBtn": "Hide QR",
+     "main.tokensTitle": "Tokens",
+@@ -280,6 +281,7 @@
+     "activity.sentLabel": "Sent {amount} {asset}",
+     "activity.toLabel": "to {address}",
+     "activity.statusSent": "Sent",
++    "activity.viewOnExplorer": "View on block explorer",
+ 
+     "footer.nonCustodial": "Non-custodial — your keys never leave this device",
+ 
+diff --git a/es.js b/es.js
+index cdde78b..3d671a2 100644
+--- a/es.js
++++ b/es.js
+@@ -45,6 +45,7 @@
+     "unlock.resetInsteadBtn": "Restablecer billetera en su lugar",
+ 
+     "main.settingsTitle": "Configuración",
++    "main.portfolioLabel": "Saldo total",
+     "main.tokensTitle": "Tokens",
+     "main.addTokenBtn": "+ Agregar token",
+     "main.tokensEmpty": "Aún no has agregado tokens -- toca “+ Agregar token” e ingresa una dirección de contrato para hacer seguimiento de uno.",
+diff --git a/fr.js b/fr.js
+index 2a7a0b8..a60bfe9 100644
+--- a/fr.js
++++ b/fr.js
+@@ -46,6 +46,7 @@
+     "unlock.resetInsteadBtn": "Réinitialiser le portefeuille à la place",
+ 
+     "main.settingsTitle": "Paramètres",
++    "main.portfolioLabel": "Solde total",
+     "main.tokensTitle": "Tokens",
+     "main.addTokenBtn": "+ Ajouter un token",
+     "main.tokensEmpty": "Aucun token ajouté pour l'instant -- appuyez sur « + Ajouter un token » et saisissez une adresse de contrat pour en suivre un.",
+diff --git a/hi.js b/hi.js
+index 8e7799b..e8177b7 100644
+--- a/hi.js
++++ b/hi.js
+@@ -46,6 +46,7 @@
+     "unlock.resetInsteadBtn": "इसके बजाय वॉलेट रीसेट करें",
+ 
+     "main.settingsTitle": "सेटिंग्स",
++    "main.portfolioLabel": "कुल बैलेंस",
+     "main.tokensTitle": "टोकन",
+     "main.addTokenBtn": "+ टोकन जोड़ें",
+     "main.tokensEmpty": "अभी तक कोई टोकन नहीं जोड़ा गया है -- किसी टोकन को ट्रैक करने के लिए “+ टोकन जोड़ें” पर टैप करें और उसका कॉन्ट्रैक्ट एड्रेस दर्ज करें।",
+diff --git a/ja.js b/ja.js
+index 573ad5a..03f9c26 100644
+--- a/ja.js
++++ b/ja.js
+@@ -45,6 +45,7 @@
+     "unlock.resetInsteadBtn": "代わりにウォレットをリセット",
+ 
+     "main.settingsTitle": "設定",
++    "main.portfolioLabel": "合計残高",
+     "main.tokensTitle": "トークン",
+     "main.addTokenBtn": "+ トークンを追加",
+     "main.tokensEmpty": "まだトークンが追加されていません。「+ トークンを追加」をタップし、コントラクトアドレスを入力すると残高を表示できます。",
+diff --git a/pt.js b/pt.js
+index 3d00f80..bd7f61b 100644
+--- a/pt.js
++++ b/pt.js
+@@ -44,6 +44,7 @@
+     "unlock.resetInsteadBtn": "Redefinir carteira em vez disso",
+ 
+     "main.settingsTitle": "Configurações",
++    "main.portfolioLabel": "Saldo total",
+     "main.tokensTitle": "Tokens",
+     "main.addTokenBtn": "+ Adicionar token",
+     "main.tokensEmpty": "Nenhum token adicionado ainda -- toque em “+ Adicionar token” e informe o endereço de um contrato para acompanhá-lo.",
+diff --git a/ru.js b/ru.js
+index 230d65c..155fe29 100644
+--- a/ru.js
++++ b/ru.js
+@@ -45,6 +45,7 @@
+     "unlock.resetInsteadBtn": "Сбросить кошелёк",
+ 
+     "main.settingsTitle": "Настройки",
++    "main.portfolioLabel": "Общий баланс",
+     "main.tokensTitle": "Токены",
+     "main.addTokenBtn": "+ Добавить токен",
+     "main.tokensEmpty": "Токены ещё не добавлены — нажмите «+ Добавить токен» и введите адрес контракта, чтобы отслеживать нужный токен.",
+diff --git a/zh.js b/zh.js
+index f035b45..6484ecb 100644
+--- a/zh.js
++++ b/zh.js
+@@ -46,6 +46,7 @@
+     "unlock.resetInsteadBtn": "改为重置钱包",
+ 
+     "main.settingsTitle": "设置",
++    "main.portfolioLabel": "总余额",
+     "main.tokensTitle": "代币",
+     "main.addTokenBtn": "+ 添加代币",
+     "main.tokensEmpty": "尚未添加任何代币——点击「+ 添加代币」并输入合约地址即可添加追踪。",
+diff --git a/ar.js b/ar.js
+index 3f2cd0f..2ab4096 100644
+--- a/ar.js
++++ b/ar.js
+@@ -45,6 +45,7 @@
+     "unlock.resetInsteadBtn": "إعادة تعيين المحفظة بدلاً من ذلك",
+ 
+     "main.settingsTitle": "الإعدادات",
++    "main.portfolioLabel": "الرصيد الإجمالي",
+     "main.tokensTitle": "العملات",
+     "main.addTokenBtn": "+ إضافة عملة",
+     "main.tokensEmpty": "لم تتم إضافة أي عملات بعد -- اضغط على «+ إضافة عملة» وأدخل عنوان العقد لتتبع عملة.",
+diff --git a/prices.js b/prices.js
+index 46b00e3..714f160 100644
+--- a/prices.js
++++ b/prices.js
+@@ -130,21 +130,58 @@ async function fetchPrices(ids, currency) {
+   return { data, currency: vsCurrency };
  }
  
-+// ---- tracked (user-added) NFTs, per chain -- same shape/pattern as tracked
-+// ERC-20 tokens above, storing just enough to look the NFT back up
-+// (contract + token ID + standard) rather than caching its artwork/name,
-+// which is re-fetched from the collection's own metadata each time. ----
-+const TRACKED_NFTS_KEY = "tm_tracked_nfts";
++// Separate small in-memory cache for the price BOARD specifically (kept
++// apart from fetchPrices()'s cache above, and calling a different
++// endpoint) -- CoinGecko's /coins/markets returns price, 24h change, AND
++// each coin's own logo image in one call, which /simple/price above
++// doesn't provide. Isolating this to its own function/cache means the
++// board's request shape can't affect fetchPrices()'s existing callers
++// (native-coin balance pricing, token pricing, the send-fee USD estimate).
++let priceBoardCache = { fetchedAt: 0, cacheKey: "", data: null };
 +
-+async function getTrackedNfts(chainId) {
-+  const stored = await chrome.storage.local.get(TRACKED_NFTS_KEY);
-+  const all = stored[TRACKED_NFTS_KEY] || {};
-+  return all[chainId] || [];
-+}
-+
-+async function saveTrackedNfts(chainId, nfts) {
-+  const stored = await chrome.storage.local.get(TRACKED_NFTS_KEY);
-+  const all = stored[TRACKED_NFTS_KEY] || {};
-+  all[chainId] = nfts;
-+  await chrome.storage.local.set({ [TRACKED_NFTS_KEY]: all });
-+}
-+
-+// An NFT's tokenURI/metadata is written by whoever deployed or minted that
-+// contract -- it's untrusted input, same category as a webpage's own
-+// content, not something this wallet's own code produced. Every helper
-+// below treats it that way: a narrow IPFS rewrite, a bounded fetch, and an
-+// image-URL allowlist rather than a blocklist, so a malicious collection
-+// can't do anything worse than fail to display.
-+const NFT_IPFS_GATEWAY = "https://ipfs.io/ipfs/";
-+
-+function resolveMaybeIpfsUri(uri) {
-+  if (!uri || typeof uri !== "string") return uri;
-+  if (uri.startsWith("ipfs://")) {
-+    return NFT_IPFS_GATEWAY + uri.slice("ipfs://".length).replace(/^ipfs\//, "");
++async function fetchPriceBoardMarkets(ids, currency) {
++  const vsCurrency = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
++  const idsKey = [...new Set(ids)].sort().join(",");
++  const cacheKey = `${idsKey}|${vsCurrency}`;
++  const now = Date.now();
++  if (priceBoardCache.data && priceBoardCache.cacheKey === cacheKey && now - priceBoardCache.fetchedAt < CACHE_TTL_MS) {
++    return priceBoardCache.data;
 +  }
-+  return uri;
-+}
-+
-+// Only http(s) URLs or genuine image data: URIs are ever handed to the UI
-+// for use as an <img src> -- never javascript:, text/html, or anything
-+// else that could do something unexpected just by being displayed. This is
-+// an allowlist, not an attempt to blocklist specific bad schemes.
-+function sanitizeNftImageUrl(raw) {
-+  if (!raw || typeof raw !== "string") return null;
-+  const url = resolveMaybeIpfsUri(raw.trim());
-+  if (/^https?:\/\//i.test(url)) return url;
-+  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(url)) return url;
-+  return null;
-+}
-+
-+async function fetchNftMetadataJson(tokenUri) {
-+  const url = resolveMaybeIpfsUri(tokenUri);
-+  if (!url || !/^https?:\/\//i.test(url)) {
-+    throw new Error("This NFT's metadata URI isn't a fetchable http(s)/ipfs link.");
-+  }
-+  const controller = new AbortController();
-+  const timeoutId = setTimeout(() => controller.abort(), 8000);
++  const url = `${COINGECKO_BASE}/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&price_change_percentage=24h`;
++  let res;
 +  try {
-+    const res = await fetch(url, { signal: controller.signal });
-+    if (!res.ok) throw new Error(`Metadata fetch failed (HTTP ${res.status}).`);
-+    const text = await res.text();
-+    if (text.length > 500000) throw new Error("Metadata response was too large to use.");
-+    return JSON.parse(text);
-+  } finally {
-+    clearTimeout(timeoutId);
++    res = await fetch(url);
++  } catch (e) {
++    throw new Error("Couldn't reach CoinGecko for live prices. Check your internet connection.");
 +  }
++  if (!res.ok) {
++    throw new Error(`CoinGecko price request failed (HTTP ${res.status}).`);
++  }
++  const rows = await res.json();
++  const byId = {};
++  (Array.isArray(rows) ? rows : []).forEach((r) => {
++    byId[r.id] = r;
++  });
++  priceBoardCache = { fetchedAt: now, cacheKey, data: byId };
++  return byId;
 +}
 +
-+// Tries ERC-721's tokenURI(id) first, then falls back to ERC-1155's
-+// uri(id) -- there's no on-chain "which standard is this" call, so
-+// attempting the more common one first and falling back is the same
-+// approach MetaMask's own NFT detection uses. The {id} placeholder handling
-+// on the 1155 path is required by that standard itself (EIP-1155), not
-+// optional cleanup.
-+async function readNftTokenUri(provider, contractAddress, tokenIdBn) {
-+  try {
-+    const c721 = new ethers.Contract(contractAddress, ["function tokenURI(uint256) view returns (string)"], provider);
-+    const tokenUri = await c721.tokenURI(tokenIdBn);
-+    return { standard: "erc721", tokenUri };
-+  } catch (e721) {
-+    const c1155 = new ethers.Contract(contractAddress, ["function uri(uint256) view returns (string)"], provider);
-+    let tokenUri = await c1155.uri(tokenIdBn);
-+    if (tokenUri && tokenUri.includes("{id}")) {
-+      tokenUri = tokenUri.replace("{id}", tokenIdBn.toHexString().slice(2).padStart(64, "0"));
-+    }
-+    return { standard: "erc1155", tokenUri };
-+  }
-+}
-+
- // Shows the SAME approve screens the extension's popup.html has always had
- // (screen-approve-connect/tx/sign/addnetwork -- see index.html), just
- // in-place in this one page instead of in a second popup window, since
-@@ -494,6 +580,27 @@ async function handleMessage(msg) {
-             break;
-           }
- 
-+          // Resolves a human-readable name (currently ENS, e.g. "vitalik.eth")
-+          // typed into the Send "To" field into an address -- the same
-+          // convenience MetaMask and Coinbase Wallet offer instead of making
-+          // every send start with a raw 0x address. ethers' JsonRpcProvider
-+          // only knows an ENS registry address for networks it recognizes as
-+          // having one (mainnet); on every other chain this predictably
-+          // resolves to null rather than erroring, and the UI falls back to
-+          // requiring a raw address there, same as before this existed.
-+          case "TM_RESOLVE_NAME": {
-+            const network = await getActiveNetwork();
-+            const provider = await getProviderFor(network);
-+            let address = null;
-+            try {
-+              address = await provider.resolveName(msg.name);
-+            } catch (e) {
-+              address = null; // no ENS registry on this network, or a lookup error -- treat the same as "not found"
-+            }
-+            sendResponse({ ok: true, address });
-+            break;
-+          }
-+
-           case "TM_LOOKUP_TOKEN": {
-             if (!ethers.utils.isAddress(msg.tokenAddress)) {
-               throw new Error("That doesn't look like a valid contract address.");
-@@ -568,6 +675,111 @@ async function handleMessage(msg) {
-             break;
-           }
- 
-+          // Read-only preview of an NFT before it's added -- mirrors
-+          // TM_LOOKUP_TOKEN's "look up, show a preview, then confirm" flow.
-+          case "TM_LOOKUP_NFT": {
-+            if (!ethers.utils.isAddress(msg.contractAddress)) {
-+              throw new Error("That doesn't look like a valid contract address.");
-+            }
-+            let tokenIdBn;
-+            try {
-+              tokenIdBn = ethers.BigNumber.from(msg.tokenId);
-+              if (tokenIdBn.isNegative()) throw new Error();
-+            } catch (e) {
-+              throw new Error("Enter a valid token ID (a non-negative whole number).");
-+            }
-+            const network = await getActiveNetwork();
-+            const provider = await getProviderFor(network);
-+            let standard, tokenUri;
-+            try {
-+              ({ standard, tokenUri } = await readNftTokenUri(provider, msg.contractAddress, tokenIdBn));
-+            } catch (e) {
-+              throw new Error(
-+                `Couldn't read this as an ERC-721 or ERC-1155 NFT on ${network.name}. Double-check the contract address, token ID, and network.`
-+              );
-+            }
-+            let name = "";
-+            let image = null;
-+            let metaError = null;
-+            try {
-+              const metadata = await fetchNftMetadataJson(tokenUri);
-+              name = typeof metadata.name === "string" ? metadata.name.slice(0, 200) : "";
-+              image = sanitizeNftImageUrl(metadata.image || metadata.image_url);
-+            } catch (e) {
-+              metaError = e.message;
-+            }
-+            sendResponse({ ok: true, standard, name, image, metaError });
-+            break;
-+          }
-+
-+          case "TM_ADD_TRACKED_NFT": {
-+            const network = await getActiveNetwork();
-+            const address = ethers.utils.getAddress(msg.contractAddress);
-+            const tokenId = ethers.BigNumber.from(msg.tokenId).toString();
-+            const existing = await getTrackedNfts(network.chainId);
-+            if (existing.some((n) => n.contractAddress.toLowerCase() === address.toLowerCase() && n.tokenId === tokenId)) {
-+              throw new Error("That NFT is already in your list.");
-+            }
-+            const nfts = [
-+              ...existing,
-+              { contractAddress: address, tokenId, standard: msg.standard, name: msg.name || "" },
-+            ];
-+            await saveTrackedNfts(network.chainId, nfts);
-+            sendResponse({ ok: true, nfts });
-+            break;
-+          }
-+
-+          case "TM_REMOVE_TRACKED_NFT": {
-+            const network = await getActiveNetwork();
-+            const existing = await getTrackedNfts(network.chainId);
-+            const nfts = existing.filter(
-+              (n) =>
-+                !(
-+                  n.contractAddress.toLowerCase() === (msg.contractAddress || "").toLowerCase() &&
-+                  n.tokenId === String(msg.tokenId)
-+                )
-+            );
-+            await saveTrackedNfts(network.chainId, nfts);
-+            sendResponse({ ok: true, nfts });
-+            break;
-+          }
-+
-+          case "TM_GET_TRACKED_NFTS": {
-+            const network = await getActiveNetwork();
-+            const nfts = await getTrackedNfts(network.chainId);
-+            if (!nfts.length) {
-+              sendResponse({ ok: true, nfts: [] });
-+              break;
-+            }
-+            const provider = await getProviderFor(network);
-+            const results = await Promise.all(
-+              nfts.map(async (n) => {
-+                try {
-+                  const tokenIdBn = ethers.BigNumber.from(n.tokenId);
-+                  let tokenUri;
-+                  if (n.standard === "erc1155") {
-+                    const c = new ethers.Contract(n.contractAddress, ["function uri(uint256) view returns (string)"], provider);
-+                    tokenUri = await c.uri(tokenIdBn);
-+                    if (tokenUri && tokenUri.includes("{id}")) {
-+                      tokenUri = tokenUri.replace("{id}", tokenIdBn.toHexString().slice(2).padStart(64, "0"));
-+                    }
-+                  } else {
-+                    const c = new ethers.Contract(n.contractAddress, ["function tokenURI(uint256) view returns (string)"], provider);
-+                    tokenUri = await c.tokenURI(tokenIdBn);
-+                  }
-+                  const metadata = await fetchNftMetadataJson(tokenUri);
-+                  const name = typeof metadata.name === "string" ? metadata.name.slice(0, 200) : n.name;
-+                  const image = sanitizeNftImageUrl(metadata.image || metadata.image_url);
-+                  return { ...n, name: name || n.name, image, error: null };
-+                } catch (e) {
-+                  return { ...n, image: null, error: e.message };
-+                }
-+              })
-+            );
-+            sendResponse({ ok: true, nfts: results });
-+            break;
-+          }
-+
-           case "TM_SEND_NATIVE": {
-             requireUnlocked();
-             const network = await getActiveNetwork();
-@@ -593,6 +805,44 @@ async function handleMessage(msg) {
-             break;
-           }
- 
-+          // Read-only preview of what a send would cost, shown on the Send
-+          // screen (and echoed into the confirm card) *before* the user
-+          // commits -- the same "you'll pay about this much in network fees"
-+          // preview MetaMask and Coinbase Wallet both show, which this app
-+          // never surfaced before. Never signs or broadcasts anything.
-+          case "TM_ESTIMATE_SEND_FEE": {
-+            requireUnlocked();
-+            const network = await getActiveNetwork();
-+            const meta = await getSelectedAccountMeta();
-+            const provider = await getProviderFor(network);
-+            const from = meta.address;
-+            const amountWei = ethers.BigNumber.from(msg.amountWei || "0");
-+            let gasLimit;
-+            if (msg.tokenAddress) {
-+              const c = new ethers.Contract(
-+                msg.tokenAddress,
-+                TM_SWAP.ERC20_ABI.concat(["function transfer(address to, uint256 amount) returns (bool)"]),
-+                provider
-+              );
-+              gasLimit = await c.estimateGas.transfer(msg.to, amountWei, { from });
-+            } else {
-+              gasLimit = await provider.estimateGas({ from, to: msg.to, value: amountWei });
-+            }
-+            const feeData = await provider.getFeeData();
-+            // EIP-1559 chains quote maxFeePerGas; older chains only have
-+            // gasPrice. Either way this is a worst-case ceiling, same as
-+            // what MetaMask's own preview shows -- the actual charge can
-+            // come in lower once the block is mined.
-+            const gasPrice = feeData.maxFeePerGas || feeData.gasPrice || ethers.BigNumber.from(0);
-+            // estimateGas is a lower bound in practice (state can shift
-+            // between the estimate and the real send) -- pad it the same
-+            // ~20% most wallets use so the preview doesn't undersell it.
-+            const paddedGasLimit = gasLimit.mul(120).div(100);
-+            const feeWei = paddedGasLimit.mul(gasPrice);
-+            sendResponse({ ok: true, feeWei: feeWei.toString() });
-+            break;
-+          }
-+
-           case "TM_SWAP_QUOTE": {
-             const network = await getActiveNetwork();
-             const provider = await getProviderFor(network);
+ // Returns the fixed PRICE_BOARD list, each entry filled in with its live
+-// price (in the given display currency, USD by default) and 24h change
+-// (null if CoinGecko didn't return that coin, e.g. a request that partially
+-// fails).
++// price (in the given display currency, USD by default), 24h change, and a
++// real logo image URL straight from CoinGecko (null for any of these if
++// CoinGecko didn't return that coin, e.g. a request that partially fails).
+ async function getPriceBoard(currency) {
+   const ids = PRICE_BOARD.map((c) => COINGECKO_IDS[c.symbol]);
+-  const { data, currency: vsCurrency } = await fetchPrices(ids, currency);
++  const byId = await fetchPriceBoardMarkets(ids, currency);
+   return PRICE_BOARD.map((c) => {
+     const id = COINGECKO_IDS[c.symbol];
+-    const entry = data[id];
++    const entry = byId[id];
+     return {
+       symbol: c.symbol,
+       name: c.name,
+-      price: entry ? entry[vsCurrency] : null,
+-      change24h: entry ? entry[`${vsCurrency}_24h_change`] : null,
++      price: entry ? entry.current_price : null,
++      change24h: entry && typeof entry.price_change_percentage_24h === "number" ? entry.price_change_percentage_24h : null,
++      image: entry ? entry.image : null,
+     };
+   });
+ }

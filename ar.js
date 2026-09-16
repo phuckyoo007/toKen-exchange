@@ -45,6 +45,7 @@
     "unlock.resetInsteadBtn": "إعادة تعيين المحفظة بدلاً من ذلك",
 
     "main.settingsTitle": "الإعدادات",
+    "main.portfolioLabel": "الرصيد الإجمالي",
     "main.tokensTitle": "العملات",
     "main.addTokenBtn": "+ إضافة عملة",
     "main.tokensEmpty": "لم تتم إضافة أي عملات بعد -- اضغط على «+ إضافة عملة» وأدخل عنوان العقد لتتبع عملة.",

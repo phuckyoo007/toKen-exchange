@@ -45,6 +45,7 @@
     "unlock.resetInsteadBtn": "Restablecer billetera en su lugar",
 
     "main.settingsTitle": "Configuración",
+    "main.portfolioLabel": "Saldo total",
     "main.tokensTitle": "Tokens",
     "main.addTokenBtn": "+ Agregar token",
     "main.tokensEmpty": "Aún no has agregado tokens -- toca “+ Agregar token” e ingresa una dirección de contrato para hacer seguimiento de uno.",

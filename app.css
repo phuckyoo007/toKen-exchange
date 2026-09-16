@@ -297,6 +297,19 @@ body {
   padding: 10px 12px; border-radius: 12px;
   background: var(--bg-raised); border: 1px solid var(--line);
 }
+/* Entries with a real block-explorer link (see buildExplorerTxUrl in
+   app.js) render as an <a>, not a div -- reset its default link styling
+   back to looking like the rest of the list, then add just enough of a
+   hover/focus cue plus a small external-link glyph to signal it's
+   clickable, the same way MetaMask/Coinbase Wallet's activity rows do. */
+a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
+.activity-entry-linked:hover, .activity-entry-linked:focus-visible {
+  border-color: var(--gold-deep); background: var(--bg-hover);
+}
+.activity-entry-linked::after {
+  content: "↗"; flex-shrink: 0; align-self: flex-start;
+  font-size: 12px; color: var(--text-faint); margin-left: 2px;
+}
 /* Every logged entry is currently an outgoing send -- a small circular
    badge with an up-right arrow, the same visual shorthand MetaMask's own
    activity feed uses to mark a send at a glance. */
@@ -378,12 +391,30 @@ body {
 /* ---------------- layout ---------------- */
 .screen {
   padding: 18px 16px; flex: 1; display: flex; flex-direction: column; gap: 11px;
-  /* Deliberately NOT animated (no opacity fade-in): a fade briefly shows
-     every card at partial opacity, letting the backdrop bleed through
-     underneath -- the same "goes translucent" problem fixed on the splash
-     screen, but on every single screen change/button click instead. Cards
-     now render at full opacity immediately, matching the solid look they
-     have once settled. */
+  /* Deliberately NOT opacity-animated: a fade briefly shows every card at
+     partial opacity, letting the backdrop bleed through underneath -- the
+     same "goes translucent" problem fixed on the splash screen, but on
+     every single screen change/button click instead. Cards render at full
+     opacity immediately, matching the solid look they have once settled.
+     A screen still gets a small transform-only entrance below, which
+     never touches opacity so it can't reintroduce that bug -- it just
+     keeps navigation from feeling like an instant, jarring cut. */
+}
+/* Runs once each time a screen goes from .hidden (display:none, so no
+   animation applies) to shown -- CSS starts a fresh animation whenever an
+   element newly matches a rule with an animation-name, which is exactly
+   the show/hide toggle showScreen() already does, so no JS changes were
+   needed to trigger this. Transform + a hair of scale only, same as a
+   native app's push/pop transition -- opacity is never touched. */
+@keyframes screenEnter {
+  from { transform: translateY(6px) scale(0.985); }
+  to { transform: translateY(0) scale(1); }
+}
+.screen:not(.hidden) {
+  animation: screenEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen:not(.hidden) { animation: none; }
 }
 .hidden { display: none !important; }
 
@@ -616,6 +647,16 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    USD estimate to show (CoinGecko unreachable/rate-limited), the native
    row itself takes over the lead styling via .balance-lead-fallback
    below, so the balance box never reads as empty. */
+/* Small caption above the hero number, clarifying that it's now a combined
+   total across the native balance + all tracked tokens, not just one
+   coin's value -- hidden whenever the fallback (.balance-lead-fallback)
+   takes over, since "Total balance" reads oddly labeling a lone native
+   amount. */
+.balance-usd-label {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
 #balance-usd {
   font-family: var(--font-display); font-weight: 700;
   font-size: 30px; letter-spacing: 0.01em;
@@ -680,17 +721,44 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .tokens-list { display: flex; flex-direction: column; gap: 6px; }
 .tokens-list:not(:empty) { margin-bottom: 2px; }
 #tokens-empty { margin: 2px 0 0; }
+/* Friendlier empty states for the Tokens/NFTs sections -- a small icon
+   above the existing muted hint text, instead of just a bare line, so an
+   empty section reads as "nothing added yet" rather than "something's
+   missing/broken". Purely decorative (aria-hidden) since the text below
+   already says the same thing to a screen reader. */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 4px;
+  padding: 10px 6px 4px;
+}
+.empty-state-icon {
+  font-size: 26px; line-height: 1;
+  opacity: 0.75;
+  filter: grayscale(0.15);
+}
+.empty-state p { margin: 0; }
 .token-row {
   display: flex; align-items: center; gap: 8px;
   background: var(--bg-raised); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 10px; font-size: 13px;
 }
 .token-icon {
+  position: relative;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   width: 28px; height: 28px; border-radius: 50%;
   font-size: 10px; font-weight: 800; letter-spacing: -0.02em;
   color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+/* A real logo, when one loads, sits on top of the colored initials rather
+   than replacing them in the DOM -- see tokenIconHtml() in app.js. Sized to
+   fill whatever size .token-icon is at each call site (28px here, smaller
+   in .price-left/.prices-card-list below) rather than a fixed size. */
+.token-icon-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  border-radius: 50%; object-fit: cover;
 }
 .token-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .token-symbol { font-weight: 600; color: var(--text); }

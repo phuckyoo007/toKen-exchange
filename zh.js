@@ -46,6 +46,7 @@
     "unlock.resetInsteadBtn": "改为重置钱包",
 
     "main.settingsTitle": "设置",
+    "main.portfolioLabel": "总余额",
     "main.tokensTitle": "代币",
     "main.addTokenBtn": "+ 添加代币",
     "main.tokensEmpty": "尚未添加任何代币——点击「+ 添加代币」并输入合约地址即可添加追踪。",

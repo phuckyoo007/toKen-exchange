@@ -46,6 +46,7 @@
     "unlock.resetInsteadBtn": "इसके बजाय वॉलेट रीसेट करें",
 
     "main.settingsTitle": "सेटिंग्स",
+    "main.portfolioLabel": "कुल बैलेंस",
     "main.tokensTitle": "टोकन",
     "main.addTokenBtn": "+ टोकन जोड़ें",
     "main.tokensEmpty": "अभी तक कोई टोकन नहीं जोड़ा गया है -- किसी टोकन को ट्रैक करने के लिए “+ टोकन जोड़ें” पर टैप करें और उसका कॉन्ट्रैक्ट एड्रेस दर्ज करें।",

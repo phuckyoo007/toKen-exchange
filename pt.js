@@ -44,6 +44,7 @@
     "unlock.resetInsteadBtn": "Redefinir carteira em vez disso",
 
     "main.settingsTitle": "Configurações",
+    "main.portfolioLabel": "Saldo total",
     "main.tokensTitle": "Tokens",
     "main.addTokenBtn": "+ Adicionar token",
     "main.tokensEmpty": "Nenhum token adicionado ainda -- toque em “+ Adicionar token” e informe o endereço de um contrato para acompanhá-lo.",

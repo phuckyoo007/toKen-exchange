@@ -46,6 +46,7 @@
     "unlock.resetInsteadBtn": "Réinitialiser le portefeuille à la place",
 
     "main.settingsTitle": "Paramètres",
+    "main.portfolioLabel": "Solde total",
     "main.tokensTitle": "Tokens",
     "main.addTokenBtn": "+ Ajouter un token",
     "main.tokensEmpty": "Aucun token ajouté pour l'instant -- appuyez sur « + Ajouter un token » et saisissez une adresse de contrat pour en suivre un.",

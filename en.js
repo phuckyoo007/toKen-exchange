@@ -49,6 +49,7 @@
     "unlock.resetInsteadBtn": "Reset wallet instead",
 
     "main.settingsTitle": "Settings",
+    "main.portfolioLabel": "Total balance",
     "main.showQrBtn": "Show QR",
     "main.hideQrBtn": "Hide QR",
     "main.tokensTitle": "Tokens",
@@ -280,6 +281,7 @@
     "activity.sentLabel": "Sent {amount} {asset}",
     "activity.toLabel": "to {address}",
     "activity.statusSent": "Sent",
+    "activity.viewOnExplorer": "View on block explorer",
 
     "footer.nonCustodial": "Non-custodial — your keys never leave this device",
 

@@ -45,6 +45,7 @@
     "unlock.resetInsteadBtn": "代わりにウォレットをリセット",
 
     "main.settingsTitle": "設定",
+    "main.portfolioLabel": "合計残高",
     "main.tokensTitle": "トークン",
     "main.addTokenBtn": "+ トークンを追加",
     "main.tokensEmpty": "まだトークンが追加されていません。「+ トークンを追加」をタップし、コントラクトアドレスを入力すると残高を表示できます。",

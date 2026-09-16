@@ -45,6 +45,7 @@
     "unlock.resetInsteadBtn": "Сбросить кошелёк",
 
     "main.settingsTitle": "Настройки",
+    "main.portfolioLabel": "Общий баланс",
     "main.tokensTitle": "Токены",
     "main.addTokenBtn": "+ Добавить токен",
     "main.tokensEmpty": "Токены ещё не добавлены — нажмите «+ Добавить токен» и введите адрес контракта, чтобы отслеживать нужный токен.",
