@@ -195,6 +195,7 @@ $("btn-goto-support-unlock").addEventListener("click", () => openSupport("screen
 
 // ---------------------------------------------------------------- MAIN
 async function refreshMain() {
+  armAutoLock(); // every path that reaches the main screen is an unlocked session
   currentStatus = await sendMsg("TM_GET_STATUS");
   const netRes = await sendMsg("TM_GET_NETWORKS");
   currentNetworks = netRes.networks;
@@ -241,6 +242,7 @@ async function refreshMain() {
   document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
   refreshBalance();
   refreshTokens(); // not awaited -- same reasoning as the balance above
+  refreshNfts(); // not awaited -- same reasoning as the balance above
   refreshMainPricesCard(); // not awaited -- same reasoning as the balance above
   refreshMainPredictionsCard(); // not awaited -- same reasoning as the balance above
 }
@@ -283,15 +285,81 @@ function updateAccountIdenticon(address) {
 }
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+// A loose "this looks like a name, not an address" check -- good enough to
+// decide whether to attempt an ENS lookup at all. The lookup itself (see
+// TM_RESOLVE_NAME in wallet-engine.js) is what actually confirms it.
+const NAME_LIKE_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+
+// Resolving "vitalik.eth" (or any other ENS name) to an address, the same
+// convenience MetaMask and Coinbase Wallet offer -- this app previously
+// required pasting a raw 0x address every time. Only ever resolved via
+// ethers' own provider.resolveName() (mainnet has a known ENS registry;
+// other chains predictably come back empty and the field just behaves as
+// an address field, same as before). The resolved address is always shown
+// before it's used for anything -- never sent to silently on trust in the
+// name alone.
+let resolvedNameKey = null; // the exact input text this resolution is for
+let resolvedNameAddress = null;
+let sendToResolveToken = 0;
+let sendToResolveTimer = null;
+
+function currentSendToAddress() {
+  const val = $("send-to").value.trim();
+  if (ADDRESS_RE.test(val)) return val;
+  if (resolvedNameAddress && resolvedNameKey === val) return resolvedNameAddress;
+  return null;
+}
+
+async function resolveSendToName(name) {
+  const myToken = ++sendToResolveToken;
+  $("send-to-resolved").classList.remove("hidden");
+  $("send-to-resolved").textContent = TM_I18N.t("send.resolvingName", { name });
+  try {
+    const res = await sendMsg("TM_RESOLVE_NAME", { name });
+    if (myToken !== sendToResolveToken) return;
+    if (res.address) {
+      resolvedNameKey = name;
+      resolvedNameAddress = res.address;
+      $("send-to-resolved").textContent = TM_I18N.t("send.resolvedName", { address: res.address });
+      $("send-to-identicon").innerHTML = TM_IDENTICON.svgFor(res.address, 24);
+      $("send-to-identicon").classList.remove("hidden");
+    } else {
+      resolvedNameKey = null;
+      resolvedNameAddress = null;
+      $("send-to-resolved").textContent = TM_I18N.t("send.nameNotFound", { name });
+    }
+  } catch (e) {
+    if (myToken !== sendToResolveToken) return;
+    resolvedNameKey = null;
+    resolvedNameAddress = null;
+    $("send-to-resolved").textContent = TM_I18N.t("send.nameResolutionUnsupported");
+  } finally {
+    if (myToken === sendToResolveToken) refreshSendFeePreview();
+  }
+}
+
 $("send-to").addEventListener("input", (e) => {
   const el = $("send-to-identicon");
   const val = e.target.value.trim();
+  resolvedNameKey = null;
+  resolvedNameAddress = null;
+  clearTimeout(sendToResolveTimer);
+  sendToResolveToken++; // invalidate any in-flight lookup for the previous value
+
   if (ADDRESS_RE.test(val)) {
     el.innerHTML = TM_IDENTICON.svgFor(val, 24);
     el.classList.remove("hidden");
+    $("send-to-resolved").classList.add("hidden");
+    $("send-to-resolved").textContent = "";
+  } else if (NAME_LIKE_RE.test(val)) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    sendToResolveTimer = setTimeout(() => resolveSendToName(val), 500);
   } else {
     el.classList.add("hidden");
     el.innerHTML = "";
+    $("send-to-resolved").classList.add("hidden");
+    $("send-to-resolved").textContent = "";
   }
 });
 
@@ -329,7 +397,7 @@ $("btn-toggle-qr").addEventListener("click", () => {
 });
 
 $("btn-settings").addEventListener("click", () => showScreen("screen-settings"));
-$("btn-goto-send").addEventListener("click", () => showScreen("screen-send"));
+$("btn-goto-send").addEventListener("click", () => { showScreen("screen-send"); refreshSendFeePreview(); });
 $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
 $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
@@ -411,6 +479,143 @@ async function refreshTokens() {
     list.appendChild(row);
   });
 }
+
+// ---------------------------------------------------------------- NFTS
+// Manually added the same way tokens are (contract address, here plus a
+// token ID) rather than auto-detected -- there's no indexer/API-key
+// service wired into this app to enumerate "everything this address
+// owns," and adding one would break the keyless, no-backend approach every
+// other feature here uses. Artwork/name come from the collection's own
+// metadata (see wallet-engine.js's sanitizeNftImageUrl/fetchNftMetadataJson)
+// and are rendered strictly as an <img src> + textContent -- never
+// innerHTML -- since that metadata is written by whoever deployed the NFT
+// contract, not by this app.
+async function refreshNfts() {
+  let res;
+  try {
+    res = await sendMsg("TM_GET_TRACKED_NFTS");
+  } catch (e) {
+    return; // best-effort -- don't let this disrupt the rest of the main screen
+  }
+
+  const grid = $("nft-grid");
+  grid.innerHTML = "";
+  if (!res.nfts.length) {
+    $("nfts-empty").classList.remove("hidden");
+    return;
+  }
+  $("nfts-empty").classList.add("hidden");
+
+  res.nfts.forEach((n) => {
+    const card = document.createElement("div");
+    card.className = "nft-card";
+
+    if (n.image) {
+      const img = document.createElement("img");
+      img.className = "nft-thumb";
+      img.src = n.image; // already scheme-checked server-side (http(s) or image data: URI only)
+      img.alt = "";
+      img.loading = "lazy";
+      // A broken/unreachable image link falls back to the same placeholder
+      // a metadata fetch failure gets, instead of showing a broken-image icon.
+      img.addEventListener("error", () => {
+        img.replaceWith(nftThumbFallback());
+      });
+      card.appendChild(img);
+    } else {
+      card.appendChild(nftThumbFallback());
+    }
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "nft-name";
+    nameEl.textContent = n.name || (n.error ? TM_I18N.t("nfts.loadError") : `#${n.tokenId}`);
+    card.appendChild(nameEl);
+
+    const idEl = document.createElement("span");
+    idEl.className = "nft-id";
+    idEl.textContent = `#${n.tokenId}`;
+    card.appendChild(idEl);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "nft-remove-btn";
+    removeBtn.title = TM_I18N.t("nfts.removeTitle");
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", async () => {
+      await sendMsg("TM_REMOVE_TRACKED_NFT", { contractAddress: n.contractAddress, tokenId: n.tokenId });
+      await refreshNfts();
+    });
+    card.appendChild(removeBtn);
+
+    grid.appendChild(card);
+  });
+}
+
+function nftThumbFallback() {
+  const el = document.createElement("div");
+  el.className = "nft-thumb-fallback";
+  el.textContent = "?";
+  return el;
+}
+
+function resetAddNftScreen() {
+  hideError("add-nft-error");
+  $("add-nft-address").value = "";
+  $("add-nft-token-id").value = "";
+  $("add-nft-preview").classList.add("hidden");
+  $("add-nft-preview-image").classList.add("hidden");
+  $("add-nft-preview-image").src = "";
+  $("add-nft-meta-warning").classList.add("hidden");
+  delete $("add-nft-preview").dataset.address;
+}
+
+$("btn-goto-add-nft").addEventListener("click", () => { resetAddNftScreen(); showScreen("screen-add-nft"); });
+
+$("btn-nft-lookup").addEventListener("click", async () => {
+  hideError("add-nft-error");
+  $("add-nft-preview").classList.add("hidden");
+  try {
+    const address = $("add-nft-address").value.trim();
+    const tokenId = $("add-nft-token-id").value.trim();
+    if (!ethers.utils.isAddress(address)) throw new Error(TM_I18N.t("addNft.invalidAddress"));
+    if (!/^\d+$/.test(tokenId)) throw new Error(TM_I18N.t("addNft.invalidTokenId"));
+    const info = await sendMsg("TM_LOOKUP_NFT", { contractAddress: address, tokenId });
+
+    const preview = $("add-nft-preview");
+    $("add-nft-name").textContent = info.name || TM_I18N.t("addNft.noName");
+    $("add-nft-standard").textContent = info.standard === "erc1155" ? "ERC-1155" : "ERC-721";
+    if (info.image) {
+      $("add-nft-preview-image").src = info.image;
+      $("add-nft-preview-image").classList.remove("hidden");
+    } else {
+      $("add-nft-preview-image").classList.add("hidden");
+    }
+    $("add-nft-meta-warning").classList.toggle("hidden", !info.metaError);
+    preview.dataset.address = address;
+    preview.dataset.tokenId = tokenId;
+    preview.dataset.standard = info.standard;
+    preview.dataset.name = info.name || "";
+    preview.classList.remove("hidden");
+  } catch (e) {
+    showError("add-nft-error", e.message);
+  }
+});
+
+$("btn-nft-confirm-add").addEventListener("click", async () => {
+  hideError("add-nft-error");
+  try {
+    const d = $("add-nft-preview").dataset;
+    await sendMsg("TM_ADD_TRACKED_NFT", {
+      contractAddress: d.address,
+      tokenId: d.tokenId,
+      standard: d.standard,
+      name: d.name,
+    });
+    await refreshNfts();
+    showScreen("screen-main");
+  } catch (e) {
+    showError("add-nft-error", e.message);
+  }
+});
 
 function resetAddTokenScreen() {
   hideError("add-token-error");
@@ -693,6 +898,7 @@ $("btn-goto-walletconnect").addEventListener("click", () => {
 $("btn-view-seed").addEventListener("click", () => showScreen("screen-view-seed"));
 $("btn-goto-support-settings").addEventListener("click", () => openSupport("screen-settings"));
 $("btn-lock").addEventListener("click", async () => {
+  disarmAutoLock();
   await sendMsg("TM_LOCK", {});
   showScreen("screen-unlock");
 });
@@ -747,7 +953,94 @@ $("btn-view-seed-submit").addEventListener("click", async () => {
 // ---------------------------------------------------------------- SEND
 $("send-asset-select").addEventListener("change", (e) => {
   $("send-token-address").classList.toggle("hidden", e.target.value !== "token");
+  refreshSendFeePreview();
 });
+
+// Estimated network fee, shown on the form itself before the user even
+// taps Send -- and echoed into the confirm card below -- the same "you'll
+// pay about this much in gas" preview MetaMask and Coinbase Wallet both
+// show up front. This app never surfaced any fee estimate before. Always
+// paid in the chain's native currency, whether the transfer itself is
+// native or a token.
+let sendFeePreviewToken = 0; // guards against a slow, stale estimate landing after a newer one
+let lastSendFeeWei = null;
+let sendFeePreviewTimer = null;
+
+function clearSendFeePreview() {
+  lastSendFeeWei = null;
+  $("send-fee-preview").classList.add("hidden");
+  $("send-fee-preview").textContent = "";
+}
+
+async function estimateSendFeeNow() {
+  const to = currentSendToAddress(); // raw address, or a name already resolved to one -- never the unresolved name text
+  const amountStr = $("send-amount").value.trim();
+  const isNative = $("send-asset-select").value === "native";
+  const tokenAddress = isNative ? null : $("send-token-address").value.trim();
+
+  if (!to || !amountStr || Number(amountStr) <= 0) {
+    clearSendFeePreview();
+    return;
+  }
+  if (!isNative && !ethers.utils.isAddress(tokenAddress)) {
+    clearSendFeePreview();
+    return;
+  }
+
+  const myToken = ++sendFeePreviewToken;
+  $("send-fee-preview").classList.remove("hidden");
+  $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateLoading");
+
+  try {
+    let amountWei;
+    if (isNative) {
+      amountWei = ethers.utils.parseEther(amountStr);
+    } else {
+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
+      amountWei = ethers.utils.parseUnits(amountStr, info.decimals);
+    }
+    const res = await sendMsg("TM_ESTIMATE_SEND_FEE", {
+      to,
+      amountWei: amountWei.toString(),
+      tokenAddress: isNative ? null : tokenAddress,
+    });
+    if (myToken !== sendFeePreviewToken) return; // a newer estimate has since started
+
+    lastSendFeeWei = res.feeWei;
+    const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
+    const feeFormatted = Number(ethers.utils.formatEther(res.feeWei)).toPrecision(3).replace(/\.?0+$/, "");
+
+    let usdText = null;
+    try {
+      const price = await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
+      if (price != null) usdText = formatCurrency(Number(ethers.utils.formatEther(res.feeWei)) * price);
+    } catch (e) {
+      // Best-effort only -- the native-amount fee line below still stands on its own.
+    }
+    if (myToken !== sendFeePreviewToken) return;
+
+    $("send-fee-preview").textContent = usdText
+      ? TM_I18N.t("send.feeEstimate", { fee: feeFormatted, symbol, usd: usdText })
+      : TM_I18N.t("send.feeEstimateNoUsd", { fee: feeFormatted, symbol });
+  } catch (e) {
+    if (myToken !== sendFeePreviewToken) return;
+    // Common and expected -- e.g. the amount exceeds the balance, or the
+    // RPC is briefly unavailable. Never block sending on this: the real fee
+    // is still confirmed by the wallet before anything is signed.
+    lastSendFeeWei = null;
+    $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateUnavailable");
+  }
+}
+
+// Debounced so a fast typist doesn't fire an RPC call per keystroke.
+function refreshSendFeePreview() {
+  clearTimeout(sendFeePreviewTimer);
+  sendFeePreviewTimer = setTimeout(estimateSendFeeNow, 500);
+}
+
+$("send-to").addEventListener("input", refreshSendFeePreview);
+$("send-amount").addEventListener("input", refreshSendFeePreview);
+$("send-token-address").addEventListener("input", refreshSendFeePreview);
 
 // Send delay / cancel window -- see Settings. Every send made from this
 // screen is held for this many seconds (with a visible countdown and a
@@ -779,6 +1072,93 @@ function populateSendDelaySelect() {
     chrome.storage.local.set({ [TM_SEND_DELAY_KEY]: currentSendDelaySeconds });
   });
 }
+
+// ---------------------------------------------------------------- AUTO-LOCK
+// unlockedSecret (see wallet-engine.js) lives in this same page's memory for
+// as long as the tab stays open -- there's no separate background process
+// here to time it out the way a real browser extension's service worker
+// could. This is the page-level equivalent: after N minutes with no click,
+// tap, or keystroke anywhere in the app, lock exactly the way the "Lock
+// wallet" button does. 5 minutes by default (matching MetaMask's own
+// out-of-the-box auto-lock timer), fully configurable in Settings.
+const TM_AUTO_LOCK_KEY = "tm_auto_lock_minutes";
+let currentAutoLockMinutes = 5;
+let autoLockTimerId = null;
+let autoLockArmed = false; // only true once a real wallet session is unlocked
+let autoLockLastReset = 0;
+
+function loadAutoLockMinutes() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([TM_AUTO_LOCK_KEY], (res) => {
+      const stored = res[TM_AUTO_LOCK_KEY];
+      currentAutoLockMinutes = typeof stored === "number" ? stored : 5;
+      resolve();
+    });
+  });
+}
+
+function populateAutoLockSelect() {
+  const sel = $("auto-lock-select");
+  sel.value = String(currentAutoLockMinutes);
+  sel.addEventListener("change", (e) => {
+    currentAutoLockMinutes = Number(e.target.value) || 0;
+    chrome.storage.local.set({ [TM_AUTO_LOCK_KEY]: currentAutoLockMinutes });
+    resetAutoLockTimer();
+  });
+}
+
+function clearAutoLockTimer() {
+  if (autoLockTimerId) {
+    clearTimeout(autoLockTimerId);
+    autoLockTimerId = null;
+  }
+}
+
+function resetAutoLockTimer() {
+  clearAutoLockTimer();
+  if (!autoLockArmed || !currentAutoLockMinutes) return;
+  autoLockTimerId = setTimeout(async () => {
+    autoLockArmed = false;
+    try {
+      await sendMsg("TM_LOCK", {});
+    } catch (e) {
+      // Already locked, or the page is mid-navigation -- either way there's
+      // nothing left to protect, so just make sure the UI reflects it.
+    }
+    resetSendConfirmUi();
+    showScreen("screen-unlock");
+  }, currentAutoLockMinutes * 60 * 1000);
+}
+
+// Arms (or re-arms) the idle timer. Called every time the app reaches an
+// unlocked, authenticated state (see refreshMain()) -- cheap and idempotent,
+// so calling it again on every account/network switch is fine.
+function armAutoLock() {
+  autoLockArmed = true;
+  resetAutoLockTimer();
+}
+
+function disarmAutoLock() {
+  autoLockArmed = false;
+  clearAutoLockTimer();
+}
+
+// Any real user activity resets the countdown. Throttled to roughly once
+// every 2 seconds so a stream of mousemove events doesn't churn
+// clearTimeout/setTimeout on every pixel of movement.
+["click", "keydown", "touchstart", "scroll", "mousemove"].forEach((evt) => {
+  document.addEventListener(
+    evt,
+    () => {
+      if (!autoLockArmed) return;
+      const now = Date.now();
+      if (now - autoLockLastReset < 2000) return;
+      autoLockLastReset = now;
+      resetAutoLockTimer();
+    },
+    { passive: true }
+  );
+});
 
 // "Known address" = already in the address book, or already sent to from
 // this device -- used only to show a heads-up in the confirm step, never
@@ -843,9 +1223,10 @@ $("btn-send-submit").addEventListener("click", async () => {
   hideError("send-error");
   $("send-status").classList.add("hidden");
   try {
-    const to = $("send-to").value.trim();
+    const typedTo = $("send-to").value.trim();
+    const to = currentSendToAddress(); // resolves a name to its looked-up address; never sends to unresolved name text
+    if (!to) throw new Error(TM_I18N.t("send.invalidRecipient"));
     const amountStr = $("send-amount").value.trim();
-    if (!ethers.utils.isAddress(to)) throw new Error(TM_I18N.t("send.invalidRecipient"));
     const isNative = $("send-asset-select").value === "native";
     const tokenAddress = isNative ? null : $("send-token-address").value.trim();
     if (!isNative && !ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
@@ -863,7 +1244,18 @@ $("btn-send-submit").addEventListener("click", async () => {
     $("send-to").disabled = true;
     $("send-amount").disabled = true;
     $("send-asset-select").disabled = true;
-    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to });
+    // When a name was typed, show the resolved address alongside it -- the
+    // countdown/confirm step is exactly where that should be double-checked.
+    const displayTo = typedTo !== to ? `${typedTo} (${to})` : to;
+    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to: displayTo });
+    if (lastSendFeeWei) {
+      const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
+      const feeFormatted = Number(ethers.utils.formatEther(lastSendFeeWei)).toPrecision(3).replace(/\.?0+$/, "");
+      $("send-confirm-fee").textContent = TM_I18N.t("send.confirmFeeLine", { fee: feeFormatted, symbol });
+      $("send-confirm-fee").classList.remove("hidden");
+    } else {
+      $("send-confirm-fee").classList.add("hidden");
+    }
     $("send-confirm-new-address-warning").classList.toggle("hidden", known);
     $("send-confirm-card").classList.remove("hidden");
 
@@ -1311,11 +1703,14 @@ function activateSplashLanding() {
   splashLandingActivated = true;
   clearSplashAutoTimers();
   const el = $("splash-screen");
-  if (el) el.classList.add("splash-home");
-  ["splash-tab-home", "splash-tab-assets", "splash-tab-activity", "splash-tab-send"].forEach((id) => {
-    const tab = $(id);
-    if (tab) tab.addEventListener("click", () => hideSplash());
-  });
+  if (!el) return;
+  // Distinct from splash-home: no wallet exists yet (or it's locked), so
+  // the Home/Assets/Activity/Send bar doesn't apply here -- see the CSS
+  // for #splash-screen.splash-landing. The whole splash becomes one big
+  // "tap to continue" target instead of four nav icons that don't yet
+  // mean anything.
+  el.classList.add("splash-landing");
+  el.addEventListener("click", () => hideSplash());
 }
 
 // ---------------------------------------------------------------- ACTIVITY
@@ -1579,6 +1974,8 @@ function renderActivity() {
   populateCurrencySelect();
   await loadSendDelay();
   populateSendDelaySelect();
+  await loadAutoLockMinutes();
+  populateAutoLockSelect();
 
   const params = new URLSearchParams(location.search);
   if (params.get("mode") === "approve") {

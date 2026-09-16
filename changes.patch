@@ -1,548 +1,1119 @@
 diff --git a/app.css b/app.css
-index a4fcad7..7fc250d 100644
+index 7fc250d..b189a94 100644
 --- a/app.css
 +++ b/app.css
-@@ -87,14 +87,13 @@ body {
- 
- /* ---------------- full-bleed arcade-cabinet scene ----------------
-    A fixed backdrop -- the user's own AI-generated "jackpot" reference
--   art -- sitting behind the whole popup on every screen, standing in
--   for the header-only SVG logo's cabinet. A dark scrim gradient is
--   baked into the same layer: strong enough near the top to reveal the
--   art's own slot-machine assembly, then quickly opaque enough that
--   real screen content (headings, inputs, buttons) stays fully
--   readable over it lower down. #app itself is transparent so this
--   shows through; individual cards/inputs keep their own solid
--   dark fills for contrast. */
-+   art -- sitting behind the whole popup on every screen. A dark scrim
-+   gradient is baked into the same layer: strong enough near the top to
-+   reveal the art's own slot-machine assembly (blending into the header
-+   logo above it), then quickly opaque enough that real screen content
-+   (headings, inputs, buttons) stays fully readable over it lower down.
-+   #app itself is transparent so this shows through; individual
-+   cards/inputs keep their own solid dark fills for contrast. */
- #bg-scene {
-   position: fixed;
-   inset: 0;
-@@ -116,14 +115,23 @@ body {
-   display: flex;
-   flex-direction: column;
-   min-height: 480px;
--  background: transparent;
-+  /* Fully opaque -- no part of the app card lets the #bg-scene backdrop
-+     show through anymore. The backdrop art is still visible around the
-+     outside of this card on wide/desktop viewports (see the framed
-+     look below), but nothing inside it -- header included -- is
-+     see-through in any way. */
-+  background: var(--bg);
+@@ -231,6 +231,46 @@ body {
+     transparent 100%);
  }
- 
- /* ---------------- splash screen ----------------
-    Shown for a brief moment every time the popup opens, before the
-    onboarding/unlock/main screen underneath -- the MetaMask-fox-style
--   "brand moment" the user asked for. Sits above #app and fades out
--   once the real starting screen is ready. */
-+   "brand moment" the user asked for. Sits above #app and comes down
-+   once the real starting screen is ready.
-+   Deliberately NOT animated (no opacity transition): a fade would pass
-+   through a half-see-through frame first, which is exactly the
-+   "translucent, does nothing" glitch reported when tapping a tab
-+   before a wallet exists. A hard cut avoids that state entirely. */
- #splash-screen {
-   position: fixed;
-   inset: 0;
-@@ -135,7 +143,6 @@ body {
-   display: flex;
-   align-items: center;
-   justify-content: center;
--  transition: opacity 0.4s ease;
- }
- #splash-screen img {
-   position: absolute;
-@@ -169,6 +176,9 @@ body {
-   opacity: 0;
-   pointer-events: none;
- }
-+/* Only relevant to the framed web-wallet layout (see below) -- hidden
-+   by default so it has no effect in the extension popup context. */
-+#splash-tagline { display: none; }
- #splash-spinner {
-   position: absolute;
-   bottom: 100px;
-@@ -296,19 +306,16 @@ body {
- }
- 
- /* ---------------- header ----------------
--   The header no longer draws its own logo art: the full-bleed
--   #bg-scene behind it already shows the "TOKEN EXCHANGE" slot-machine
--   cabinet at the very top of every screen (it's the top of the same
--   reference image), so #brand-logo/#app-header just reserve the
--   matching amount of vertical space and let the network badge sit
--   just under the cabinet, over the scene. */
-+   #app is now fully opaque (see #app above) -- nothing behind it shows
-+   through anymore, including here. This no longer reserves space for
-+   the backdrop's baked-in title, so it's sized to just its own content
-+   (the network pill); the circular badge logo lives down in the
-+   footer instead (see below). */
- #app-header {
-   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
--  min-height: 246px;
--  padding: 9px 12px 10px;
-+  padding: 12px 12px 10px;
-   flex-shrink: 0;
- }
--#brand-logo { display: none; }
- #network-badge {
-   font-family: var(--font-body);
-   font-weight: 600;
-@@ -331,22 +338,34 @@ body {
- /* ---------------- layout ---------------- */
- .screen {
-   padding: 18px 16px; flex: 1; display: flex; flex-direction: column; gap: 11px;
--  animation: screenFadeIn 0.18s ease;
--}
--@keyframes screenFadeIn {
--  from { opacity: 0; transform: translateY(4px); }
--  to { opacity: 1; transform: translateY(0); }
-+  /* Deliberately NOT animated (no opacity fade-in): a fade briefly shows
-+     every card at partial opacity, letting the backdrop bleed through
-+     underneath -- the same "goes translucent" problem fixed on the splash
-+     screen, but on every single screen change/button click instead. Cards
-+     now render at full opacity immediately, matching the solid look they
-+     have once settled. */
- }
- .hidden { display: none !important; }
- 
--/* ---------------- footer ---------------- */
-+/* ---------------- footer ----------------
-+   The circular "TOKEN EXCHANGE" badge (the same image used as the app
-+   icon) now sits down here at the bottom of every screen instead of up
-+   in the header, where it fought with the backdrop's own baked-in
-+   title. Small and out of the way of the actual "non-custodial"
-+   messaging it sits above. */
- #app-footer {
--  display: flex; align-items: center; justify-content: center; gap: 6px;
--  padding: 7px 16px; border-top: 1px solid var(--line);
-+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-+  padding: 10px 16px 12px; border-top: 1px solid var(--line);
-   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
-   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
-   flex-shrink: 0;
- }
-+#app-footer #brand-logo {
-+  display: block; width: 56px; height: 56px;
-+  border-radius: 50%;
-+  box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(221, 172, 77, 0.25);
+ #splash-screen.splash-home #splash-tabbar { display: flex; }
++
++/* Before any wallet exists yet (screen-onboarding) or while one exists but
++   is locked (screen-unlock), the splash still lingers instead of
++   auto-fading -- see activateSplashLanding() -- but showing the
++   Home/Assets/Activity/Send bar here makes no sense: those are existing-
++   wallet features and there's nothing to tap that actually starts
++   onboarding or unlocking. This swaps that bar for one plain "tap to
++   continue" hint, and the whole splash becomes a single big tap target
++   (see activateSplashLanding()), so a first-time visitor isn't left
++   guessing which nav icon dismisses a screen that never explained itself. */
++#splash-screen.splash-landing #splash-spinner { display: none; }
++#splash-screen.splash-landing #splash-tabbar { display: none; }
++#splash-screen.splash-landing { cursor: pointer; }
++#splash-continue-hint {
++  display: none;
++  position: absolute;
++  left: 0; right: 0; bottom: 0;
++  z-index: 1;
++  /* Same 132px min-height and gradient shape as #splash-tabbar above --
++     this still has to fully cover the artwork's own baked-in tab-bar
++     ghost (~45-95px up from the bottom) even though no real buttons
++     render here in landing mode. */
++  min-height: 132px;
++  align-items: center;
++  justify-content: center;
++  padding: 10px 10px calc(24px + env(safe-area-inset-bottom, 0px));
++  background: linear-gradient(to top,
++    rgba(9, 11, 17, 0.99) 0%,
++    rgba(9, 11, 17, 0.99) 68%,
++    rgba(9, 11, 17, 0.9) 82%,
++    rgba(9, 11, 17, 0.4) 94%,
++    transparent 100%);
++  color: var(--gold-bright);
++  font-family: var(--font-display);
++  font-weight: 700;
++  font-size: 13px;
++  letter-spacing: 0.04em;
++  text-transform: uppercase;
 +}
-+#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
- #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
- 
- h2 {
-@@ -447,6 +466,17 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
-   border-left: 3px solid var(--gold-deep);
-   padding: 9px 11px; border-radius: 7px;
++#splash-screen.splash-landing #splash-continue-hint { display: flex; }
+ .splash-tab {
+   flex: 1;
+   display: flex;
+@@ -663,6 +703,42 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
  }
-+/* Same slot-machine top-strip treatment as the card panels above (see
-+   .prices-card / .tokens-section), applied to just this one .warn box --
-+   not .warn generally, so the smaller warning callouts elsewhere (create
-+   password, send confirmation, etc.) stay their plain solid selves. */
-+.onboarding-intro-card {
+ .token-remove-btn:hover { color: var(--danger); }
+ 
++/* NFTs are shown as image thumbnails rather than balance rows -- a small
++   grid instead of .tokens-list's stacked rows -- but the outer
++   .tokens-section/.tokens-header/.tokens-title classes are reused as-is so
++   this section matches the Tokens card above it exactly (same backdrop
++   strip, same header style). */
++.nft-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
++.nft-grid:not(:empty) { margin-bottom: 2px; }
++.nft-card {
 +  position: relative;
-+  background:
-+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 44px, #2a2110 100%),
-+    url(img/bg-scene.jpg) center top / cover no-repeat;
-+  padding-top: 44px;
++  background: var(--bg-raised); border: 1px solid var(--line);
++  border-radius: 8px; padding: 6px; text-align: center;
 +}
- .hint {
-   color: var(--success); font-size: 12px; line-height: 1.5;
-   background: #142822; border: 1px solid #234a3d;
-@@ -455,6 +485,22 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
-   display: flex; align-items: center; gap: 8px;
++.nft-thumb {
++  width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
++  border-radius: 6px; background: var(--bg-inset);
++  display: block; margin-bottom: 4px;
++}
++.nft-thumb-fallback {
++  width: 100%; aspect-ratio: 1 / 1; border-radius: 6px;
++  background: var(--bg-inset); display: flex; align-items: center; justify-content: center;
++  color: var(--text-faint); font-size: 10px; margin-bottom: 4px;
++}
++.nft-name {
++  display: block; font-size: 11px; color: var(--text);
++  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
++}
++.nft-id { display: block; font-size: 9.5px; color: var(--text-faint); font-family: var(--font-mono); }
++.nft-remove-btn {
++  position: absolute; top: 2px; right: 2px;
++  width: 18px; height: 18px; border-radius: 50%;
++  background: rgba(9, 11, 17, 0.75); border: 1px solid var(--line);
++  color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer;
++  display: flex; align-items: center; justify-content: center; padding: 0;
++}
++.nft-remove-btn:hover { color: var(--danger); }
++
+ .prices-list {
+   display: flex; flex-direction: column; gap: 6px;
+   background: var(--bg-inset); border: 1px solid var(--line);
+diff --git a/app.js b/app.js
+index 7644037..e1c69a7 100644
+--- a/app.js
++++ b/app.js
+@@ -195,6 +195,7 @@ $("btn-goto-support-unlock").addEventListener("click", () => openSupport("screen
+ 
+ // ---------------------------------------------------------------- MAIN
+ async function refreshMain() {
++  armAutoLock(); // every path that reaches the main screen is an unlocked session
+   currentStatus = await sendMsg("TM_GET_STATUS");
+   const netRes = await sendMsg("TM_GET_NETWORKS");
+   currentNetworks = netRes.networks;
+@@ -241,6 +242,7 @@ async function refreshMain() {
+   document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
+   refreshBalance();
+   refreshTokens(); // not awaited -- same reasoning as the balance above
++  refreshNfts(); // not awaited -- same reasoning as the balance above
+   refreshMainPricesCard(); // not awaited -- same reasoning as the balance above
+   refreshMainPredictionsCard(); // not awaited -- same reasoning as the balance above
+ }
+@@ -283,15 +285,81 @@ function updateAccountIdenticon(address) {
  }
  
-+/* ---------------- send confirm / cancel-window card ----------------
-+   Shown after "Send" is tapped and before the transaction actually goes
-+   out, while the (configurable, cancellable) delay counts down. Sits
-+   right where the Send button was, so nothing about the layout jumps. */
-+.send-confirm-card {
-+  margin-top: 10px; padding: 12px; border-radius: 10px;
-+  background: var(--bg-inset); border: 1px solid var(--line-strong);
-+  display: flex; flex-direction: column; gap: 8px;
-+}
-+.send-confirm-card .warn,
-+.send-confirm-card .error { margin: 0; }
-+.send-confirm-summary {
-+  margin: 0; font-size: 13px; color: var(--text);
-+  font-family: var(--font-mono); word-break: break-all;
+ const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
++// A loose "this looks like a name, not an address" check -- good enough to
++// decide whether to attempt an ENS lookup at all. The lookup itself (see
++// TM_RESOLVE_NAME in wallet-engine.js) is what actually confirms it.
++const NAME_LIKE_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
++
++// Resolving "vitalik.eth" (or any other ENS name) to an address, the same
++// convenience MetaMask and Coinbase Wallet offer -- this app previously
++// required pasting a raw 0x address every time. Only ever resolved via
++// ethers' own provider.resolveName() (mainnet has a known ENS registry;
++// other chains predictably come back empty and the field just behaves as
++// an address field, same as before). The resolved address is always shown
++// before it's used for anything -- never sent to silently on trust in the
++// name alone.
++let resolvedNameKey = null; // the exact input text this resolution is for
++let resolvedNameAddress = null;
++let sendToResolveToken = 0;
++let sendToResolveTimer = null;
++
++function currentSendToAddress() {
++  const val = $("send-to").value.trim();
++  if (ADDRESS_RE.test(val)) return val;
++  if (resolvedNameAddress && resolvedNameKey === val) return resolvedNameAddress;
++  return null;
 +}
 +
- /* The one shared "you're waiting on something" cue (see coinSpinnerHtml()
-    in popup.js) -- small enough to sit inline next to a loading label
-    wherever one is needed, reusing the same image and spin as the startup
-@@ -575,9 +621,19 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
- .actions-row button { flex: 1; }
- .swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
- 
-+/* A strip of the slot-machine artwork (the same source as #bg-scene)
-+   across the top of a card, fading into the card's own solid fill by
-+   44px down -- a small decorative callback to the backdrop, without
-+   making any part of the card itself see-through. Real content starts
-+   below the reserved padding, never overlapping the art. */
- .tokens-section {
--  margin-top: 4px; background: var(--bg-inset); border: 1px solid var(--line);
--  border-radius: 10px; padding: 10px;
-+  margin-top: 4px;
-+  position: relative;
-+  background:
-+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
-+    url(img/bg-scene.jpg) center top / cover no-repeat;
-+  border: 1px solid var(--line);
-+  border-radius: 10px; padding: 44px 10px 10px;
- }
- .tokens-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
- .tokens-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
-@@ -644,8 +700,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
-    reuse .price-row/.price-name/etc. above so the two views stay visually
-    consistent. */
- .prices-card {
--  background: var(--bg-inset); border: 1px solid var(--line);
--  border-radius: 10px; padding: 10px; margin-bottom: 10px;
-+  position: relative;
-+  background:
-+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
-+    url(img/bg-scene.jpg) center top / cover no-repeat;
-+  border: 1px solid var(--line);
-+  border-radius: 10px; padding: 44px 10px 10px; margin-bottom: 10px;
- }
- .prices-card-header {
-   display: flex; align-items: center; justify-content: space-between;
-@@ -720,8 +780,9 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
- .support-input-row button { flex-shrink: 0; }
- 
- /* ---------------- language picker ---------------- */
--.language-picker { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
-+.language-picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
- .language-picker label { margin: 0; flex-shrink: 0; }
-+.language-picker > p.muted { flex: 1 0 100%; margin: 2px 0 0; font-size: 11px; line-height: 1.4; }
- .language-picker select {
-   width: auto; min-width: 0; flex: 1; max-width: 62%;
-   border-radius: 999px; padding: 9px 16px;
-@@ -792,23 +853,48 @@ body.tm-web-wallet #app {
-   overflow: hidden;
-   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
- }
--/* The extension pins the splash to the popup window's own top-left corner
--   (position: fixed; inset: 0) since the popup window IS 360x600. Here it's
--   repositioned to sit right on top of the #app card instead of the whole
--   browser viewport. */
-+/* Back to the framed-card look on a wide window: the splash sits right
-+   on top of where the #app card will be (same 390x640 rounded
-+   rectangle, gold-bordered like a phone screenshot floating on a dark
-+   desk) instead of stretching edge-to-edge, with the "non-custodial"
-+   tagline floating just below it on the page background. On an actual
-+   phone-width screen (the media query below) it goes back to filling
-+   the whole viewport, same as #app does there -- there's no "desk"
-+   around it to show on a real phone screen anyway. */
- body.tm-web-wallet #splash-screen {
--  position: absolute;
--  inset: auto;
--  top: 32px;
-+  position: fixed;
-+  top: 50%;
-   left: 50%;
--  transform: translateX(-50%);
-+  right: auto;
-+  bottom: auto;
-+  transform: translate(-50%, -50%);
-   width: 390px;
-   height: 640px;
-   max-width: calc(100% - 24px);
-+  max-height: calc(100vh - 24px);
-   border-radius: 20px;
-+  border: 2px solid var(--gold-deep);
-+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
-+}
-+body.tm-web-wallet #splash-tagline {
-+  display: flex; align-items: center; justify-content: center; gap: 6px;
-+  position: fixed; z-index: 999;
-+  left: 50%; top: calc(50% + 320px + 18px);
-+  transform: translateX(-50%);
-+  color: var(--text-faint); font-size: 12px; letter-spacing: 0.02em;
-+  white-space: nowrap;
-+}
-+body.tm-web-wallet #splash-tagline .footer-lock { color: var(--gold-deep); font-size: 12px; }
-+@media (max-width: 460px) {
-+  body.tm-web-wallet #splash-screen {
-+    top: 0; left: 0; transform: none;
-+    width: 100%; height: 100%;
-+    max-width: 100%; max-height: 100%;
-+    border-radius: 0; border: none;
++async function resolveSendToName(name) {
++  const myToken = ++sendToResolveToken;
++  $("send-to-resolved").classList.remove("hidden");
++  $("send-to-resolved").textContent = TM_I18N.t("send.resolvingName", { name });
++  try {
++    const res = await sendMsg("TM_RESOLVE_NAME", { name });
++    if (myToken !== sendToResolveToken) return;
++    if (res.address) {
++      resolvedNameKey = name;
++      resolvedNameAddress = res.address;
++      $("send-to-resolved").textContent = TM_I18N.t("send.resolvedName", { address: res.address });
++      $("send-to-identicon").innerHTML = TM_IDENTICON.svgFor(res.address, 24);
++      $("send-to-identicon").classList.remove("hidden");
++    } else {
++      resolvedNameKey = null;
++      resolvedNameAddress = null;
++      $("send-to-resolved").textContent = TM_I18N.t("send.nameNotFound", { name });
++    }
++  } catch (e) {
++    if (myToken !== sendToResolveToken) return;
++    resolvedNameKey = null;
++    resolvedNameAddress = null;
++    $("send-to-resolved").textContent = TM_I18N.t("send.nameResolutionUnsupported");
++  } finally {
++    if (myToken === sendToResolveToken) refreshSendFeePreview();
 +  }
-+  body.tm-web-wallet #splash-tagline { display: none; }
++}
++
+ $("send-to").addEventListener("input", (e) => {
+   const el = $("send-to-identicon");
+   const val = e.target.value.trim();
++  resolvedNameKey = null;
++  resolvedNameAddress = null;
++  clearTimeout(sendToResolveTimer);
++  sendToResolveToken++; // invalidate any in-flight lookup for the previous value
++
+   if (ADDRESS_RE.test(val)) {
+     el.innerHTML = TM_IDENTICON.svgFor(val, 24);
+     el.classList.remove("hidden");
++    $("send-to-resolved").classList.add("hidden");
++    $("send-to-resolved").textContent = "";
++  } else if (NAME_LIKE_RE.test(val)) {
++    el.classList.add("hidden");
++    el.innerHTML = "";
++    sendToResolveTimer = setTimeout(() => resolveSendToName(val), 500);
+   } else {
+     el.classList.add("hidden");
+     el.innerHTML = "";
++    $("send-to-resolved").classList.add("hidden");
++    $("send-to-resolved").textContent = "";
+   }
+ });
+ 
+@@ -329,7 +397,7 @@ $("btn-toggle-qr").addEventListener("click", () => {
+ });
+ 
+ $("btn-settings").addEventListener("click", () => showScreen("screen-settings"));
+-$("btn-goto-send").addEventListener("click", () => showScreen("screen-send"));
++$("btn-goto-send").addEventListener("click", () => { showScreen("screen-send"); refreshSendFeePreview(); });
+ $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+ $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
+ $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
+@@ -412,6 +480,143 @@ async function refreshTokens() {
+   });
  }
- @media (max-width: 460px) {
-   body.tm-web-wallet { padding: 0; }
-   body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
--  body.tm-web-wallet #splash-screen { top: 0; width: 100%; height: 100vh; max-width: 100%; border-radius: 0; }
+ 
++// ---------------------------------------------------------------- NFTS
++// Manually added the same way tokens are (contract address, here plus a
++// token ID) rather than auto-detected -- there's no indexer/API-key
++// service wired into this app to enumerate "everything this address
++// owns," and adding one would break the keyless, no-backend approach every
++// other feature here uses. Artwork/name come from the collection's own
++// metadata (see wallet-engine.js's sanitizeNftImageUrl/fetchNftMetadataJson)
++// and are rendered strictly as an <img src> + textContent -- never
++// innerHTML -- since that metadata is written by whoever deployed the NFT
++// contract, not by this app.
++async function refreshNfts() {
++  let res;
++  try {
++    res = await sendMsg("TM_GET_TRACKED_NFTS");
++  } catch (e) {
++    return; // best-effort -- don't let this disrupt the rest of the main screen
++  }
++
++  const grid = $("nft-grid");
++  grid.innerHTML = "";
++  if (!res.nfts.length) {
++    $("nfts-empty").classList.remove("hidden");
++    return;
++  }
++  $("nfts-empty").classList.add("hidden");
++
++  res.nfts.forEach((n) => {
++    const card = document.createElement("div");
++    card.className = "nft-card";
++
++    if (n.image) {
++      const img = document.createElement("img");
++      img.className = "nft-thumb";
++      img.src = n.image; // already scheme-checked server-side (http(s) or image data: URI only)
++      img.alt = "";
++      img.loading = "lazy";
++      // A broken/unreachable image link falls back to the same placeholder
++      // a metadata fetch failure gets, instead of showing a broken-image icon.
++      img.addEventListener("error", () => {
++        img.replaceWith(nftThumbFallback());
++      });
++      card.appendChild(img);
++    } else {
++      card.appendChild(nftThumbFallback());
++    }
++
++    const nameEl = document.createElement("span");
++    nameEl.className = "nft-name";
++    nameEl.textContent = n.name || (n.error ? TM_I18N.t("nfts.loadError") : `#${n.tokenId}`);
++    card.appendChild(nameEl);
++
++    const idEl = document.createElement("span");
++    idEl.className = "nft-id";
++    idEl.textContent = `#${n.tokenId}`;
++    card.appendChild(idEl);
++
++    const removeBtn = document.createElement("button");
++    removeBtn.className = "nft-remove-btn";
++    removeBtn.title = TM_I18N.t("nfts.removeTitle");
++    removeBtn.textContent = "×";
++    removeBtn.addEventListener("click", async () => {
++      await sendMsg("TM_REMOVE_TRACKED_NFT", { contractAddress: n.contractAddress, tokenId: n.tokenId });
++      await refreshNfts();
++    });
++    card.appendChild(removeBtn);
++
++    grid.appendChild(card);
++  });
++}
++
++function nftThumbFallback() {
++  const el = document.createElement("div");
++  el.className = "nft-thumb-fallback";
++  el.textContent = "?";
++  return el;
++}
++
++function resetAddNftScreen() {
++  hideError("add-nft-error");
++  $("add-nft-address").value = "";
++  $("add-nft-token-id").value = "";
++  $("add-nft-preview").classList.add("hidden");
++  $("add-nft-preview-image").classList.add("hidden");
++  $("add-nft-preview-image").src = "";
++  $("add-nft-meta-warning").classList.add("hidden");
++  delete $("add-nft-preview").dataset.address;
++}
++
++$("btn-goto-add-nft").addEventListener("click", () => { resetAddNftScreen(); showScreen("screen-add-nft"); });
++
++$("btn-nft-lookup").addEventListener("click", async () => {
++  hideError("add-nft-error");
++  $("add-nft-preview").classList.add("hidden");
++  try {
++    const address = $("add-nft-address").value.trim();
++    const tokenId = $("add-nft-token-id").value.trim();
++    if (!ethers.utils.isAddress(address)) throw new Error(TM_I18N.t("addNft.invalidAddress"));
++    if (!/^\d+$/.test(tokenId)) throw new Error(TM_I18N.t("addNft.invalidTokenId"));
++    const info = await sendMsg("TM_LOOKUP_NFT", { contractAddress: address, tokenId });
++
++    const preview = $("add-nft-preview");
++    $("add-nft-name").textContent = info.name || TM_I18N.t("addNft.noName");
++    $("add-nft-standard").textContent = info.standard === "erc1155" ? "ERC-1155" : "ERC-721";
++    if (info.image) {
++      $("add-nft-preview-image").src = info.image;
++      $("add-nft-preview-image").classList.remove("hidden");
++    } else {
++      $("add-nft-preview-image").classList.add("hidden");
++    }
++    $("add-nft-meta-warning").classList.toggle("hidden", !info.metaError);
++    preview.dataset.address = address;
++    preview.dataset.tokenId = tokenId;
++    preview.dataset.standard = info.standard;
++    preview.dataset.name = info.name || "";
++    preview.classList.remove("hidden");
++  } catch (e) {
++    showError("add-nft-error", e.message);
++  }
++});
++
++$("btn-nft-confirm-add").addEventListener("click", async () => {
++  hideError("add-nft-error");
++  try {
++    const d = $("add-nft-preview").dataset;
++    await sendMsg("TM_ADD_TRACKED_NFT", {
++      contractAddress: d.address,
++      tokenId: d.tokenId,
++      standard: d.standard,
++      name: d.name,
++    });
++    await refreshNfts();
++    showScreen("screen-main");
++  } catch (e) {
++    showError("add-nft-error", e.message);
++  }
++});
++
+ function resetAddTokenScreen() {
+   hideError("add-token-error");
+   $("add-token-address").value = "";
+@@ -693,6 +898,7 @@ $("btn-goto-walletconnect").addEventListener("click", () => {
+ $("btn-view-seed").addEventListener("click", () => showScreen("screen-view-seed"));
+ $("btn-goto-support-settings").addEventListener("click", () => openSupport("screen-settings"));
+ $("btn-lock").addEventListener("click", async () => {
++  disarmAutoLock();
+   await sendMsg("TM_LOCK", {});
+   showScreen("screen-unlock");
+ });
+@@ -747,8 +953,95 @@ $("btn-view-seed-submit").addEventListener("click", async () => {
+ // ---------------------------------------------------------------- SEND
+ $("send-asset-select").addEventListener("change", (e) => {
+   $("send-token-address").classList.toggle("hidden", e.target.value !== "token");
++  refreshSendFeePreview();
+ });
+ 
++// Estimated network fee, shown on the form itself before the user even
++// taps Send -- and echoed into the confirm card below -- the same "you'll
++// pay about this much in gas" preview MetaMask and Coinbase Wallet both
++// show up front. This app never surfaced any fee estimate before. Always
++// paid in the chain's native currency, whether the transfer itself is
++// native or a token.
++let sendFeePreviewToken = 0; // guards against a slow, stale estimate landing after a newer one
++let lastSendFeeWei = null;
++let sendFeePreviewTimer = null;
++
++function clearSendFeePreview() {
++  lastSendFeeWei = null;
++  $("send-fee-preview").classList.add("hidden");
++  $("send-fee-preview").textContent = "";
++}
++
++async function estimateSendFeeNow() {
++  const to = currentSendToAddress(); // raw address, or a name already resolved to one -- never the unresolved name text
++  const amountStr = $("send-amount").value.trim();
++  const isNative = $("send-asset-select").value === "native";
++  const tokenAddress = isNative ? null : $("send-token-address").value.trim();
++
++  if (!to || !amountStr || Number(amountStr) <= 0) {
++    clearSendFeePreview();
++    return;
++  }
++  if (!isNative && !ethers.utils.isAddress(tokenAddress)) {
++    clearSendFeePreview();
++    return;
++  }
++
++  const myToken = ++sendFeePreviewToken;
++  $("send-fee-preview").classList.remove("hidden");
++  $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateLoading");
++
++  try {
++    let amountWei;
++    if (isNative) {
++      amountWei = ethers.utils.parseEther(amountStr);
++    } else {
++      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
++      amountWei = ethers.utils.parseUnits(amountStr, info.decimals);
++    }
++    const res = await sendMsg("TM_ESTIMATE_SEND_FEE", {
++      to,
++      amountWei: amountWei.toString(),
++      tokenAddress: isNative ? null : tokenAddress,
++    });
++    if (myToken !== sendFeePreviewToken) return; // a newer estimate has since started
++
++    lastSendFeeWei = res.feeWei;
++    const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
++    const feeFormatted = Number(ethers.utils.formatEther(res.feeWei)).toPrecision(3).replace(/\.?0+$/, "");
++
++    let usdText = null;
++    try {
++      const price = await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
++      if (price != null) usdText = formatCurrency(Number(ethers.utils.formatEther(res.feeWei)) * price);
++    } catch (e) {
++      // Best-effort only -- the native-amount fee line below still stands on its own.
++    }
++    if (myToken !== sendFeePreviewToken) return;
++
++    $("send-fee-preview").textContent = usdText
++      ? TM_I18N.t("send.feeEstimate", { fee: feeFormatted, symbol, usd: usdText })
++      : TM_I18N.t("send.feeEstimateNoUsd", { fee: feeFormatted, symbol });
++  } catch (e) {
++    if (myToken !== sendFeePreviewToken) return;
++    // Common and expected -- e.g. the amount exceeds the balance, or the
++    // RPC is briefly unavailable. Never block sending on this: the real fee
++    // is still confirmed by the wallet before anything is signed.
++    lastSendFeeWei = null;
++    $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateUnavailable");
++  }
++}
++
++// Debounced so a fast typist doesn't fire an RPC call per keystroke.
++function refreshSendFeePreview() {
++  clearTimeout(sendFeePreviewTimer);
++  sendFeePreviewTimer = setTimeout(estimateSendFeeNow, 500);
++}
++
++$("send-to").addEventListener("input", refreshSendFeePreview);
++$("send-amount").addEventListener("input", refreshSendFeePreview);
++$("send-token-address").addEventListener("input", refreshSendFeePreview);
++
+ // Send delay / cancel window -- see Settings. Every send made from this
+ // screen is held for this many seconds (with a visible countdown and a
+ // Cancel button) before it's actually signed and broadcast, so a
+@@ -780,6 +1073,93 @@ function populateSendDelaySelect() {
+   });
  }
+ 
++// ---------------------------------------------------------------- AUTO-LOCK
++// unlockedSecret (see wallet-engine.js) lives in this same page's memory for
++// as long as the tab stays open -- there's no separate background process
++// here to time it out the way a real browser extension's service worker
++// could. This is the page-level equivalent: after N minutes with no click,
++// tap, or keystroke anywhere in the app, lock exactly the way the "Lock
++// wallet" button does. 5 minutes by default (matching MetaMask's own
++// out-of-the-box auto-lock timer), fully configurable in Settings.
++const TM_AUTO_LOCK_KEY = "tm_auto_lock_minutes";
++let currentAutoLockMinutes = 5;
++let autoLockTimerId = null;
++let autoLockArmed = false; // only true once a real wallet session is unlocked
++let autoLockLastReset = 0;
++
++function loadAutoLockMinutes() {
++  return new Promise((resolve) => {
++    chrome.storage.local.get([TM_AUTO_LOCK_KEY], (res) => {
++      const stored = res[TM_AUTO_LOCK_KEY];
++      currentAutoLockMinutes = typeof stored === "number" ? stored : 5;
++      resolve();
++    });
++  });
++}
++
++function populateAutoLockSelect() {
++  const sel = $("auto-lock-select");
++  sel.value = String(currentAutoLockMinutes);
++  sel.addEventListener("change", (e) => {
++    currentAutoLockMinutes = Number(e.target.value) || 0;
++    chrome.storage.local.set({ [TM_AUTO_LOCK_KEY]: currentAutoLockMinutes });
++    resetAutoLockTimer();
++  });
++}
++
++function clearAutoLockTimer() {
++  if (autoLockTimerId) {
++    clearTimeout(autoLockTimerId);
++    autoLockTimerId = null;
++  }
++}
++
++function resetAutoLockTimer() {
++  clearAutoLockTimer();
++  if (!autoLockArmed || !currentAutoLockMinutes) return;
++  autoLockTimerId = setTimeout(async () => {
++    autoLockArmed = false;
++    try {
++      await sendMsg("TM_LOCK", {});
++    } catch (e) {
++      // Already locked, or the page is mid-navigation -- either way there's
++      // nothing left to protect, so just make sure the UI reflects it.
++    }
++    resetSendConfirmUi();
++    showScreen("screen-unlock");
++  }, currentAutoLockMinutes * 60 * 1000);
++}
++
++// Arms (or re-arms) the idle timer. Called every time the app reaches an
++// unlocked, authenticated state (see refreshMain()) -- cheap and idempotent,
++// so calling it again on every account/network switch is fine.
++function armAutoLock() {
++  autoLockArmed = true;
++  resetAutoLockTimer();
++}
++
++function disarmAutoLock() {
++  autoLockArmed = false;
++  clearAutoLockTimer();
++}
++
++// Any real user activity resets the countdown. Throttled to roughly once
++// every 2 seconds so a stream of mousemove events doesn't churn
++// clearTimeout/setTimeout on every pixel of movement.
++["click", "keydown", "touchstart", "scroll", "mousemove"].forEach((evt) => {
++  document.addEventListener(
++    evt,
++    () => {
++      if (!autoLockArmed) return;
++      const now = Date.now();
++      if (now - autoLockLastReset < 2000) return;
++      autoLockLastReset = now;
++      resetAutoLockTimer();
++    },
++    { passive: true }
++  );
++});
++
+ // "Known address" = already in the address book, or already sent to from
+ // this device -- used only to show a heads-up in the confirm step, never
+ // to block anything.
+@@ -843,9 +1223,10 @@ $("btn-send-submit").addEventListener("click", async () => {
+   hideError("send-error");
+   $("send-status").classList.add("hidden");
+   try {
+-    const to = $("send-to").value.trim();
++    const typedTo = $("send-to").value.trim();
++    const to = currentSendToAddress(); // resolves a name to its looked-up address; never sends to unresolved name text
++    if (!to) throw new Error(TM_I18N.t("send.invalidRecipient"));
+     const amountStr = $("send-amount").value.trim();
+-    if (!ethers.utils.isAddress(to)) throw new Error(TM_I18N.t("send.invalidRecipient"));
+     const isNative = $("send-asset-select").value === "native";
+     const tokenAddress = isNative ? null : $("send-token-address").value.trim();
+     if (!isNative && !ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
+@@ -863,7 +1244,18 @@ $("btn-send-submit").addEventListener("click", async () => {
+     $("send-to").disabled = true;
+     $("send-amount").disabled = true;
+     $("send-asset-select").disabled = true;
+-    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to });
++    // When a name was typed, show the resolved address alongside it -- the
++    // countdown/confirm step is exactly where that should be double-checked.
++    const displayTo = typedTo !== to ? `${typedTo} (${to})` : to;
++    $("send-confirm-summary").textContent = TM_I18N.t("send.confirmSummary", { amount: amountStr, asset: sentAsset, to: displayTo });
++    if (lastSendFeeWei) {
++      const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
++      const feeFormatted = Number(ethers.utils.formatEther(lastSendFeeWei)).toPrecision(3).replace(/\.?0+$/, "");
++      $("send-confirm-fee").textContent = TM_I18N.t("send.confirmFeeLine", { fee: feeFormatted, symbol });
++      $("send-confirm-fee").classList.remove("hidden");
++    } else {
++      $("send-confirm-fee").classList.add("hidden");
++    }
+     $("send-confirm-new-address-warning").classList.toggle("hidden", known);
+     $("send-confirm-card").classList.remove("hidden");
+ 
+@@ -1311,11 +1703,14 @@ function activateSplashLanding() {
+   splashLandingActivated = true;
+   clearSplashAutoTimers();
+   const el = $("splash-screen");
+-  if (el) el.classList.add("splash-home");
+-  ["splash-tab-home", "splash-tab-assets", "splash-tab-activity", "splash-tab-send"].forEach((id) => {
+-    const tab = $(id);
+-    if (tab) tab.addEventListener("click", () => hideSplash());
+-  });
++  if (!el) return;
++  // Distinct from splash-home: no wallet exists yet (or it's locked), so
++  // the Home/Assets/Activity/Send bar doesn't apply here -- see the CSS
++  // for #splash-screen.splash-landing. The whole splash becomes one big
++  // "tap to continue" target instead of four nav icons that don't yet
++  // mean anything.
++  el.classList.add("splash-landing");
++  el.addEventListener("click", () => hideSplash());
+ }
+ 
+ // ---------------------------------------------------------------- ACTIVITY
+@@ -1579,6 +1974,8 @@ function renderActivity() {
+   populateCurrencySelect();
+   await loadSendDelay();
+   populateSendDelaySelect();
++  await loadAutoLockMinutes();
++  populateAutoLockSelect();
+ 
+   const params = new URLSearchParams(location.search);
+   if (params.get("mode") === "approve") {
+diff --git a/en.js b/en.js
+index 8ecc989..5bdb94d 100644
+--- a/en.js
++++ b/en.js
+@@ -14,6 +14,7 @@
+     "common.send": "Send",
+     "common.swap": "Swap",
+     "common.buy": "Buy",
++    "common.sell": "Sell",
+     "common.livePrices": "Live prices",
+     "common.seeAll": "See all",
+     "common.reject": "Reject",
+@@ -53,6 +54,9 @@
+     "main.tokensTitle": "Tokens",
+     "main.addTokenBtn": "+ Add token",
+     "main.tokensEmpty": "No tokens added yet -- tap “+ Add token” and enter a contract address to track one.",
++    "main.nftsTitle": "NFTs",
++    "main.addNftBtn": "+ Add NFT",
++    "main.nftsEmpty": "No NFTs added yet -- tap “+ Add NFT” and enter a contract address and token ID to track one.",
+     "main.networkLabel": "Network",
+     "main.balanceFetchErrorPrefix": "Couldn't fetch balance: ",
+     "main.livePricesTitle": "Live Prices",
+@@ -73,6 +77,19 @@
+     "addToken.noName": "(no name)",
+     "addToken.swapUnavailableSuffix": " (swap unavailable)",
+ 
++    "nfts.loadError": "Couldn't load",
++    "nfts.removeTitle": "Remove",
++    "addNft.title": "Add NFT",
++    "addNft.description": "Enter the NFT's contract address and token ID on the current network. Works for ERC-721 and ERC-1155 collections. Only add an NFT whose contract address you got from a source you trust -- artwork and names shown here come from the collection's own metadata, which anyone can set to anything.",
++    "addNft.addressLabel": "NFT contract address",
++    "addNft.tokenIdLabel": "Token ID",
++    "addNft.tokenIdPlaceholder": "0",
++    "addNft.standardLabel": "Standard:",
++    "addNft.invalidAddress": "Enter a valid contract address.",
++    "addNft.invalidTokenId": "Enter a valid token ID (a non-negative whole number).",
++    "addNft.metaWarning": "Couldn't load this NFT's image/name from its metadata URI, but the contract and token ID check out -- you can still add it and try again later.",
++    "addNft.noName": "(no name)",
++
+     "prices.description": "Live prices from CoinGecko's public API, in whichever currency you pick in Settings. Purely informational -- nothing about your wallet is sent to look these up.",
+     "prices.loading": "Loading...",
+     "prices.naText": "n/a",
+@@ -91,6 +108,12 @@
+     "buy.description2Html": "MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:",
+     "buy.continueBtn": "Continue to MoonPay",
+ 
++    "sell.title": "Sell for cash",
++    "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
++    "sell.description2": "MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
++    "sell.description3Html": "Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.",
++    "sell.continueBtn": "Continue to MoonPay",
++
+     "support.title": "Help & support",
+     "support.description": "Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.",
+     "support.inputPlaceholder": "Type a question...",
+@@ -114,6 +137,21 @@
+     "send.invalidRecipient": "Enter a valid recipient address.",
+     "send.invalidTokenAddress": "Enter a valid token contract address.",
+     "send.sentStatus": "Sent! Tx hash: {txHash}",
++    "send.confirmIntro": "Sending in {seconds}s -- you can still cancel.",
++    "send.confirmSummary": "{amount} {asset} to {to}",
++    "send.newAddressWarning": "You haven't sent to this address from this device before -- double check it's correct.",
++    "send.cancelBtn": "Cancel send",
++    "send.cancelledStatus": "Send cancelled -- nothing was sent.",
++    "send.feeEstimateLoading": "Estimating network fee...",
++    "send.feeEstimate": "Estimated network fee: ~{fee} {symbol} (~{usd})",
++    "send.feeEstimateNoUsd": "Estimated network fee: ~{fee} {symbol}",
++    "send.feeEstimateUnavailable": "Network fee estimate unavailable -- you'll still see the real fee before anything is broadcast.",
++    "send.confirmFeeLine": "Network fee: ~{fee} {symbol}",
++    "send.toPlaceholder": "0x... or name.eth",
++    "send.resolvingName": "Looking up {name}...",
++    "send.resolvedName": "Resolves to {address}",
++    "send.nameNotFound": "Couldn't find an address for {name} -- double-check the name, or paste the address directly.",
++    "send.nameResolutionUnsupported": "Name lookups aren't available on this network -- paste the address directly.",
+ 
+     "swap.unsupportedWarning": "Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings → Networks first.",
+     "swap.fromLabel": "From",
+@@ -139,9 +177,39 @@
+     "settings.currencyLabel": "Display currency",
+     "settings.viewSeedBtn": "View recovery phrase",
+     "settings.helpBtn": "Help & support",
++    "settings.feedbackBtn": "Request a feature",
++    "settings.sendDelayLabel": "Send delay (cancel window)",
++    "settings.sendDelayHint": "Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.",
++
++    "settings.autoLockLabel": "Auto-lock after inactivity",
++    "settings.autoLockOff": "Off (never auto-lock)",
++    "settings.autoLock1": "1 minute",
++    "settings.autoLock5": "5 minutes (recommended)",
++    "settings.autoLock15": "15 minutes",
++    "settings.autoLock30": "30 minutes",
++    "settings.autoLockHint": "Locks the wallet automatically after this much time with no clicks, taps, or keystrokes here -- since a browser tab you leave open otherwise stays unlocked indefinitely.",
++    "settings.sendDelayOff": "Off (send immediately)",
++    "settings.sendDelay15": "15 seconds",
++    "settings.sendDelay30": "30 seconds (recommended)",
++    "settings.sendDelay60": "60 seconds",
+     "settings.lockBtn": "Lock wallet",
+     "settings.resetBtn": "Reset wallet",
+ 
++    "feedback.title": "Feature requests",
++    "feedback.subtitle": "See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.",
++    "feedback.titlePlaceholder": "Short title (e.g. \"Dark mode\")",
++    "feedback.descPlaceholder": "A bit more detail (optional)",
++    "feedback.submitBtn": "Post request",
++    "feedback.submittingStatus": "Posting...",
++    "feedback.submittedStatus": "Thanks! Your request is live below.",
++    "feedback.listTitle": "REQUESTS",
++    "feedback.empty": "No requests yet -- be the first!",
++    "feedback.loadError": "Couldn't load requests. Try again in a moment.",
++    "feedback.titleRequired": "Give it a short title first.",
++    "feedback.upvoteBtn": "Upvote",
++    "feedback.upvotedBtn": "Upvoted",
++    "feedback.contactLine": "Prefer email? Reach us at msandersod@gmail.com",
++
+     "importKey.title": "Import private key",
+     "importKey.placeholder": "0x private key",
+ 
+@@ -204,6 +272,7 @@
+     "home.tabAssets": "Assets",
+     "home.tabActivity": "Activity",
+     "home.tabSend": "Send",
++    "home.tapToContinue": "Tap to continue",
+ 
+     "activity.title": "Activity",
+     "activity.subtitle": "A local record of sends made from this wallet on this device -- nothing here is fetched from a server.",
 diff --git a/index.html b/index.html
-index e954bd6..b9f2adc 100644
+index b9f2adc..f4c0d70 100644
 --- a/index.html
 +++ b/index.html
-@@ -18,7 +18,10 @@
- <body class="tm-web-wallet">
- <div id="bg-scene"></div>
- <div id="splash-screen">
--  <img src="img/splash.jpg" alt="Token Exchange" />
-+  <picture>
-+    <source srcset="img/splash-light.jpg" media="(prefers-color-scheme: light)" />
-+    <img src="img/splash.jpg" alt="Token Exchange" />
-+  </picture>
-   <div id="splash-brand">TOKEN EXCHANGE</div>
-   <div id="splash-spinner"><img src="img/spinner-coin.png" alt="" /></div>
-   <div id="splash-tabbar">
-@@ -40,118 +43,13 @@
+@@ -42,6 +42,9 @@
+       <span class="splash-tab-label" data-i18n="home.tabSend">Send</span>
      </button>
    </div>
++  <div id="splash-continue-hint">
++    <span data-i18n="home.tapToContinue">Tap to continue</span>
++  </div>
  </div>
-+<div id="splash-tagline">
-+  <span class="footer-lock">&#128274;</span>
-+  <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
-+</div>
- <div id="app">
- 
-   <header id="app-header">
--    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange">
--      <defs>
--        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
--          <stop offset="0%" stop-color="#fff3c4"/>
--          <stop offset="30%" stop-color="#f4c430"/>
--          <stop offset="65%" stop-color="#caa02a"/>
--          <stop offset="100%" stop-color="#8a6a10"/>
--        </linearGradient>
--        <linearGradient id="gGoldEdge" x1="0" y1="0" x2="0" y2="1">
--          <stop offset="0%" stop-color="#fffbe6"/>
--          <stop offset="100%" stop-color="#6b4e08"/>
--        </linearGradient>
--        <radialGradient id="gCoinB" cx="35%" cy="30%" r="75%">
--          <stop offset="0%" stop-color="#ffb74d"/>
--          <stop offset="100%" stop-color="#d9770a"/>
--        </radialGradient>
--        <radialGradient id="gCoinE" cx="35%" cy="30%" r="75%">
--          <stop offset="0%" stop-color="#c7d3ee"/>
--          <stop offset="100%" stop-color="#5f6ea3"/>
--        </radialGradient>
--        <radialGradient id="gCoinT" cx="35%" cy="30%" r="75%">
--          <stop offset="0%" stop-color="#7fe0b8"/>
--          <stop offset="100%" stop-color="#1a9c74"/>
--        </radialGradient>
--        <radialGradient id="gLeverPink" cx="35%" cy="30%" r="75%">
--          <stop offset="0%" stop-color="#ffc2e2"/>
--          <stop offset="50%" stop-color="#ff4fa3"/>
--          <stop offset="100%" stop-color="#c2136b"/>
--        </radialGradient>
--        <linearGradient id="gLeverStem" x1="0" y1="0" x2="0" y2="1">
--          <stop offset="0%" stop-color="#ff9bcb"/>
--          <stop offset="100%" stop-color="#a30f5e"/>
--        </linearGradient>
--        <clipPath id="reelClip1"><rect x="70" y="46" width="52" height="40" rx="3"/></clipPath>
--        <clipPath id="reelClip2"><rect x="134" y="46" width="52" height="40" rx="3"/></clipPath>
--        <clipPath id="reelClip3"><rect x="198" y="46" width="52" height="40" rx="3"/></clipPath>
--        <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1">
--          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
--          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
--          <stop offset="36%" stop-color="#ffffff" stop-opacity="0"/>
--          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
--        </linearGradient>
--        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
--          <feGaussianBlur stdDeviation="3.2"/>
--        </filter>
--      </defs>
--
--      <!-- outer cabinet -->
--      <rect x="2" y="2" width="316" height="104" rx="16" fill="url(#gGold)" stroke="url(#gGoldEdge)" stroke-width="3"/>
--      <rect x="9" y="9" width="302" height="90" rx="12" fill="none" stroke="#7a5a10" stroke-width="1.5" opacity="0.6"/>
--
--      <!-- corner flourishes, evoking cast-iron scrollwork -->
--      <g stroke="#7a5a10" stroke-width="1.5" fill="none" opacity="0.55">
--        <path d="M14 22 Q22 14 30 22"/>
--        <path d="M290 22 Q298 14 306 22"/>
--      </g>
--
--      <!-- marquee title -->
--      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
--      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
--
--      <!-- glass display housing -->
--      <rect x="64" y="40" width="192" height="52" rx="6" fill="#0c0f16" stroke="#3a2c05" stroke-width="2"/>
--
--      <!-- reel 1: Bitcoin symbol -->
--      <g clip-path="url(#reelClip1)">
--        <rect x="70" y="46" width="52" height="40" fill="#12141c"/>
--        <circle cx="96" cy="30" r="15" fill="url(#gCoinB)" opacity="0.55"/>
--        <circle cx="96" cy="66" r="21" fill="#ffb74d" opacity="0.5" filter="url(#softGlow)"/>
--        <circle cx="96" cy="66" r="17" fill="url(#gCoinB)"/>
--        <text x="96" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#3a1d00">&#8383;</text>
--        <circle cx="96" cy="102" r="15" fill="url(#gCoinB)" opacity="0.55"/>
--      </g>
--
--      <!-- reel 2: Ethereum symbol -->
--      <g clip-path="url(#reelClip2)">
--        <rect x="134" y="46" width="52" height="40" fill="#12141c"/>
--        <circle cx="160" cy="30" r="15" fill="url(#gCoinE)" opacity="0.55"/>
--        <circle cx="160" cy="66" r="21" fill="#8fa3e0" opacity="0.45" filter="url(#softGlow)"/>
--        <circle cx="160" cy="66" r="17" fill="url(#gCoinE)"/>
--        <text x="160" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#1c2340">&#926;</text>
--        <circle cx="160" cy="102" r="15" fill="url(#gCoinE)" opacity="0.55"/>
--      </g>
--
--      <!-- reel 3: Tether symbol -->
--      <g clip-path="url(#reelClip3)">
--        <rect x="198" y="46" width="52" height="40" fill="#12141c"/>
--        <circle cx="224" cy="30" r="15" fill="url(#gCoinT)" opacity="0.55"/>
--        <circle cx="224" cy="66" r="21" fill="#4fe0ad" opacity="0.45" filter="url(#softGlow)"/>
--        <circle cx="224" cy="66" r="17" fill="url(#gCoinT)"/>
--        <text x="224" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#063d2b">&#8366;</text>
--        <circle cx="224" cy="102" r="15" fill="url(#gCoinT)" opacity="0.55"/>
--      </g>
--
--      <!-- reel divider lines -->
--      <line x1="122" y1="40" x2="122" y2="92" stroke="#3a2c05" stroke-width="2"/>
--      <line x1="186" y1="40" x2="186" y2="92" stroke="#3a2c05" stroke-width="2"/>
--
--      <!-- glass pane shine, sells "clear plastic screen" -->
--      <rect x="64" y="40" width="192" height="52" rx="6" fill="url(#glassShine)"/>
--      <rect x="64" y="40" width="192" height="52" rx="6" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="1"/>
--
--      <!-- side lever -->
--      <rect x="298" y="30" width="6" height="34" rx="3" fill="url(#gLeverStem)"/>
--      <circle cx="301" cy="26" r="9" fill="url(#gLeverPink)" stroke="#8a0f52" stroke-width="1.5"/>
--
--      <!-- base plate -->
--      <text x="160" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#5c4208" letter-spacing="3" opacity="0.85">EST. VAULT NO. 0500</text>
--    </svg>
-     <div id="network-badge" class="hidden"></div>
-   </header>
- 
-@@ -163,7 +61,7 @@
+ <div id="splash-tagline">
+   <span class="footer-lock">&#128274;</span>
+@@ -172,6 +175,15 @@
+       <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
      </div>
-     <h2 data-i18n="onboarding.title">Welcome</h2>
-     <p class="muted" data-i18n="onboarding.subtitle">Set up your wallet to get started.</p>
--    <div class="warn" style="text-align:left; margin: 10px 0;">
-+    <div class="warn onboarding-intro-card" style="text-align:left; margin: 10px 0;">
-       This is the standalone <strong>website</strong> version of Token Exchange. It
-       encrypts your wallet and stores it only in this browser (nowhere else) --
-       but a website is an easier target for phishing/DNS/lookalike-domain tricks
-@@ -247,6 +145,7 @@
-       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
-       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
-       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
-+      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
-     </div>
-     <div class="prices-card">
-       <div class="prices-card-header">
-@@ -334,6 +233,17 @@
-     <p id="buy-error" class="error hidden"></p>
+ 
++    <div class="tokens-section">
++      <div class="tokens-header">
++        <span class="tokens-title" data-i18n="main.nftsTitle">NFTs</span>
++        <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
++      </div>
++      <div id="nft-grid" class="nft-grid"></div>
++      <p id="nfts-empty" class="muted small hidden" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
++    </div>
++
+     <div class="network-picker">
+       <label data-i18n="main.networkLabel">Network</label>
+       <div class="network-select-row">
+@@ -199,6 +211,26 @@
+     <p id="add-token-error" class="error hidden"></p>
    </section>
  
-+  <!-- SELL -->
-+  <section id="screen-sell" class="screen hidden">
-+    <h2 data-i18n="sell.title">Sell for cash</h2>
-+    <p class="muted" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
-+    <p class="muted" data-i18n="sell.description2">MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
-+    <p class="muted" data-i18n-html="sell.description3Html">Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.</p>
-+    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
++  <!-- ADD NFT -->
++  <section id="screen-add-nft" class="screen hidden">
++    <h2 data-i18n="addNft.title">Add NFT</h2>
++    <p class="muted" data-i18n="addNft.description">Enter the NFT's contract address and token ID on the current network. Works for ERC-721 and ERC-1155 collections. Only add an NFT whose contract address you got from a source you trust -- artwork and names shown here come from the collection's own metadata, which anyone can set to anything.</p>
++    <label data-i18n="addNft.addressLabel">NFT contract address</label>
++    <input type="text" id="add-nft-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
++    <label data-i18n="addNft.tokenIdLabel">Token ID</label>
++    <input type="text" id="add-nft-token-id" data-i18n-placeholder="addNft.tokenIdPlaceholder" placeholder="0" />
++    <button id="btn-nft-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
++    <div id="add-nft-preview" class="hidden">
++      <img id="add-nft-preview-image" class="nft-thumb hidden" alt="" style="max-width:120px;" />
++      <p class="muted"><span data-i18n="addToken.nameLabel">Name:</span> <span id="add-nft-name" class="mono"></span></p>
++      <p class="muted"><span data-i18n="addNft.standardLabel">Standard:</span> <span id="add-nft-standard" class="mono"></span></p>
++      <p id="add-nft-meta-warning" class="hint hidden" data-i18n="addNft.metaWarning">Couldn't load this NFT's image/name from its metadata URI, but the contract and token ID check out -- you can still add it and try again later.</p>
++      <button id="btn-nft-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
++    </div>
 +    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-+    <p id="sell-error" class="error hidden"></p>
++    <p id="add-nft-error" class="error hidden"></p>
 +  </section>
 +
-   <!-- SUPPORT -->
-   <section id="screen-support" class="screen hidden">
-     <h2 data-i18n="support.title">Help &amp; support</h2>
-@@ -367,6 +277,12 @@
+   <!-- PRICES -->
+   <section id="screen-prices" class="screen hidden">
+     <h2 data-i18n="common.livePrices">Live prices</h2>
+@@ -272,14 +304,17 @@
+     </div>
+     <div class="send-to-row">
+       <span id="send-to-identicon" class="account-identicon hidden" aria-hidden="true"></span>
+-      <input type="text" id="send-to" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
++      <input type="text" id="send-to" data-i18n-placeholder="send.toPlaceholder" placeholder="0x... or name.eth" />
+     </div>
++    <p id="send-to-resolved" class="muted hidden"></p>
      <label data-i18n="send.amountLabel">Amount</label>
      <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
++    <p id="send-fee-preview" class="muted hidden"></p>
      <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
-+    <div id="send-confirm-card" class="send-confirm-card hidden">
-+      <p id="send-confirm-intro" class="warn"></p>
-+      <p id="send-confirm-summary" class="send-confirm-summary"></p>
-+      <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
-+      <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
-+    </div>
-     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-     <p id="send-status" class="hint hidden"></p>
-     <p id="send-error" class="error hidden"></p>
-@@ -430,6 +346,7 @@
-     <button id="btn-goto-contacts" class="secondary" data-i18n="settings.contactsBtn">Address book</button>
-     <button id="btn-view-seed" class="secondary" data-i18n="settings.viewSeedBtn">View recovery phrase</button>
-     <button id="btn-goto-support-settings" class="secondary" data-i18n="settings.helpBtn">Help &amp; support</button>
-+    <button id="btn-goto-feedback" class="secondary" data-i18n="settings.feedbackBtn">Request a feature</button>
+     <div id="send-confirm-card" class="send-confirm-card hidden">
+       <p id="send-confirm-intro" class="warn"></p>
+       <p id="send-confirm-summary" class="send-confirm-summary"></p>
++      <p id="send-confirm-fee" class="muted hidden"></p>
+       <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
+       <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
+     </div>
+@@ -357,7 +392,7 @@
+     </div>
      <div class="language-picker">
-       <label data-i18n="common.languageLabel">Language</label>
-       <select id="language-select-settings" class="language-select"></select>
-@@ -438,11 +355,36 @@
-       <label data-i18n="settings.currencyLabel">Display currency</label>
-       <select id="currency-select-settings" class="currency-select"></select>
+       <label data-i18n="settings.sendDelayLabel">Send delay (cancel window)</label>
+-      <select id="send-delay-select" class="language-select">
++      <select id="send-delay-select">
+         <option value="0" data-i18n="settings.sendDelayOff">Off (send immediately)</option>
+         <option value="15" data-i18n="settings.sendDelay15">15 seconds</option>
+         <option value="30" data-i18n="settings.sendDelay30">30 seconds (recommended)</option>
+@@ -365,6 +400,17 @@
+       </select>
+       <p class="muted" data-i18n="settings.sendDelayHint">Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.</p>
      </div>
 +    <div class="language-picker">
-+      <label data-i18n="settings.sendDelayLabel">Send delay (cancel window)</label>
-+      <select id="send-delay-select" class="language-select">
-+        <option value="0" data-i18n="settings.sendDelayOff">Off (send immediately)</option>
-+        <option value="15" data-i18n="settings.sendDelay15">15 seconds</option>
-+        <option value="30" data-i18n="settings.sendDelay30">30 seconds (recommended)</option>
-+        <option value="60" data-i18n="settings.sendDelay60">60 seconds</option>
++      <label data-i18n="settings.autoLockLabel">Auto-lock after inactivity</label>
++      <select id="auto-lock-select">
++        <option value="0" data-i18n="settings.autoLockOff">Off (never auto-lock)</option>
++        <option value="1" data-i18n="settings.autoLock1">1 minute</option>
++        <option value="5" data-i18n="settings.autoLock5">5 minutes (recommended)</option>
++        <option value="15" data-i18n="settings.autoLock15">15 minutes</option>
++        <option value="30" data-i18n="settings.autoLock30">30 minutes</option>
 +      </select>
-+      <p class="muted" data-i18n="settings.sendDelayHint">Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.</p>
++      <p class="muted" data-i18n="settings.autoLockHint">Locks the wallet automatically after this much time with no clicks, taps, or keystrokes here -- since a browser tab you leave open otherwise stays unlocked indefinitely.</p>
 +    </div>
      <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
      <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
      <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-   </section>
+diff --git a/wallet-engine.js b/wallet-engine.js
+index 9ecf4cc..23e43b8 100644
+--- a/wallet-engine.js
++++ b/wallet-engine.js
+@@ -57,6 +57,92 @@ async function saveTrackedTokens(chainId, tokens) {
+   await chrome.storage.local.set({ [TRACKED_TOKENS_KEY]: all });
+ }
  
-+  <section id="screen-feedback" class="screen hidden">
-+    <h2 data-i18n="feedback.title">Feature requests</h2>
-+    <p class="muted" data-i18n="feedback.subtitle">See what other users are asking for, upvote the ones you want too, or post your own. This list is public -- it's how we decide what to build next.</p>
-+    <input type="text" id="feedback-title-input" maxlength="140" data-i18n-placeholder="feedback.titlePlaceholder" placeholder="Short title (e.g. &quot;Dark mode&quot;)" />
-+    <textarea id="feedback-desc-input" maxlength="2000" rows="3" data-i18n-placeholder="feedback.descPlaceholder" placeholder="A bit more detail (optional)"></textarea>
-+    <button id="btn-feedback-submit" class="primary" data-i18n="feedback.submitBtn">Post request</button>
-+    <p id="feedback-error" class="error hidden"></p>
-+    <p id="feedback-status" class="hint hidden"></p>
-+    <div class="tokens-header"><span class="tokens-title" data-i18n="feedback.listTitle">REQUESTS</span></div>
-+    <div id="feedback-list"></div>
-+    <p id="feedback-empty" class="muted hidden" data-i18n="feedback.empty">No requests yet -- be the first!</p>
-+    <p class="muted" data-i18n="feedback.contactLine">Prefer email? Reach us at msandersod@gmail.com</p>
-+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
-+  </section>
++// ---- tracked (user-added) NFTs, per chain -- same shape/pattern as tracked
++// ERC-20 tokens above, storing just enough to look the NFT back up
++// (contract + token ID + standard) rather than caching its artwork/name,
++// which is re-fetched from the collection's own metadata each time. ----
++const TRACKED_NFTS_KEY = "tm_tracked_nfts";
 +
-   <section id="screen-contacts" class="screen hidden">
-     <h2 data-i18n="contacts.title">Address book</h2>
-     <p id="contacts-picker-hint" class="muted hidden" data-i18n="contacts.pickerHint">Tap a contact to fill it in as the recipient.</p>
-@@ -569,8 +511,11 @@
-   </section>
++async function getTrackedNfts(chainId) {
++  const stored = await chrome.storage.local.get(TRACKED_NFTS_KEY);
++  const all = stored[TRACKED_NFTS_KEY] || {};
++  return all[chainId] || [];
++}
++
++async function saveTrackedNfts(chainId, nfts) {
++  const stored = await chrome.storage.local.get(TRACKED_NFTS_KEY);
++  const all = stored[TRACKED_NFTS_KEY] || {};
++  all[chainId] = nfts;
++  await chrome.storage.local.set({ [TRACKED_NFTS_KEY]: all });
++}
++
++// An NFT's tokenURI/metadata is written by whoever deployed or minted that
++// contract -- it's untrusted input, same category as a webpage's own
++// content, not something this wallet's own code produced. Every helper
++// below treats it that way: a narrow IPFS rewrite, a bounded fetch, and an
++// image-URL allowlist rather than a blocklist, so a malicious collection
++// can't do anything worse than fail to display.
++const NFT_IPFS_GATEWAY = "https://ipfs.io/ipfs/";
++
++function resolveMaybeIpfsUri(uri) {
++  if (!uri || typeof uri !== "string") return uri;
++  if (uri.startsWith("ipfs://")) {
++    return NFT_IPFS_GATEWAY + uri.slice("ipfs://".length).replace(/^ipfs\//, "");
++  }
++  return uri;
++}
++
++// Only http(s) URLs or genuine image data: URIs are ever handed to the UI
++// for use as an <img src> -- never javascript:, text/html, or anything
++// else that could do something unexpected just by being displayed. This is
++// an allowlist, not an attempt to blocklist specific bad schemes.
++function sanitizeNftImageUrl(raw) {
++  if (!raw || typeof raw !== "string") return null;
++  const url = resolveMaybeIpfsUri(raw.trim());
++  if (/^https?:\/\//i.test(url)) return url;
++  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(url)) return url;
++  return null;
++}
++
++async function fetchNftMetadataJson(tokenUri) {
++  const url = resolveMaybeIpfsUri(tokenUri);
++  if (!url || !/^https?:\/\//i.test(url)) {
++    throw new Error("This NFT's metadata URI isn't a fetchable http(s)/ipfs link.");
++  }
++  const controller = new AbortController();
++  const timeoutId = setTimeout(() => controller.abort(), 8000);
++  try {
++    const res = await fetch(url, { signal: controller.signal });
++    if (!res.ok) throw new Error(`Metadata fetch failed (HTTP ${res.status}).`);
++    const text = await res.text();
++    if (text.length > 500000) throw new Error("Metadata response was too large to use.");
++    return JSON.parse(text);
++  } finally {
++    clearTimeout(timeoutId);
++  }
++}
++
++// Tries ERC-721's tokenURI(id) first, then falls back to ERC-1155's
++// uri(id) -- there's no on-chain "which standard is this" call, so
++// attempting the more common one first and falling back is the same
++// approach MetaMask's own NFT detection uses. The {id} placeholder handling
++// on the 1155 path is required by that standard itself (EIP-1155), not
++// optional cleanup.
++async function readNftTokenUri(provider, contractAddress, tokenIdBn) {
++  try {
++    const c721 = new ethers.Contract(contractAddress, ["function tokenURI(uint256) view returns (string)"], provider);
++    const tokenUri = await c721.tokenURI(tokenIdBn);
++    return { standard: "erc721", tokenUri };
++  } catch (e721) {
++    const c1155 = new ethers.Contract(contractAddress, ["function uri(uint256) view returns (string)"], provider);
++    let tokenUri = await c1155.uri(tokenIdBn);
++    if (tokenUri && tokenUri.includes("{id}")) {
++      tokenUri = tokenUri.replace("{id}", tokenIdBn.toHexString().slice(2).padStart(64, "0"));
++    }
++    return { standard: "erc1155", tokenUri };
++  }
++}
++
+ // Shows the SAME approve screens the extension's popup.html has always had
+ // (screen-approve-connect/tx/sign/addnetwork -- see index.html), just
+ // in-place in this one page instead of in a second popup window, since
+@@ -494,6 +580,27 @@ async function handleMessage(msg) {
+             break;
+           }
  
-   <footer id="app-footer">
--    <span class="footer-lock">&#128274;</span>
--    <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
-+    <img id="brand-logo" src="img/icon-512.png" alt="Token Exchange" />
-+    <div class="footer-tagline">
-+      <span class="footer-lock">&#128274;</span>
-+      <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
-+    </div>
-   </footer>
++          // Resolves a human-readable name (currently ENS, e.g. "vitalik.eth")
++          // typed into the Send "To" field into an address -- the same
++          // convenience MetaMask and Coinbase Wallet offer instead of making
++          // every send start with a raw 0x address. ethers' JsonRpcProvider
++          // only knows an ENS registry address for networks it recognizes as
++          // having one (mainnet); on every other chain this predictably
++          // resolves to null rather than erroring, and the UI falls back to
++          // requiring a raw address there, same as before this existed.
++          case "TM_RESOLVE_NAME": {
++            const network = await getActiveNetwork();
++            const provider = await getProviderFor(network);
++            let address = null;
++            try {
++              address = await provider.resolveName(msg.name);
++            } catch (e) {
++              address = null; // no ENS registry on this network, or a lookup error -- treat the same as "not found"
++            }
++            sendResponse({ ok: true, address });
++            break;
++          }
++
+           case "TM_LOOKUP_TOKEN": {
+             if (!ethers.utils.isAddress(msg.tokenAddress)) {
+               throw new Error("That doesn't look like a valid contract address.");
+@@ -568,6 +675,111 @@ async function handleMessage(msg) {
+             break;
+           }
  
- </div>
-@@ -581,6 +526,7 @@
- <script src="lib/prices.js"></script>
- <script src="lib/polymarket.js"></script>
- <script src="lib/buy-config.js"></script>
-+<script src="lib/sell-config.js"></script>
- <script src="lib/i18n/en.js"></script>
- <script src="lib/i18n/ar.js"></script>
- <script src="lib/i18n/zh.js"></script>
-@@ -602,5 +548,6 @@
- <script src="shim.js"></script>
- <script src="wallet-engine.js"></script>
- <script src="app.js"></script>
-+<script src="lib/feature-requests.js"></script>
- </body>
- </html>
++          // Read-only preview of an NFT before it's added -- mirrors
++          // TM_LOOKUP_TOKEN's "look up, show a preview, then confirm" flow.
++          case "TM_LOOKUP_NFT": {
++            if (!ethers.utils.isAddress(msg.contractAddress)) {
++              throw new Error("That doesn't look like a valid contract address.");
++            }
++            let tokenIdBn;
++            try {
++              tokenIdBn = ethers.BigNumber.from(msg.tokenId);
++              if (tokenIdBn.isNegative()) throw new Error();
++            } catch (e) {
++              throw new Error("Enter a valid token ID (a non-negative whole number).");
++            }
++            const network = await getActiveNetwork();
++            const provider = await getProviderFor(network);
++            let standard, tokenUri;
++            try {
++              ({ standard, tokenUri } = await readNftTokenUri(provider, msg.contractAddress, tokenIdBn));
++            } catch (e) {
++              throw new Error(
++                `Couldn't read this as an ERC-721 or ERC-1155 NFT on ${network.name}. Double-check the contract address, token ID, and network.`
++              );
++            }
++            let name = "";
++            let image = null;
++            let metaError = null;
++            try {
++              const metadata = await fetchNftMetadataJson(tokenUri);
++              name = typeof metadata.name === "string" ? metadata.name.slice(0, 200) : "";
++              image = sanitizeNftImageUrl(metadata.image || metadata.image_url);
++            } catch (e) {
++              metaError = e.message;
++            }
++            sendResponse({ ok: true, standard, name, image, metaError });
++            break;
++          }
++
++          case "TM_ADD_TRACKED_NFT": {
++            const network = await getActiveNetwork();
++            const address = ethers.utils.getAddress(msg.contractAddress);
++            const tokenId = ethers.BigNumber.from(msg.tokenId).toString();
++            const existing = await getTrackedNfts(network.chainId);
++            if (existing.some((n) => n.contractAddress.toLowerCase() === address.toLowerCase() && n.tokenId === tokenId)) {
++              throw new Error("That NFT is already in your list.");
++            }
++            const nfts = [
++              ...existing,
++              { contractAddress: address, tokenId, standard: msg.standard, name: msg.name || "" },
++            ];
++            await saveTrackedNfts(network.chainId, nfts);
++            sendResponse({ ok: true, nfts });
++            break;
++          }
++
++          case "TM_REMOVE_TRACKED_NFT": {
++            const network = await getActiveNetwork();
++            const existing = await getTrackedNfts(network.chainId);
++            const nfts = existing.filter(
++              (n) =>
++                !(
++                  n.contractAddress.toLowerCase() === (msg.contractAddress || "").toLowerCase() &&
++                  n.tokenId === String(msg.tokenId)
++                )
++            );
++            await saveTrackedNfts(network.chainId, nfts);
++            sendResponse({ ok: true, nfts });
++            break;
++          }
++
++          case "TM_GET_TRACKED_NFTS": {
++            const network = await getActiveNetwork();
++            const nfts = await getTrackedNfts(network.chainId);
++            if (!nfts.length) {
++              sendResponse({ ok: true, nfts: [] });
++              break;
++            }
++            const provider = await getProviderFor(network);
++            const results = await Promise.all(
++              nfts.map(async (n) => {
++                try {
++                  const tokenIdBn = ethers.BigNumber.from(n.tokenId);
++                  let tokenUri;
++                  if (n.standard === "erc1155") {
++                    const c = new ethers.Contract(n.contractAddress, ["function uri(uint256) view returns (string)"], provider);
++                    tokenUri = await c.uri(tokenIdBn);
++                    if (tokenUri && tokenUri.includes("{id}")) {
++                      tokenUri = tokenUri.replace("{id}", tokenIdBn.toHexString().slice(2).padStart(64, "0"));
++                    }
++                  } else {
++                    const c = new ethers.Contract(n.contractAddress, ["function tokenURI(uint256) view returns (string)"], provider);
++                    tokenUri = await c.tokenURI(tokenIdBn);
++                  }
++                  const metadata = await fetchNftMetadataJson(tokenUri);
++                  const name = typeof metadata.name === "string" ? metadata.name.slice(0, 200) : n.name;
++                  const image = sanitizeNftImageUrl(metadata.image || metadata.image_url);
++                  return { ...n, name: name || n.name, image, error: null };
++                } catch (e) {
++                  return { ...n, image: null, error: e.message };
++                }
++              })
++            );
++            sendResponse({ ok: true, nfts: results });
++            break;
++          }
++
+           case "TM_SEND_NATIVE": {
+             requireUnlocked();
+             const network = await getActiveNetwork();
+@@ -593,6 +805,44 @@ async function handleMessage(msg) {
+             break;
+           }
+ 
++          // Read-only preview of what a send would cost, shown on the Send
++          // screen (and echoed into the confirm card) *before* the user
++          // commits -- the same "you'll pay about this much in network fees"
++          // preview MetaMask and Coinbase Wallet both show, which this app
++          // never surfaced before. Never signs or broadcasts anything.
++          case "TM_ESTIMATE_SEND_FEE": {
++            requireUnlocked();
++            const network = await getActiveNetwork();
++            const meta = await getSelectedAccountMeta();
++            const provider = await getProviderFor(network);
++            const from = meta.address;
++            const amountWei = ethers.BigNumber.from(msg.amountWei || "0");
++            let gasLimit;
++            if (msg.tokenAddress) {
++              const c = new ethers.Contract(
++                msg.tokenAddress,
++                TM_SWAP.ERC20_ABI.concat(["function transfer(address to, uint256 amount) returns (bool)"]),
++                provider
++              );
++              gasLimit = await c.estimateGas.transfer(msg.to, amountWei, { from });
++            } else {
++              gasLimit = await provider.estimateGas({ from, to: msg.to, value: amountWei });
++            }
++            const feeData = await provider.getFeeData();
++            // EIP-1559 chains quote maxFeePerGas; older chains only have
++            // gasPrice. Either way this is a worst-case ceiling, same as
++            // what MetaMask's own preview shows -- the actual charge can
++            // come in lower once the block is mined.
++            const gasPrice = feeData.maxFeePerGas || feeData.gasPrice || ethers.BigNumber.from(0);
++            // estimateGas is a lower bound in practice (state can shift
++            // between the estimate and the real send) -- pad it the same
++            // ~20% most wallets use so the preview doesn't undersell it.
++            const paddedGasLimit = gasLimit.mul(120).div(100);
++            const feeWei = paddedGasLimit.mul(gasPrice);
++            sendResponse({ ok: true, feeWei: feeWei.toString() });
++            break;
++          }
++
+           case "TM_SWAP_QUOTE": {
+             const network = await getActiveNetwork();
+             const provider = await getProviderFor(network);

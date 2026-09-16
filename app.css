@@ -231,6 +231,46 @@ body {
     transparent 100%);
 }
 #splash-screen.splash-home #splash-tabbar { display: flex; }
+
+/* Before any wallet exists yet (screen-onboarding) or while one exists but
+   is locked (screen-unlock), the splash still lingers instead of
+   auto-fading -- see activateSplashLanding() -- but showing the
+   Home/Assets/Activity/Send bar here makes no sense: those are existing-
+   wallet features and there's nothing to tap that actually starts
+   onboarding or unlocking. This swaps that bar for one plain "tap to
+   continue" hint, and the whole splash becomes a single big tap target
+   (see activateSplashLanding()), so a first-time visitor isn't left
+   guessing which nav icon dismisses a screen that never explained itself. */
+#splash-screen.splash-landing #splash-spinner { display: none; }
+#splash-screen.splash-landing #splash-tabbar { display: none; }
+#splash-screen.splash-landing { cursor: pointer; }
+#splash-continue-hint {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  /* Same 132px min-height and gradient shape as #splash-tabbar above --
+     this still has to fully cover the artwork's own baked-in tab-bar
+     ghost (~45-95px up from the bottom) even though no real buttons
+     render here in landing mode. */
+  min-height: 132px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 10px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top,
+    rgba(9, 11, 17, 0.99) 0%,
+    rgba(9, 11, 17, 0.99) 68%,
+    rgba(9, 11, 17, 0.9) 82%,
+    rgba(9, 11, 17, 0.4) 94%,
+    transparent 100%);
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#splash-screen.splash-landing #splash-continue-hint { display: flex; }
 .splash-tab {
   flex: 1;
   display: flex;
@@ -662,6 +702,42 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   font-size: 16px; line-height: 1; padding: 2px 4px; cursor: pointer;
 }
 .token-remove-btn:hover { color: var(--danger); }
+
+/* NFTs are shown as image thumbnails rather than balance rows -- a small
+   grid instead of .tokens-list's stacked rows -- but the outer
+   .tokens-section/.tokens-header/.tokens-title classes are reused as-is so
+   this section matches the Tokens card above it exactly (same backdrop
+   strip, same header style). */
+.nft-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.nft-grid:not(:empty) { margin-bottom: 2px; }
+.nft-card {
+  position: relative;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px; text-align: center;
+}
+.nft-thumb {
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+  border-radius: 6px; background: var(--bg-inset);
+  display: block; margin-bottom: 4px;
+}
+.nft-thumb-fallback {
+  width: 100%; aspect-ratio: 1 / 1; border-radius: 6px;
+  background: var(--bg-inset); display: flex; align-items: center; justify-content: center;
+  color: var(--text-faint); font-size: 10px; margin-bottom: 4px;
+}
+.nft-name {
+  display: block; font-size: 11px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nft-id { display: block; font-size: 9.5px; color: var(--text-faint); font-family: var(--font-mono); }
+.nft-remove-btn {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(9, 11, 17, 0.75); border: 1px solid var(--line);
+  color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.nft-remove-btn:hover { color: var(--danger); }
 
 .prices-list {
   display: flex; flex-direction: column; gap: 6px;

@@ -42,6 +42,9 @@
       <span class="splash-tab-label" data-i18n="home.tabSend">Send</span>
     </button>
   </div>
+  <div id="splash-continue-hint">
+    <span data-i18n="home.tapToContinue">Tap to continue</span>
+  </div>
 </div>
 <div id="splash-tagline">
   <span class="footer-lock">&#128274;</span>
@@ -172,6 +175,15 @@
       <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
     </div>
 
+    <div class="tokens-section">
+      <div class="tokens-header">
+        <span class="tokens-title" data-i18n="main.nftsTitle">NFTs</span>
+        <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
+      </div>
+      <div id="nft-grid" class="nft-grid"></div>
+      <p id="nfts-empty" class="muted small hidden" data-i18n="main.nftsEmpty">No NFTs added yet -- tap "+ Add NFT" and enter a contract address and token ID to track one.</p>
+    </div>
+
     <div class="network-picker">
       <label data-i18n="main.networkLabel">Network</label>
       <div class="network-select-row">
@@ -197,6 +209,26 @@
     </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="add-token-error" class="error hidden"></p>
+  </section>
+
+  <!-- ADD NFT -->
+  <section id="screen-add-nft" class="screen hidden">
+    <h2 data-i18n="addNft.title">Add NFT</h2>
+    <p class="muted" data-i18n="addNft.description">Enter the NFT's contract address and token ID on the current network. Works for ERC-721 and ERC-1155 collections. Only add an NFT whose contract address you got from a source you trust -- artwork and names shown here come from the collection's own metadata, which anyone can set to anything.</p>
+    <label data-i18n="addNft.addressLabel">NFT contract address</label>
+    <input type="text" id="add-nft-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
+    <label data-i18n="addNft.tokenIdLabel">Token ID</label>
+    <input type="text" id="add-nft-token-id" data-i18n-placeholder="addNft.tokenIdPlaceholder" placeholder="0" />
+    <button id="btn-nft-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
+    <div id="add-nft-preview" class="hidden">
+      <img id="add-nft-preview-image" class="nft-thumb hidden" alt="" style="max-width:120px;" />
+      <p class="muted"><span data-i18n="addToken.nameLabel">Name:</span> <span id="add-nft-name" class="mono"></span></p>
+      <p class="muted"><span data-i18n="addNft.standardLabel">Standard:</span> <span id="add-nft-standard" class="mono"></span></p>
+      <p id="add-nft-meta-warning" class="hint hidden" data-i18n="addNft.metaWarning">Couldn't load this NFT's image/name from its metadata URI, but the contract and token ID check out -- you can still add it and try again later.</p>
+      <button id="btn-nft-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
+    </div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="add-nft-error" class="error hidden"></p>
   </section>
 
   <!-- PRICES -->
@@ -272,14 +304,17 @@
     </div>
     <div class="send-to-row">
       <span id="send-to-identicon" class="account-identicon hidden" aria-hidden="true"></span>
-      <input type="text" id="send-to" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
+      <input type="text" id="send-to" data-i18n-placeholder="send.toPlaceholder" placeholder="0x... or name.eth" />
     </div>
+    <p id="send-to-resolved" class="muted hidden"></p>
     <label data-i18n="send.amountLabel">Amount</label>
     <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+    <p id="send-fee-preview" class="muted hidden"></p>
     <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
     <div id="send-confirm-card" class="send-confirm-card hidden">
       <p id="send-confirm-intro" class="warn"></p>
       <p id="send-confirm-summary" class="send-confirm-summary"></p>
+      <p id="send-confirm-fee" class="muted hidden"></p>
       <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
       <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
     </div>
@@ -357,13 +392,24 @@
     </div>
     <div class="language-picker">
       <label data-i18n="settings.sendDelayLabel">Send delay (cancel window)</label>
-      <select id="send-delay-select" class="language-select">
+      <select id="send-delay-select">
         <option value="0" data-i18n="settings.sendDelayOff">Off (send immediately)</option>
         <option value="15" data-i18n="settings.sendDelay15">15 seconds</option>
         <option value="30" data-i18n="settings.sendDelay30">30 seconds (recommended)</option>
         <option value="60" data-i18n="settings.sendDelay60">60 seconds</option>
       </select>
       <p class="muted" data-i18n="settings.sendDelayHint">Holds every outgoing send for this long so you have a chance to cancel it before it's broadcast. This only covers sends made here in Token Exchange -- it can't protect a wallet whose private key or recovery phrase has already been exposed outside the app.</p>
+    </div>
+    <div class="language-picker">
+      <label data-i18n="settings.autoLockLabel">Auto-lock after inactivity</label>
+      <select id="auto-lock-select">
+        <option value="0" data-i18n="settings.autoLockOff">Off (never auto-lock)</option>
+        <option value="1" data-i18n="settings.autoLock1">1 minute</option>
+        <option value="5" data-i18n="settings.autoLock5">5 minutes (recommended)</option>
+        <option value="15" data-i18n="settings.autoLock15">15 minutes</option>
+        <option value="30" data-i18n="settings.autoLock30">30 minutes</option>
+      </select>
+      <p class="muted" data-i18n="settings.autoLockHint">Locks the wallet automatically after this much time with no clicks, taps, or keystrokes here -- since a browser tab you leave open otherwise stays unlocked indefinitely.</p>
     </div>
     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>

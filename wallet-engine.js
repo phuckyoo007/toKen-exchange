@@ -57,6 +57,92 @@ async function saveTrackedTokens(chainId, tokens) {
   await chrome.storage.local.set({ [TRACKED_TOKENS_KEY]: all });
 }
 
+// ---- tracked (user-added) NFTs, per chain -- same shape/pattern as tracked
+// ERC-20 tokens above, storing just enough to look the NFT back up
+// (contract + token ID + standard) rather than caching its artwork/name,
+// which is re-fetched from the collection's own metadata each time. ----
+const TRACKED_NFTS_KEY = "tm_tracked_nfts";
+
+async function getTrackedNfts(chainId) {
+  const stored = await chrome.storage.local.get(TRACKED_NFTS_KEY);
+  const all = stored[TRACKED_NFTS_KEY] || {};
+  return all[chainId] || [];
+}
+
+async function saveTrackedNfts(chainId, nfts) {
+  const stored = await chrome.storage.local.get(TRACKED_NFTS_KEY);
+  const all = stored[TRACKED_NFTS_KEY] || {};
+  all[chainId] = nfts;
+  await chrome.storage.local.set({ [TRACKED_NFTS_KEY]: all });
+}
+
+// An NFT's tokenURI/metadata is written by whoever deployed or minted that
+// contract -- it's untrusted input, same category as a webpage's own
+// content, not something this wallet's own code produced. Every helper
+// below treats it that way: a narrow IPFS rewrite, a bounded fetch, and an
+// image-URL allowlist rather than a blocklist, so a malicious collection
+// can't do anything worse than fail to display.
+const NFT_IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+
+function resolveMaybeIpfsUri(uri) {
+  if (!uri || typeof uri !== "string") return uri;
+  if (uri.startsWith("ipfs://")) {
+    return NFT_IPFS_GATEWAY + uri.slice("ipfs://".length).replace(/^ipfs\//, "");
+  }
+  return uri;
+}
+
+// Only http(s) URLs or genuine image data: URIs are ever handed to the UI
+// for use as an <img src> -- never javascript:, text/html, or anything
+// else that could do something unexpected just by being displayed. This is
+// an allowlist, not an attempt to blocklist specific bad schemes.
+function sanitizeNftImageUrl(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const url = resolveMaybeIpfsUri(raw.trim());
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(url)) return url;
+  return null;
+}
+
+async function fetchNftMetadataJson(tokenUri) {
+  const url = resolveMaybeIpfsUri(tokenUri);
+  if (!url || !/^https?:\/\//i.test(url)) {
+    throw new Error("This NFT's metadata URI isn't a fetchable http(s)/ipfs link.");
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`Metadata fetch failed (HTTP ${res.status}).`);
+    const text = await res.text();
+    if (text.length > 500000) throw new Error("Metadata response was too large to use.");
+    return JSON.parse(text);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Tries ERC-721's tokenURI(id) first, then falls back to ERC-1155's
+// uri(id) -- there's no on-chain "which standard is this" call, so
+// attempting the more common one first and falling back is the same
+// approach MetaMask's own NFT detection uses. The {id} placeholder handling
+// on the 1155 path is required by that standard itself (EIP-1155), not
+// optional cleanup.
+async function readNftTokenUri(provider, contractAddress, tokenIdBn) {
+  try {
+    const c721 = new ethers.Contract(contractAddress, ["function tokenURI(uint256) view returns (string)"], provider);
+    const tokenUri = await c721.tokenURI(tokenIdBn);
+    return { standard: "erc721", tokenUri };
+  } catch (e721) {
+    const c1155 = new ethers.Contract(contractAddress, ["function uri(uint256) view returns (string)"], provider);
+    let tokenUri = await c1155.uri(tokenIdBn);
+    if (tokenUri && tokenUri.includes("{id}")) {
+      tokenUri = tokenUri.replace("{id}", tokenIdBn.toHexString().slice(2).padStart(64, "0"));
+    }
+    return { standard: "erc1155", tokenUri };
+  }
+}
+
 // Shows the SAME approve screens the extension's popup.html has always had
 // (screen-approve-connect/tx/sign/addnetwork -- see index.html), just
 // in-place in this one page instead of in a second popup window, since
@@ -494,6 +580,27 @@ async function handleMessage(msg) {
             break;
           }
 
+          // Resolves a human-readable name (currently ENS, e.g. "vitalik.eth")
+          // typed into the Send "To" field into an address -- the same
+          // convenience MetaMask and Coinbase Wallet offer instead of making
+          // every send start with a raw 0x address. ethers' JsonRpcProvider
+          // only knows an ENS registry address for networks it recognizes as
+          // having one (mainnet); on every other chain this predictably
+          // resolves to null rather than erroring, and the UI falls back to
+          // requiring a raw address there, same as before this existed.
+          case "TM_RESOLVE_NAME": {
+            const network = await getActiveNetwork();
+            const provider = await getProviderFor(network);
+            let address = null;
+            try {
+              address = await provider.resolveName(msg.name);
+            } catch (e) {
+              address = null; // no ENS registry on this network, or a lookup error -- treat the same as "not found"
+            }
+            sendResponse({ ok: true, address });
+            break;
+          }
+
           case "TM_LOOKUP_TOKEN": {
             if (!ethers.utils.isAddress(msg.tokenAddress)) {
               throw new Error("That doesn't look like a valid contract address.");
@@ -568,6 +675,111 @@ async function handleMessage(msg) {
             break;
           }
 
+          // Read-only preview of an NFT before it's added -- mirrors
+          // TM_LOOKUP_TOKEN's "look up, show a preview, then confirm" flow.
+          case "TM_LOOKUP_NFT": {
+            if (!ethers.utils.isAddress(msg.contractAddress)) {
+              throw new Error("That doesn't look like a valid contract address.");
+            }
+            let tokenIdBn;
+            try {
+              tokenIdBn = ethers.BigNumber.from(msg.tokenId);
+              if (tokenIdBn.isNegative()) throw new Error();
+            } catch (e) {
+              throw new Error("Enter a valid token ID (a non-negative whole number).");
+            }
+            const network = await getActiveNetwork();
+            const provider = await getProviderFor(network);
+            let standard, tokenUri;
+            try {
+              ({ standard, tokenUri } = await readNftTokenUri(provider, msg.contractAddress, tokenIdBn));
+            } catch (e) {
+              throw new Error(
+                `Couldn't read this as an ERC-721 or ERC-1155 NFT on ${network.name}. Double-check the contract address, token ID, and network.`
+              );
+            }
+            let name = "";
+            let image = null;
+            let metaError = null;
+            try {
+              const metadata = await fetchNftMetadataJson(tokenUri);
+              name = typeof metadata.name === "string" ? metadata.name.slice(0, 200) : "";
+              image = sanitizeNftImageUrl(metadata.image || metadata.image_url);
+            } catch (e) {
+              metaError = e.message;
+            }
+            sendResponse({ ok: true, standard, name, image, metaError });
+            break;
+          }
+
+          case "TM_ADD_TRACKED_NFT": {
+            const network = await getActiveNetwork();
+            const address = ethers.utils.getAddress(msg.contractAddress);
+            const tokenId = ethers.BigNumber.from(msg.tokenId).toString();
+            const existing = await getTrackedNfts(network.chainId);
+            if (existing.some((n) => n.contractAddress.toLowerCase() === address.toLowerCase() && n.tokenId === tokenId)) {
+              throw new Error("That NFT is already in your list.");
+            }
+            const nfts = [
+              ...existing,
+              { contractAddress: address, tokenId, standard: msg.standard, name: msg.name || "" },
+            ];
+            await saveTrackedNfts(network.chainId, nfts);
+            sendResponse({ ok: true, nfts });
+            break;
+          }
+
+          case "TM_REMOVE_TRACKED_NFT": {
+            const network = await getActiveNetwork();
+            const existing = await getTrackedNfts(network.chainId);
+            const nfts = existing.filter(
+              (n) =>
+                !(
+                  n.contractAddress.toLowerCase() === (msg.contractAddress || "").toLowerCase() &&
+                  n.tokenId === String(msg.tokenId)
+                )
+            );
+            await saveTrackedNfts(network.chainId, nfts);
+            sendResponse({ ok: true, nfts });
+            break;
+          }
+
+          case "TM_GET_TRACKED_NFTS": {
+            const network = await getActiveNetwork();
+            const nfts = await getTrackedNfts(network.chainId);
+            if (!nfts.length) {
+              sendResponse({ ok: true, nfts: [] });
+              break;
+            }
+            const provider = await getProviderFor(network);
+            const results = await Promise.all(
+              nfts.map(async (n) => {
+                try {
+                  const tokenIdBn = ethers.BigNumber.from(n.tokenId);
+                  let tokenUri;
+                  if (n.standard === "erc1155") {
+                    const c = new ethers.Contract(n.contractAddress, ["function uri(uint256) view returns (string)"], provider);
+                    tokenUri = await c.uri(tokenIdBn);
+                    if (tokenUri && tokenUri.includes("{id}")) {
+                      tokenUri = tokenUri.replace("{id}", tokenIdBn.toHexString().slice(2).padStart(64, "0"));
+                    }
+                  } else {
+                    const c = new ethers.Contract(n.contractAddress, ["function tokenURI(uint256) view returns (string)"], provider);
+                    tokenUri = await c.tokenURI(tokenIdBn);
+                  }
+                  const metadata = await fetchNftMetadataJson(tokenUri);
+                  const name = typeof metadata.name === "string" ? metadata.name.slice(0, 200) : n.name;
+                  const image = sanitizeNftImageUrl(metadata.image || metadata.image_url);
+                  return { ...n, name: name || n.name, image, error: null };
+                } catch (e) {
+                  return { ...n, image: null, error: e.message };
+                }
+              })
+            );
+            sendResponse({ ok: true, nfts: results });
+            break;
+          }
+
           case "TM_SEND_NATIVE": {
             requireUnlocked();
             const network = await getActiveNetwork();
@@ -590,6 +802,44 @@ async function handleMessage(msg) {
             const c = new ethers.Contract(msg.tokenAddress, TM_SWAP.ERC20_ABI.concat(["function transfer(address to, uint256 amount) returns (bool)"]), wallet);
             const tx = await c.transfer(msg.to, ethers.BigNumber.from(msg.amountWei));
             sendResponse({ ok: true, txHash: tx.hash });
+            break;
+          }
+
+          // Read-only preview of what a send would cost, shown on the Send
+          // screen (and echoed into the confirm card) *before* the user
+          // commits -- the same "you'll pay about this much in network fees"
+          // preview MetaMask and Coinbase Wallet both show, which this app
+          // never surfaced before. Never signs or broadcasts anything.
+          case "TM_ESTIMATE_SEND_FEE": {
+            requireUnlocked();
+            const network = await getActiveNetwork();
+            const meta = await getSelectedAccountMeta();
+            const provider = await getProviderFor(network);
+            const from = meta.address;
+            const amountWei = ethers.BigNumber.from(msg.amountWei || "0");
+            let gasLimit;
+            if (msg.tokenAddress) {
+              const c = new ethers.Contract(
+                msg.tokenAddress,
+                TM_SWAP.ERC20_ABI.concat(["function transfer(address to, uint256 amount) returns (bool)"]),
+                provider
+              );
+              gasLimit = await c.estimateGas.transfer(msg.to, amountWei, { from });
+            } else {
+              gasLimit = await provider.estimateGas({ from, to: msg.to, value: amountWei });
+            }
+            const feeData = await provider.getFeeData();
+            // EIP-1559 chains quote maxFeePerGas; older chains only have
+            // gasPrice. Either way this is a worst-case ceiling, same as
+            // what MetaMask's own preview shows -- the actual charge can
+            // come in lower once the block is mined.
+            const gasPrice = feeData.maxFeePerGas || feeData.gasPrice || ethers.BigNumber.from(0);
+            // estimateGas is a lower bound in practice (state can shift
+            // between the estimate and the real send) -- pad it the same
+            // ~20% most wallets use so the preview doesn't undersell it.
+            const paddedGasLimit = gasLimit.mul(120).div(100);
+            const feeWei = paddedGasLimit.mul(gasPrice);
+            sendResponse({ ok: true, feeWei: feeWei.toString() });
             break;
           }
 
