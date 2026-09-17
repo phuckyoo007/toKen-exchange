@@ -145,6 +145,7 @@
       <button id="btn-toggle-qr" class="link" data-i18n="main.showQrBtn">Show QR</button>
     </div>
     <div id="address-qr-box" class="qr-box hidden"></div>
+    <p id="watch-only-notice" class="warn hidden" data-i18n="main.watchOnlyNotice">You're viewing a watch-only address -- there's no private key for it in this wallet, so Send and Swap are turned off here.</p>
     <div class="actions-row">
       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
@@ -316,6 +317,11 @@
     <p id="send-to-resolved" class="muted hidden"></p>
     <label data-i18n="send.amountLabel">Amount</label>
     <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+    <div id="send-speed-row" class="send-speed-row hidden">
+      <button type="button" class="send-speed-btn" data-speed="slow" data-i18n="send.speedSlow">Slow</button>
+      <button type="button" class="send-speed-btn active" data-speed="standard" data-i18n="send.speedStandard">Standard</button>
+      <button type="button" class="send-speed-btn" data-speed="fast" data-i18n="send.speedFast">Fast</button>
+    </div>
     <p id="send-fee-preview" class="muted hidden"></p>
     <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
     <div id="send-confirm-card" class="send-confirm-card hidden">
@@ -323,6 +329,7 @@
       <p id="send-confirm-summary" class="send-confirm-summary"></p>
       <p id="send-confirm-fee" class="muted hidden"></p>
       <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
+      <p id="send-confirm-poison-warning" class="error poison-warning hidden"></p>
       <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
     </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
@@ -383,6 +390,8 @@
     <h2 data-i18n="settings.title">Settings</h2>
     <button id="btn-add-account" class="secondary" data-i18n="settings.addAccountBtn">Add account</button>
     <button id="btn-goto-import-key" class="secondary" data-i18n="settings.importKeyBtn">Import private key</button>
+    <button id="btn-goto-add-watch" class="secondary" data-i18n="settings.addWatchBtn">Add watch-only address</button>
+    <button id="btn-goto-approvals" class="secondary" data-i18n="settings.approvalsBtn">Manage approvals</button>
     <button id="btn-goto-add-network" class="secondary" data-i18n="settings.addNetworkBtn">Add network</button>
     <button id="btn-goto-walletconnect" class="secondary" data-i18n="settings.walletConnectBtn">WalletConnect</button>
     <button id="btn-goto-contacts" class="secondary" data-i18n="settings.contactsBtn">Address book</button>
@@ -466,10 +475,35 @@
 
   <section id="screen-import-key" class="screen hidden">
     <h2 data-i18n="importKey.title">Import private key</h2>
+    <p class="muted small" data-i18n="importKey.description">This adds a separate account to this wallet from a raw private key, not from your recovery phrase -- back it up on its own, since your recovery phrase won't restore it. Never share a private key with anyone; anyone who has it can spend everything in that account.</p>
     <input type="text" id="import-key-input" data-i18n-placeholder="importKey.placeholder" placeholder="0x private key" />
     <button id="btn-import-key-submit" class="primary" data-i18n="import.submitBtn">Import</button>
     <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
     <p id="import-key-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-add-watch" class="screen hidden">
+    <h2 data-i18n="addWatch.title">Add watch-only address</h2>
+    <p class="muted small" data-i18n="addWatch.description">Tracks an address's balance, tokens and activity without holding a key for it -- there's nothing here to sign with, so Send and Swap stay off for it. Useful for keeping an eye on a cold-storage or hardware-wallet address from here.</p>
+    <input type="text" id="add-watch-address" data-i18n-placeholder="addWatch.addressPlaceholder" placeholder="0x..." />
+    <input type="text" id="add-watch-label" data-i18n-placeholder="addWatch.labelPlaceholder" placeholder="Label (optional)" />
+    <button id="btn-add-watch-submit" class="primary" data-i18n="addWatch.submitBtn">Add</button>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <p id="add-watch-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-approvals" class="screen hidden">
+    <h2 data-i18n="approvals.title">Manage approvals</h2>
+    <p class="muted small" data-i18n="approvals.description">Token approvals let a contract spend a token on your behalf -- swaps need one, but a forgotten approval from an old dapp keeps working until you revoke it. This lists approvals this wallet's own swap router holds for tokens you've added; check any other spender manually below.</p>
+    <div id="approvals-list"></div>
+    <p id="approvals-empty" class="muted small hidden" data-i18n="approvals.emptyText">No active approvals found for your added tokens on this network.</p>
+    <label data-i18n="approvals.manualHeading">Check a specific approval</label>
+    <input type="text" id="approval-check-token" data-i18n-placeholder="approvals.tokenPlaceholder" placeholder="Token contract address (0x...)" />
+    <input type="text" id="approval-check-spender" data-i18n-placeholder="approvals.spenderPlaceholder" placeholder="Spender address (0x...)" />
+    <button id="btn-approval-check" class="secondary" data-i18n="approvals.checkBtn">Check allowance</button>
+    <div id="approval-check-result" class="tx-details hidden"></div>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <p id="approvals-error" class="error hidden"></p>
   </section>
 
   <section id="screen-add-network" class="screen hidden">
@@ -524,6 +558,7 @@
   <section id="screen-approve-tx" class="screen hidden">
     <h2 data-i18n="approve.txTitle">Transaction request</h2>
     <p class="muted" id="approve-tx-origin"></p>
+    <div id="approve-tx-decoded" class="tx-details decoded-tx hidden"></div>
     <div class="tx-details">
       <div><span class="muted" data-i18n="approve.toLabel">To:</span> <span id="approve-tx-to" class="mono"></span></div>
       <div><span class="muted" data-i18n="approve.valueLabel">Value:</span> <span id="approve-tx-value"></span></div>

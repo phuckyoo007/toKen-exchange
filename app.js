@@ -180,9 +180,43 @@ function showScreen(id) {
   $(id).classList.remove("hidden");
 }
 
+// Most errors shown in this app are already this app's OWN plain-language
+// text (e.g. "That doesn't look like a valid contract address.") -- those
+// pass straight through untouched. The exception is anything that bubbled
+// up from ethers/the RPC layer unhandled, which reads like
+// `processing response error (body="...", error={...}, code=NETWORK_ERROR,
+// version=providers/5.7.2)` -- accurate for debugging, meaningless and
+// alarming for someone just trying to check a balance. This maps the
+// common cases to a calm, plain-language line, and falls back to a
+// generic one for anything else that still looks like a raw technical
+// dump rather than a message meant for a person.
+const FRIENDLY_ERROR_PATTERNS = [
+  { re: /could not detect network|NETWORK_ERROR/i, text: "Couldn't reach the network. Check your connection and try again." },
+  { re: /insufficient funds/i, text: "Not enough balance to cover this amount plus the network fee." },
+  { re: /user rejected|ACTION_REJECTED/i, text: "That request was cancelled." },
+  { re: /nonce has already been used|nonce too low/i, text: "That transaction couldn't be sent right now -- please try again." },
+  { re: /replacement (fee|transaction) too low|underpriced/i, text: "Network fees just changed -- please try again." },
+  { re: /timeout|ETIMEDOUT/i, text: "The network took too long to respond. Please try again." },
+  { re: /rate limit|too many requests|\b429\b/i, text: "Too many requests right now -- please wait a moment and try again." },
+  { re: /call_exception|execution reverted/i, text: "The network rejected this request. Double-check the details and try again." },
+  { re: /invalid response|server_error|processing response error/i, text: "Couldn't get a response from the network. Please try again." },
+];
+function friendlyErrorMessage(raw) {
+  const msg = String(raw == null ? "" : raw);
+  for (const { re, text } of FRIENDLY_ERROR_PATTERNS) {
+    if (re.test(msg)) return text;
+  }
+  // Anything else that still looks like a raw technical dump (a JSON-ish
+  // blob, an ethers `code=`/`version=providers` tag, very long text) gets a
+  // generic fallback instead of being shown as-is; genuinely short,
+  // plain-language messages (this app's own thrown errors) pass through.
+  const looksTechnical = /code=|version=providers|"jsonrpc"|\{[^}]*\}|event="/i.test(msg) || msg.length > 160;
+  return looksTechnical ? "Something went wrong talking to the network. Please try again." : msg;
+}
+
 function showError(id, message) {
   const el = $(id);
-  el.textContent = message;
+  el.textContent = friendlyErrorMessage(message);
   el.classList.remove("hidden");
 }
 function hideError(id) { $(id).classList.add("hidden"); }
@@ -214,7 +248,7 @@ $("btn-create-submit").addEventListener("click", async () => {
     $("create-step-password").classList.add("hidden");
     $("create-step-backup").classList.remove("hidden");
   } catch (e) {
-    alert(e.message);
+    alert(friendlyErrorMessage(e.message));
   }
 });
 
@@ -257,6 +291,21 @@ $("btn-goto-reset").addEventListener("click", () => showScreen("screen-reset"));
 $("btn-goto-support-unlock").addEventListener("click", () => openSupport("screen-unlock"));
 
 // ---------------------------------------------------------------- MAIN
+// Watch-only accounts have no private key in this wallet at all -- Send
+// and Swap can never work for one, so they're turned off here rather
+// than left clickable only to fail with a confusing signing error deeper
+// in the flow. Buy still works (it's just an address to receive to).
+// Called both after a fresh refreshMain() and after switching accounts in
+// the dropdown, since currentStatus.selectedAddress changes in both cases.
+function applyWatchOnlyGating() {
+  const selectedMeta = (currentStatus.accounts || []).find((a) => a.address === currentStatus.selectedAddress);
+  const isWatchOnly = !!selectedMeta && selectedMeta.type === "watch";
+  $("watch-only-notice").classList.toggle("hidden", !isWatchOnly);
+  $("btn-goto-send").disabled = isWatchOnly;
+  $("btn-goto-swap").disabled = isWatchOnly;
+  $("btn-goto-sell").disabled = isWatchOnly;
+}
+
 async function refreshMain() {
   armAutoLock(); // every path that reaches the main screen is an unlocked session
   currentStatus = await sendMsg("TM_GET_STATUS");
@@ -269,10 +318,22 @@ async function refreshMain() {
   currentStatus.accounts.forEach((a) => {
     const opt = document.createElement("option");
     opt.value = a.address;
-    opt.textContent = `${a.name} (${a.address.slice(0, 6)}...${a.address.slice(-4)})`;
+    const watchSuffix = a.type === "watch" ? ` ${TM_I18N.t("main.watchOnlySuffix")}` : "";
+    opt.textContent = `${a.name} (${a.address.slice(0, 6)}...${a.address.slice(-4)})${watchSuffix}`;
     if (a.address === currentStatus.selectedAddress) opt.selected = true;
     accSel.appendChild(opt);
   });
+  applyWatchOnlyGating();
+  // "Add account" (already backed by TM_ADD_ACCOUNT -- see Settings) lived
+  // only as a button buried in Settings, easy to miss since the account
+  // picker itself never hinted more than one account was possible. Putting
+  // it as the dropdown's own last option puts it exactly where MetaMask's
+  // account switcher shows it: right where you'd look to add or switch
+  // accounts, not off in a separate screen.
+  const addAccountOpt = document.createElement("option");
+  addAccountOpt.value = ACCOUNT_SELECT_ADD_VALUE;
+  addAccountOpt.textContent = TM_I18N.t("main.addAccountOption");
+  accSel.appendChild(addAccountOpt);
 
   const netSel = $("network-select");
   netSel.innerHTML = "";
@@ -326,6 +387,13 @@ async function refreshBalance() {
     $("balance-amount").textContent = Number(formatted).toFixed(5);
     $("balance-symbol").textContent = bal.symbol;
     refreshBalanceUsd(); // not awaited -- a slow/rate-limited price API shouldn't block the balance display
+    if (currentNetwork) {
+      checkForIncomingBalance(
+        `${currentStatus.selectedAddress.toLowerCase()}:${currentNetwork.key}:native`,
+        bal.balanceWei,
+        { decimals: bal.decimals, symbol: bal.symbol, networkName: currentNetwork.name }
+      );
+    }
   } catch (e) {
     $("balance-amount").textContent = "--";
     // No native amount to base a USD estimate on -- but tracked tokens may
@@ -338,12 +406,28 @@ async function refreshBalance() {
   }
 }
 
+const ACCOUNT_SELECT_ADD_VALUE = "__add_account__";
 $("account-select").addEventListener("change", async (e) => {
+  if (e.target.value === ACCOUNT_SELECT_ADD_VALUE) {
+    // Picking this option isn't a real account -- reset the dropdown back
+    // to whatever's actually selected first (so it doesn't visually sit on
+    // "+ Add account" if the derivation below fails), then add the next HD
+    // account the same way Settings' "Add account" button always has.
+    e.target.value = currentStatus.selectedAddress;
+    try {
+      await sendMsg("TM_ADD_ACCOUNT", {});
+    } catch (err) {
+      return showError("main-error", err.message);
+    }
+    await refreshMain();
+    return;
+  }
   await sendMsg("TM_SELECT_ACCOUNT", { address: e.target.value });
   currentStatus.selectedAddress = e.target.value;
   $("address-display").textContent = e.target.value;
   updateAccountIdenticon(e.target.value);
   refreshAddressQr();
+  applyWatchOnlyGating();
   await refreshBalance();
   await refreshTokens();
 });
@@ -467,7 +551,7 @@ $("btn-toggle-qr").addEventListener("click", () => {
 });
 
 $("btn-settings").addEventListener("click", () => showScreen("screen-settings"));
-$("btn-goto-send").addEventListener("click", () => { showScreen("screen-send"); refreshSendFeePreview(); });
+$("btn-goto-send").addEventListener("click", () => { setSendSpeed("standard"); showScreen("screen-send"); refreshSendFeePreview(); });
 $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
 $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
@@ -518,6 +602,13 @@ async function refreshTokens() {
 
   let tokensUsdTotal = 0;
   res.tokens.forEach((t) => {
+    if (!t.error && currentNetwork && currentStatus.selectedAddress) {
+      checkForIncomingBalance(
+        `${currentStatus.selectedAddress.toLowerCase()}:${currentNetwork.key}:${t.address.toLowerCase()}`,
+        t.balanceWei,
+        { decimals: t.decimals, symbol: t.symbol, networkName: currentNetwork.name }
+      );
+    }
     const row = document.createElement("div");
     row.className = "token-row";
     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
@@ -981,9 +1072,11 @@ $("btn-add-account").addEventListener("click", async () => {
   try {
     await sendMsg("TM_ADD_ACCOUNT", {});
     await refreshMain();
-  } catch (e) { alert(e.message); }
+  } catch (e) { alert(friendlyErrorMessage(e.message)); }
 });
 $("btn-goto-import-key").addEventListener("click", () => showScreen("screen-import-key"));
+$("btn-goto-add-watch").addEventListener("click", () => showScreen("screen-add-watch"));
+$("btn-goto-approvals").addEventListener("click", () => { showScreen("screen-approvals"); renderApprovals(); });
 $("btn-goto-add-network").addEventListener("click", () => showScreen("screen-add-network"));
 $("btn-goto-walletconnect").addEventListener("click", () => {
   showScreen("screen-walletconnect");
@@ -1010,6 +1103,98 @@ $("btn-import-key-submit").addEventListener("click", async () => {
     showScreen("screen-main");
   } catch (e) {
     showError("import-key-error", e.message);
+  }
+});
+
+$("btn-add-watch-submit").addEventListener("click", async () => {
+  hideError("add-watch-error");
+  try {
+    await sendMsg("TM_ADD_WATCH_ACCOUNT", { address: $("add-watch-address").value.trim(), label: $("add-watch-label").value.trim() });
+    $("add-watch-address").value = "";
+    $("add-watch-label").value = "";
+    await refreshMain();
+    showScreen("screen-main");
+  } catch (e) {
+    showError("add-watch-error", e.message);
+  }
+});
+
+// ---------------------------------------------------------------- APPROVALS
+function approvalAmountHtml(allowanceWei, symbol, decimals) {
+  if (ethers.BigNumber.from(allowanceWei).eq(ethers.constants.MaxUint256)) {
+    return `<span class="decoded-unlimited">${TM_I18N.t("approve.decodedUnlimited", { symbol: escapeHtml(symbol) })}</span>`;
+  }
+  return escapeHtml(`${ethers.utils.formatUnits(allowanceWei, decimals)} ${symbol}`);
+}
+
+async function revokeApproval(tokenAddress, spender, btn) {
+  hideError("approvals-error");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = TM_I18N.t("approvals.revokingBtn");
+  try {
+    await sendMsg("TM_REVOKE_APPROVAL", { tokenAddress, spender });
+    await renderApprovals();
+    $("approval-check-result").classList.add("hidden");
+  } catch (e) {
+    showError("approvals-error", friendlyErrorMessage(e.message));
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+async function renderApprovals() {
+  hideError("approvals-error");
+  const listEl = $("approvals-list");
+  listEl.innerHTML = `<p class="muted small">${TM_I18N.t("approvals.loading")}</p>`;
+  $("approvals-empty").classList.add("hidden");
+  try {
+    const res = await sendMsg("TM_LIST_APPROVALS", {});
+    listEl.innerHTML = "";
+    if (!res.approvals.length) {
+      $("approvals-empty").classList.remove("hidden");
+      return;
+    }
+    res.approvals.forEach((a) => {
+      const row = document.createElement("div");
+      row.className = "tx-details approval-row";
+      const amountHtml = a.error
+        ? `<span class="error">${escapeHtml(a.error)}</span>`
+        : approvalAmountHtml(a.allowanceWei, a.symbol, a.decimals);
+      row.innerHTML = `
+        <div><span class="muted">${TM_I18N.t("approvals.tokenLabel")}</span> ${escapeHtml(a.symbol)} <span class="mono small">(${escapeHtml(a.address)})</span></div>
+        <div><span class="muted">${TM_I18N.t("approvals.spenderLabel")}</span> <span class="mono small">${escapeHtml(a.spender)}</span></div>
+        <div><span class="muted">${TM_I18N.t("approvals.allowanceLabel")}</span> ${amountHtml}</div>
+        <button class="danger btn-revoke-approval">${TM_I18N.t("approvals.revokeBtn")}</button>
+      `;
+      row.querySelector(".btn-revoke-approval").addEventListener("click", (e) => revokeApproval(a.address, a.spender, e.target));
+      listEl.appendChild(row);
+    });
+  } catch (e) {
+    listEl.innerHTML = "";
+    showError("approvals-error", e.message);
+  }
+}
+
+$("btn-approval-check").addEventListener("click", async () => {
+  hideError("approvals-error");
+  $("approval-check-result").classList.add("hidden");
+  const tokenAddress = $("approval-check-token").value.trim();
+  const spender = $("approval-check-spender").value.trim();
+  try {
+    const res = await sendMsg("TM_CHECK_APPROVAL", { tokenAddress, spender });
+    const amountHtml = approvalAmountHtml(res.allowanceWei, res.symbol, res.decimals);
+    $("approval-check-result").innerHTML = `<div>${TM_I18N.t("approvals.allowanceLabel")} ${amountHtml}</div>`;
+    if (ethers.BigNumber.from(res.allowanceWei).gt(0)) {
+      const btn = document.createElement("button");
+      btn.className = "danger";
+      btn.textContent = TM_I18N.t("approvals.revokeBtn");
+      btn.addEventListener("click", () => revokeApproval(tokenAddress, spender, btn));
+      $("approval-check-result").appendChild(btn);
+    }
+    $("approval-check-result").classList.remove("hidden");
+  } catch (e) {
+    showError("approvals-error", e.message);
   }
 });
 
@@ -1060,8 +1245,33 @@ let sendFeePreviewToken = 0; // guards against a slow, stale estimate landing af
 let lastSendFeeWei = null;
 let sendFeePreviewTimer = null;
 
+// Adjustable send speed (gas) -- "standard" matches the network's own
+// suggested fee; "slow"/"fast" scale it down/up (see scaleFeeDataForSpeed
+// in wallet-engine.js). Resets to "standard" each time the Send screen is
+// opened fresh, same as MetaMask/Coinbase Wallet default back to their
+// middle tier rather than remembering a previous choice.
+let currentSendSpeed = "standard";
+let lastFeeTiers = null; // { slow, standard, fast } wei strings from the last estimate
+
+function setSendSpeed(speed) {
+  currentSendSpeed = speed;
+  document.querySelectorAll(".send-speed-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.speed === speed);
+  });
+}
+
+document.querySelectorAll(".send-speed-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.speed === currentSendSpeed) return;
+    setSendSpeed(btn.dataset.speed);
+    estimateSendFeeNow();
+  });
+});
+
 function clearSendFeePreview() {
   lastSendFeeWei = null;
+  lastFeeTiers = null;
+  $("send-speed-row").classList.add("hidden");
   $("send-fee-preview").classList.add("hidden");
   $("send-fee-preview").textContent = "";
 }
@@ -1082,6 +1292,7 @@ async function estimateSendFeeNow() {
   }
 
   const myToken = ++sendFeePreviewToken;
+  $("send-speed-row").classList.remove("hidden");
   $("send-fee-preview").classList.remove("hidden");
   $("send-fee-preview").textContent = TM_I18N.t("send.feeEstimateLoading");
 
@@ -1100,14 +1311,16 @@ async function estimateSendFeeNow() {
     });
     if (myToken !== sendFeePreviewToken) return; // a newer estimate has since started
 
-    lastSendFeeWei = res.feeWei;
+    lastFeeTiers = res.tiers || null;
+    const selectedFeeWei = (lastFeeTiers && lastFeeTiers[currentSendSpeed]) || res.feeWei;
+    lastSendFeeWei = selectedFeeWei;
     const symbol = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
-    const feeFormatted = Number(ethers.utils.formatEther(res.feeWei)).toPrecision(3).replace(/\.?0+$/, "");
+    const feeFormatted = Number(ethers.utils.formatEther(selectedFeeWei)).toPrecision(3).replace(/\.?0+$/, "");
 
     let usdText = null;
     try {
       const price = await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
-      if (price != null) usdText = formatCurrency(Number(ethers.utils.formatEther(res.feeWei)) * price);
+      if (price != null) usdText = formatCurrency(Number(ethers.utils.formatEther(selectedFeeWei)) * price);
     } catch (e) {
       // Best-effort only -- the native-amount fee line below still stands on its own.
     }
@@ -1258,13 +1471,49 @@ function disarmAutoLock() {
 // this device -- used only to show a heads-up in the confirm step, never
 // to block anything.
 async function isKnownAddress(address) {
+  const result = await findAddressWarning(address);
+  return result.level === "known";
+}
+
+// Address-poisoning heuristic: an attacker generates a vanity address that
+// shares the same leading and trailing characters as one you've genuinely
+// used before (cheap to do with public vanity-address tools), then gets it
+// into your history -- e.g. sending it a dust transfer -- hoping a quick
+// glance at "0x1a2b...9f3c" won't catch that the middle is entirely
+// different. Checked only against addresses this device already has on
+// file (contacts + past send recipients), never against arbitrary chain
+// data, so this can only warn about something concretely known here --
+// never guess at a false match.
+function isLookalikeAddress(a, b) {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  if (x === y) return false; // identical is "known", not "lookalike"
+  if (x.length !== y.length) return false;
+  const PREFIX = 6; // chars after "0x" that must match
+  const SUFFIX = 4;
+  if (x.length < 2 + PREFIX + SUFFIX) return false;
+  return x.slice(0, 2 + PREFIX) === y.slice(0, 2 + PREFIX) && x.slice(-SUFFIX) === y.slice(-SUFFIX);
+}
+
+// Returns one of:
+//   { level: "known" }          -- exact match on file, no warning needed
+//   { level: "poison", match }  -- not on file, but a near-identical lookalike is
+//   { level: "new" }            -- genuinely unseen, generic "first time" warning
+async function findAddressWarning(address) {
   const target = address.toLowerCase();
   const contacts = await getContacts();
-  if (contacts.some((c) => (c.address || "").toLowerCase() === target)) return true;
   const activity = await new Promise((resolve) => {
     chrome.storage.local.get([TM_ACTIVITY_KEY], (res) => resolve(Array.isArray(res[TM_ACTIVITY_KEY]) ? res[TM_ACTIVITY_KEY] : []));
   });
-  return activity.some((a) => (a.to || "").toLowerCase() === target);
+  const knownAddresses = [
+    ...contacts.map((c) => c.address || ""),
+    ...activity.filter((a) => a.direction === "out" && a.to).map((a) => a.to),
+  ].filter(Boolean);
+
+  if (knownAddresses.some((k) => k.toLowerCase() === target)) return { level: "known" };
+  const lookalike = knownAddresses.find((k) => isLookalikeAddress(k, address));
+  if (lookalike) return { level: "poison", match: lookalike };
+  return { level: "new" };
 }
 
 function resetSendConfirmUi() {
@@ -1274,10 +1523,12 @@ function resetSendConfirmUi() {
   }
   $("send-confirm-card").classList.add("hidden");
   $("send-confirm-new-address-warning").classList.add("hidden");
+  $("send-confirm-poison-warning").classList.add("hidden");
   $("btn-send-submit").disabled = false;
   $("send-to").disabled = false;
   $("send-amount").disabled = false;
   $("send-asset-select").disabled = false;
+  document.querySelectorAll(".send-speed-btn").forEach((btn) => { btn.disabled = false; });
 }
 
 // Cancels any in-progress countdown if the user navigates away from the
@@ -1289,15 +1540,15 @@ showScreen = function (id) {
   return _origShowScreenForSend(id);
 };
 
-async function executeSend({ to, amountStr, isNative, tokenAddress }) {
+async function executeSend({ to, amountStr, isNative, tokenAddress, speed }) {
   let res;
   if (isNative) {
     const amountWei = ethers.utils.parseEther(amountStr || "0");
-    res = await sendMsg("TM_SEND_NATIVE", { to, amountWei: amountWei.toString() });
+    res = await sendMsg("TM_SEND_NATIVE", { to, amountWei: amountWei.toString(), speed });
   } else {
     const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress });
     const amountWei = ethers.utils.parseUnits(amountStr || "0", info.decimals);
-    res = await sendMsg("TM_SEND_TOKEN", { to, tokenAddress, amountWei: amountWei.toString() });
+    res = await sendMsg("TM_SEND_TOKEN", { to, tokenAddress, amountWei: amountWei.toString(), speed });
   }
   $("send-status").textContent = TM_I18N.t("send.sentStatus", { txHash: res.txHash });
   $("send-status").classList.remove("hidden");
@@ -1307,6 +1558,7 @@ async function executeSend({ to, amountStr, isNative, tokenAddress }) {
   // the wrong chain's explorer -- each entry always points at whichever
   // network the transaction actually went out on.
   recordActivity({
+    direction: "out",
     amount: amountStr,
     asset: sentAsset,
     to,
@@ -1335,20 +1587,25 @@ $("btn-send-submit").addEventListener("click", async () => {
     const isNative = $("send-asset-select").value === "native";
     const tokenAddress = isNative ? null : $("send-token-address").value.trim();
     if (!isNative && !ethers.utils.isAddress(tokenAddress)) throw new Error(TM_I18N.t("send.invalidTokenAddress"));
+    // Captured now, at the moment Send is actually pressed -- not re-read
+    // later, so nothing that happens during the cancel-window countdown
+    // (or a stray click) can change which tier a send goes out at.
+    const speed = currentSendSpeed;
 
     if (!currentSendDelaySeconds) {
       // Delay turned off in Settings -- send immediately, same as before.
-      await executeSend({ to, amountStr, isNative, tokenAddress });
+      await executeSend({ to, amountStr, isNative, tokenAddress, speed });
       return;
     }
 
     const sentAsset = isNative ? (currentNetwork && currentNetwork.nativeCurrency.symbol) || "" : "token";
-    const known = await isKnownAddress(to);
+    const addressWarning = await findAddressWarning(to);
 
     $("btn-send-submit").disabled = true;
     $("send-to").disabled = true;
     $("send-amount").disabled = true;
     $("send-asset-select").disabled = true;
+    document.querySelectorAll(".send-speed-btn").forEach((btn) => { btn.disabled = true; });
     // When a name was typed, show the resolved address alongside it -- the
     // countdown/confirm step is exactly where that should be double-checked.
     const displayTo = typedTo !== to ? `${typedTo} (${to})` : to;
@@ -1361,7 +1618,13 @@ $("btn-send-submit").addEventListener("click", async () => {
     } else {
       $("send-confirm-fee").classList.add("hidden");
     }
-    $("send-confirm-new-address-warning").classList.toggle("hidden", known);
+    $("send-confirm-new-address-warning").classList.toggle("hidden", addressWarning.level !== "new");
+    if (addressWarning.level === "poison") {
+      $("send-confirm-poison-warning").textContent = TM_I18N.t("send.poisonWarning", { match: addressWarning.match });
+      $("send-confirm-poison-warning").classList.remove("hidden");
+    } else {
+      $("send-confirm-poison-warning").classList.add("hidden");
+    }
     $("send-confirm-card").classList.remove("hidden");
 
     let secondsLeft = currentSendDelaySeconds;
@@ -1373,7 +1636,7 @@ $("btn-send-submit").addEventListener("click", async () => {
         pendingSendTimer = null;
         resetSendConfirmUi();
         try {
-          await executeSend({ to, amountStr, isNative, tokenAddress });
+          await executeSend({ to, amountStr, isNative, tokenAddress, speed });
         } catch (e) {
           showError("send-error", e.message);
         }
@@ -1489,7 +1752,7 @@ async function initApprovalFlow(requestId) {
   try {
     pending = await sendMsg("TM_GET_PENDING_REQUEST", { requestId });
   } catch (e) {
-    document.body.innerHTML = `<div class="screen"><p class="error">${e.message}</p></div>`;
+    document.body.innerHTML = `<div class="screen"><p class="error">${escapeHtml(friendlyErrorMessage(e.message))}</p></div>`;
     return;
   }
 
@@ -1538,6 +1801,74 @@ window.TM_SHOW_APPROVAL = function (requestId) {
   initApprovalFlow(requestId);
 };
 
+// ---------------------------------------------------------------- TX DECODE
+// Plain-language preview of a transaction's raw call data on the approve
+// screen, decoded entirely from a small bundled dictionary of common
+// ERC-20/router function signatures -- never a network call to a
+// third-party "simulation" service, consistent with the rest of this
+// wallet's "nothing leaves your device but the RPC calls you already
+// trust" posture. This is NOT a real simulation: it reads the call's own
+// declared parameters, it does not execute anything to see what would
+// actually happen, and an unrecognized selector (most custom router/
+// contract calls) is left undecoded on purpose rather than guessed at --
+// the raw To/Value/Data box below it is still the source of truth.
+const TM_TX_DECODE_ABI = [
+  "function transfer(address to, uint256 amount)",
+  "function approve(address spender, uint256 amount)",
+  "function transferFrom(address from, address to, uint256 amount)",
+  "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)",
+  "function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline)",
+  "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)",
+  "function deposit()",
+  "function withdraw(uint256 amount)",
+  "function multicall(bytes[] data)",
+  "function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)",
+];
+let tmTxDecodeInterface = null;
+function tmTxDecodeTryParse(data) {
+  if (!data || data === "0x" || data.length < 10) return null;
+  try {
+    tmTxDecodeInterface = tmTxDecodeInterface || new ethers.utils.Interface(TM_TX_DECODE_ABI);
+    return tmTxDecodeInterface.parseTransaction({ data });
+  } catch (e) {
+    return null; // selector not in our small dictionary -- stay quiet, don't guess
+  }
+}
+
+async function renderTxDecodeSummary(tx) {
+  const el = $("approve-tx-decoded");
+  el.classList.add("hidden");
+  el.innerHTML = "";
+  const parsed = tmTxDecodeTryParse(tx.data);
+  if (!parsed) return;
+  const { name, args, functionFragment } = parsed;
+
+  if (name === "approve" || name === "transfer" || name === "transferFrom") {
+    const amountArg = name === "transferFrom" ? args[2] : args[1];
+    const targetArg = name === "transferFrom" ? args[1] : args[0];
+    const isUnlimited = amountArg.eq(ethers.constants.MaxUint256);
+    el.innerHTML = `<p class="decoded-line">${TM_I18N.t("approve.decodedLoading")}</p>`;
+    el.classList.remove("hidden");
+    let symbol = "", amountDisplay = amountArg.toString() + TM_I18N.t("approve.decodedRawUnitsSuffix");
+    try {
+      const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: tx.to });
+      symbol = info.symbol;
+      if (!isUnlimited) amountDisplay = `${ethers.utils.formatUnits(amountArg, info.decimals)} ${symbol}`;
+    } catch (e) { /* token lookup failed -- fall back to the raw integer amount set above */ }
+    const verbKey = name === "approve" ? "approve.decodedApproveLine" : "approve.decodedTransferLine";
+    const amountHtml = isUnlimited
+      ? `<span class="decoded-unlimited">${TM_I18N.t("approve.decodedUnlimited", { symbol: symbol || TM_I18N.t("approve.decodedThisToken") })}</span>`
+      : escapeHtml(amountDisplay);
+    el.innerHTML = `<p class="decoded-line">${TM_I18N.t(verbKey, { amount: amountHtml, to: `<span class="mono">${escapeHtml(targetArg)}</span>` })}</p>`;
+  } else {
+    const lines = functionFragment.inputs
+      .map((inp, i) => `<div class="decoded-arg"><span class="muted">${escapeHtml(inp.name || `arg${i}`)}:</span><span class="mono small">${escapeHtml(String(args[i]))}</span></div>`)
+      .join("");
+    el.innerHTML = `<p class="decoded-line">${TM_I18N.t("approve.decodedGenericIntro", { fn: name })}</p>${lines}`;
+    el.classList.remove("hidden");
+  }
+}
+
 async function renderApproval(requestId, pending) {
   const { type, payload } = pending;
 
@@ -1558,6 +1889,7 @@ async function renderApproval(requestId, pending) {
     try { valueDisplay = ethers.utils.formatEther(payload.tx.value || "0x0") + TM_I18N.t("approve.nativeSuffix"); } catch (e) {}
     $("approve-tx-value").textContent = valueDisplay;
     $("approve-tx-data").textContent = payload.tx.data || "0x";
+    renderTxDecodeSummary(payload.tx); // not awaited -- best-effort, upgrades in place once (if) the token lookup resolves
     showScreen("screen-approve-tx");
     $("btn-approve-tx-accept").onclick = () => respondApproval(requestId, true, true);
     $("btn-approve-tx-reject").onclick = () => respondApproval(requestId, false, null, "User rejected transaction.");
@@ -1590,7 +1922,7 @@ async function renderApproval(requestId, pending) {
         await sendMsg("TM_ADD_NETWORK", { network: payload });
         await respondApproval(requestId, true, true);
       } catch (e) {
-        alert(e.message);
+        alert(friendlyErrorMessage(e.message));
       }
     };
     $("btn-approve-addnet-reject").onclick = () => respondApproval(requestId, false, null, "User rejected adding network.");
@@ -1791,7 +2123,9 @@ function activateSplashHome() {
   });
   $("splash-tab-send").addEventListener("click", () => {
     hideSplash();
+    setSendSpeed("standard");
     showScreen("screen-send");
+    refreshSendFeePreview();
   });
 }
 
@@ -2018,6 +2352,95 @@ function buildExplorerTxUrl(blockExplorer, txHash) {
   return `${blockExplorer.replace(/\/+$/, "")}/tx/${txHash}`;
 }
 
+// ---------------------------------------------------------------- INCOMING ACTIVITY (best-effort)
+// This app has no backend, no chain indexer, and (by design -- see the
+// CoinGecko/Trust-Wallet-CDN choices elsewhere) no Etherscan-style API key,
+// so there is no service anywhere it can ask "what has ever been sent to
+// this address." The only signal available is the balance itself: if it
+// went up since this device last checked, something arrived. That's cheap
+// enough to piggyback on the balance/token refreshes this app already does
+// (refreshBalance / refreshTokens), with no extra RPC calls of its own.
+//
+// What this can't do, by construction: report anything that happened
+// before the FIRST time this device saw a given account+network(+token) --
+// there's no earlier balance to compare against, so that first check just
+// records a baseline rather than reporting the account's entire existing
+// balance as "received" (which would misfire on every newly-created or
+// newly-imported account, and every time a token already held is added to
+// the tracked list); catch a same-poll round trip where a balance went up
+// and back down between two checks; or attach a real transaction hash or
+// block-explorer link, since a balance delta doesn't carry one. It only
+// ever runs forward from whenever it's turned on for a given account --
+// there is no historical backfill.
+const TM_LAST_SEEN_BALANCES_KEY = "tm_last_seen_balances";
+
+function loadLastSeenBalances() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([TM_LAST_SEEN_BALANCES_KEY], (res) => {
+      const val = res[TM_LAST_SEEN_BALANCES_KEY];
+      resolve(val && typeof val === "object" ? val : {});
+    });
+  });
+}
+
+// key identifies one account+network(+token) combination, e.g.
+// "0xabc...:base:native" or "0xabc...:base:0xTokenAddress".
+async function checkForIncomingBalance(key, currentBalanceWei, meta) {
+  try {
+    const seen = await loadLastSeenBalances();
+    const prevStr = seen[key];
+    const current = ethers.BigNumber.from(currentBalanceWei);
+    if (prevStr != null) {
+      const prev = ethers.BigNumber.from(prevStr);
+      if (current.gt(prev)) {
+        recordActivity({
+          direction: "in",
+          amount: ethers.utils.formatUnits(current.sub(prev), meta.decimals),
+          asset: meta.symbol,
+          networkName: meta.networkName,
+        });
+      }
+    }
+    if (prevStr == null || !current.eq(ethers.BigNumber.from(prevStr))) {
+      seen[key] = current.toString();
+      chrome.storage.local.set({ [TM_LAST_SEEN_BALANCES_KEY]: seen });
+    }
+  } catch (e) {
+    // Best-effort only -- this must never interfere with the balance/token
+    // display it's piggybacking on.
+  }
+}
+
+// While the main screen is open, poll for incoming balance changes every
+// 25s -- frequent enough to notice a receive without leaving and
+// re-entering the screen, infrequent enough not to hammer a public RPC
+// endpoint. Stops the moment the user navigates away, same as the
+// auto-lock timer only running while genuinely on an unlocked screen.
+const TM_INCOMING_POLL_MS = 25000;
+let incomingPollTimerId = null;
+
+function startIncomingPoll() {
+  stopIncomingPoll();
+  incomingPollTimerId = setInterval(() => {
+    refreshBalance();
+    refreshTokens();
+  }, TM_INCOMING_POLL_MS);
+}
+
+function stopIncomingPoll() {
+  if (incomingPollTimerId) {
+    clearInterval(incomingPollTimerId);
+    incomingPollTimerId = null;
+  }
+}
+
+const _origShowScreenForIncomingPoll = showScreen;
+showScreen = function (id) {
+  if (id === "screen-main") startIncomingPoll();
+  else stopIncomingPoll();
+  return _origShowScreenForIncomingPoll(id);
+};
+
 // record of sends made from this device, kept in chrome.storage.local.
 const TM_ACTIVITY_KEY = "tm_activity";
 const TM_ACTIVITY_MAX = 50;
@@ -2041,11 +2464,16 @@ function renderActivity() {
       return;
     }
     list.forEach((item) => {
-      const explorerUrl = buildExplorerTxUrl(item.blockExplorer, item.txHash);
+      // Older entries (recorded before this field existed) have no
+      // `direction` at all -- every one of those was a send, so treat a
+      // missing direction the same as "out".
+      const isIncoming = item.direction === "in";
+      const explorerUrl = isIncoming ? null : buildExplorerTxUrl(item.blockExplorer, item.txHash);
       // A real <a> when there's somewhere to link -- free keyboard access,
       // "open in new tab", and middle-click, instead of reimplementing all
       // of that on a plain div. Falls back to a plain div (unchanged from
-      // before) for entries with no usable link.
+      // before) for entries with no usable link -- always true for a
+      // balance-delta-detected incoming entry, which never has a real tx hash.
       const card = document.createElement(explorerUrl ? "a" : "div");
       card.className = "activity-entry" + (explorerUrl ? " activity-entry-linked" : "");
       if (explorerUrl) {
@@ -2055,16 +2483,20 @@ function renderActivity() {
         card.title = TM_I18N.t("activity.viewOnExplorer");
       }
 
-      // Directional icon -- every entry here is an outgoing send (this log
-      // has no incoming/receive tracking yet), shown the same way MetaMask
-      // marks a send: a small circular badge with an up-right arrow.
+      // Directional icon: an up-right arrow for a send, a down-left arrow
+      // (mirrored, in the app's success-green) for a detected incoming
+      // transfer -- the same at-a-glance shorthand MetaMask's own activity
+      // feed uses for send vs. receive.
       const icon = document.createElement("span");
-      icon.className = "activity-icon";
+      icon.className = "activity-icon" + (isIncoming ? " activity-icon-in" : "");
       icon.setAttribute("aria-hidden", "true");
-      icon.innerHTML =
-        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-        '<path d="M7 17L17 7M17 7H9M17 7V15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
-        "</svg>";
+      icon.innerHTML = isIncoming
+        ? '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+          '<path d="M17 7L7 17M7 17H15M7 17V9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+          "</svg>"
+        : '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+          '<path d="M7 17L17 7M17 7H9M17 7V15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+          "</svg>";
 
       const body = document.createElement("div");
       body.className = "activity-body";
@@ -2073,22 +2505,30 @@ function renderActivity() {
       top.className = "activity-top";
       const main = document.createElement("div");
       main.className = "activity-main";
-      main.textContent = TM_I18N.t("activity.sentLabel", { amount: item.amount, asset: item.asset });
+      main.textContent = isIncoming
+        ? TM_I18N.t("activity.receivedLabel", { amount: item.amount, asset: item.asset })
+        : TM_I18N.t("activity.sentLabel", { amount: item.amount, asset: item.asset });
       const status = document.createElement("span");
       status.className = "activity-status";
-      status.textContent = TM_I18N.t("activity.statusSent");
+      status.textContent = isIncoming ? TM_I18N.t("activity.statusReceived") : TM_I18N.t("activity.statusSent");
       top.appendChild(main);
       top.appendChild(status);
 
       const sub = document.createElement("div");
       sub.className = "activity-sub";
-      sub.textContent = TM_I18N.t("activity.toLabel", { address: item.to });
+      sub.textContent = isIncoming ? (item.networkName || "") : TM_I18N.t("activity.toLabel", { address: item.to });
       const time = document.createElement("div");
       time.className = "activity-time";
       time.textContent = new Date(item.ts).toLocaleString();
 
       body.appendChild(top);
       body.appendChild(sub);
+      if (isIncoming) {
+        const approx = document.createElement("div");
+        approx.className = "activity-sub activity-approx-note";
+        approx.textContent = TM_I18N.t("activity.receivedApproxNote");
+        body.appendChild(approx);
+      }
       body.appendChild(time);
 
       card.appendChild(icon);

@@ -20,6 +20,41 @@
 // there is no dapp connection path here other than WalletConnect -- kept
 // below, unchanged, since it never depended on any of that.
 
+// ---------------------------------------------------------------- SEND SPEED
+// A single "worst-case ceiling" fee estimate (see TM_ESTIMATE_SEND_FEE
+// below) works fine as a preview, but real wallets let the sender trade
+// speed for cost: pay closer to the network's current suggested fee and
+// wait longer ("slow"), or pay a premium to jump the queue ("fast").
+// Multiplying the provider's own fee suggestion is a coarse approximation
+// (a real fee market would look at pending-block fee percentiles), but it's
+// a safe one: this only ever raises the ceiling the sender is willing to
+// pay, it never lowers a transaction's chance of being included below what
+// "standard" already gets, and it needs no extra RPC calls beyond the one
+// getFeeData() every send already made.
+const SEND_SPEED_MULTIPLIER_BPS = { slow: 100, standard: 115, fast: 140 };
+
+// Scales a provider's getFeeData() result for the given speed tier, in
+// integer basis-points math (BigNumber has no floating point), returning
+// only the override fields that apply to this chain's fee model -- EIP-1559
+// chains quote maxFeePerGas/maxPriorityFeePerGas, older chains only
+// gasPrice, and passing both to ethers on the wrong chain type throws.
+function scaleFeeDataForSpeed(feeData, speed) {
+  const bps = SEND_SPEED_MULTIPLIER_BPS[speed] || SEND_SPEED_MULTIPLIER_BPS.standard;
+  const scale = (bn) => bn.mul(bps).div(100);
+  if (feeData.maxFeePerGas) {
+    const maxPriorityFeePerGas = scale(feeData.maxPriorityFeePerGas || feeData.maxFeePerGas);
+    return { maxFeePerGas: scale(feeData.maxFeePerGas), maxPriorityFeePerGas };
+  }
+  return { gasPrice: scale(feeData.gasPrice || ethers.BigNumber.from(0)) };
+}
+
+// The single number used for a fee PREVIEW (what the Send screen shows
+// before committing) -- the ceiling this tier could cost, same "worst
+// case, may come in lower" framing TM_ESTIMATE_SEND_FEE already used.
+function feePerGasForPreview(overrides) {
+  return overrides.maxFeePerGas || overrides.gasPrice || ethers.BigNumber.from(0);
+}
+
 function assertNotSanctioned(address, label) {
   if (TM_SANCTIONS.isSanctionedAddress(address)) {
     throw new Error(
@@ -522,6 +557,13 @@ async function handleMessage(msg) {
             break;
           }
 
+          case "TM_ADD_WATCH_ACCOUNT": {
+            requireUnlocked(); // not technically needed (no key material) -- required only for a consistent Settings flow
+            const address = await TM_WALLET.addWatchAccount(msg.address, msg.label);
+            sendResponse({ ok: true, address });
+            break;
+          }
+
           case "TM_SELECT_ACCOUNT": {
             selectedAddress = msg.address;
             sendResponse({ ok: true });
@@ -786,8 +828,13 @@ async function handleMessage(msg) {
             const meta = await getSelectedAccountMeta();
             assertNotSanctioned(meta.address, "sending account");
             assertNotSanctioned(msg.to, "destination address");
-            const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
-            const tx = await wallet.sendTransaction({ to: msg.to, value: ethers.BigNumber.from(msg.amountWei) });
+            const provider = await getProviderFor(network);
+            const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(provider);
+            // Fee overrides are computed fresh at send time, not reused from
+            // an earlier preview -- gas prices move, and this is the number
+            // that actually gets signed into the transaction.
+            const feeOverrides = scaleFeeDataForSpeed(await provider.getFeeData(), msg.speed);
+            const tx = await wallet.sendTransaction({ to: msg.to, value: ethers.BigNumber.from(msg.amountWei), ...feeOverrides });
             sendResponse({ ok: true, txHash: tx.hash });
             break;
           }
@@ -798,9 +845,11 @@ async function handleMessage(msg) {
             const meta = await getSelectedAccountMeta();
             assertNotSanctioned(meta.address, "sending account");
             assertNotSanctioned(msg.to, "destination address");
-            const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
+            const provider = await getProviderFor(network);
+            const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(provider);
             const c = new ethers.Contract(msg.tokenAddress, TM_SWAP.ERC20_ABI.concat(["function transfer(address to, uint256 amount) returns (bool)"]), wallet);
-            const tx = await c.transfer(msg.to, ethers.BigNumber.from(msg.amountWei));
+            const feeOverrides = scaleFeeDataForSpeed(await provider.getFeeData(), msg.speed);
+            const tx = await c.transfer(msg.to, ethers.BigNumber.from(msg.amountWei), feeOverrides);
             sendResponse({ ok: true, txHash: tx.hash });
             break;
           }
@@ -829,17 +878,20 @@ async function handleMessage(msg) {
               gasLimit = await provider.estimateGas({ from, to: msg.to, value: amountWei });
             }
             const feeData = await provider.getFeeData();
-            // EIP-1559 chains quote maxFeePerGas; older chains only have
-            // gasPrice. Either way this is a worst-case ceiling, same as
-            // what MetaMask's own preview shows -- the actual charge can
-            // come in lower once the block is mined.
-            const gasPrice = feeData.maxFeePerGas || feeData.gasPrice || ethers.BigNumber.from(0);
             // estimateGas is a lower bound in practice (state can shift
             // between the estimate and the real send) -- pad it the same
             // ~20% most wallets use so the preview doesn't undersell it.
             const paddedGasLimit = gasLimit.mul(120).div(100);
-            const feeWei = paddedGasLimit.mul(gasPrice);
-            sendResponse({ ok: true, feeWei: feeWei.toString() });
+            // One getFeeData() call covers all three speed tiers -- each is
+            // just that same data scaled differently (see scaleFeeDataForSpeed
+            // above), same worst-case-ceiling framing as before: the actual
+            // charge can come in lower once the block is mined.
+            const tiers = {};
+            ["slow", "standard", "fast"].forEach((speed) => {
+              const overrides = scaleFeeDataForSpeed(feeData, speed);
+              tiers[speed] = paddedGasLimit.mul(feePerGasForPreview(overrides)).toString();
+            });
+            sendResponse({ ok: true, feeWei: tiers.standard, tiers });
             break;
           }
 
@@ -882,6 +934,78 @@ async function handleMessage(msg) {
             assertNotSanctioned(meta.address, "account");
             const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
             const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender: network.swapRouter, amountWei: ethers.BigNumber.from(msg.amountWei) });
+            sendResponse({ ok: true, txHash: tx.hash });
+            break;
+          }
+
+          // ---- allowance/approval manager --------------------------------
+          // Scoped honestly: this can only ever surface approvals for (a)
+          // tokens the user has actually added to their tracked-token list,
+          // checked against (b) this wallet's own configured swap router --
+          // the one spender this wallet itself ever asks for an approval.
+          // A full "every approval you've ever granted to any dapp" scan
+          // would need an unbounded eth_getLogs sweep across the whole
+          // chain's history with no contract-address filter, which public
+          // RPC endpoints routinely reject or truncate -- unreliable enough
+          // to be actively misleading (a wallet that says "no approvals
+          // found" when it just couldn't finish the scan is worse than not
+          // offering this at all). The manual lookup below covers the gap:
+          // paste in any token + spender you already know about (from a
+          // dapp you used elsewhere) and it reads the real on-chain
+          // allowance directly, same as the auto-list does.
+          case "TM_LIST_APPROVALS": {
+            const network = await getActiveNetwork();
+            const meta = await getSelectedAccountMeta();
+            if (!meta || !network.swapRouter) {
+              sendResponse({ ok: true, approvals: [], swapRouter: network.swapRouter || null });
+              break;
+            }
+            const tokens = await getTrackedTokens(network.chainId);
+            const provider = await getProviderFor(network);
+            const results = await Promise.all(
+              tokens.map(async (t) => {
+                try {
+                  const allowanceWei = await TM_SWAP.getAllowance({ provider, tokenAddress: t.address, owner: meta.address, spender: network.swapRouter });
+                  return { ...t, spender: network.swapRouter, allowanceWei: allowanceWei.toString(), error: null };
+                } catch (e) {
+                  return { ...t, spender: network.swapRouter, allowanceWei: "0", error: e.message };
+                }
+              })
+            );
+            sendResponse({
+              ok: true,
+              swapRouter: network.swapRouter,
+              approvals: results.filter((r) => r.error || ethers.BigNumber.from(r.allowanceWei).gt(0)),
+            });
+            break;
+          }
+
+          case "TM_CHECK_APPROVAL": {
+            if (!ethers.utils.isAddress(msg.tokenAddress)) throw new Error("That doesn't look like a valid token contract address.");
+            if (!ethers.utils.isAddress(msg.spender)) throw new Error("That doesn't look like a valid spender address.");
+            const network = await getActiveNetwork();
+            const meta = await getSelectedAccountMeta();
+            if (!meta) throw new Error("No account selected.");
+            const provider = await getProviderFor(network);
+            const c = new ethers.Contract(msg.tokenAddress, TM_SWAP.ERC20_ABI, provider);
+            const [allowanceWei, symbol, decimals] = await Promise.all([
+              c.allowance(meta.address, msg.spender),
+              c.symbol().catch(() => "TOKEN"),
+              c.decimals().catch(() => 18),
+            ]);
+            sendResponse({ ok: true, allowanceWei: allowanceWei.toString(), symbol, decimals });
+            break;
+          }
+
+          case "TM_REVOKE_APPROVAL": {
+            requireUnlocked();
+            if (!ethers.utils.isAddress(msg.tokenAddress)) throw new Error("That doesn't look like a valid token contract address.");
+            if (!ethers.utils.isAddress(msg.spender)) throw new Error("That doesn't look like a valid spender address.");
+            const network = await getActiveNetwork();
+            const meta = await getSelectedAccountMeta();
+            assertNotSanctioned(meta.address, "account");
+            const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
+            const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender: msg.spender, amountWei: ethers.BigNumber.from(0) });
             sendResponse({ ok: true, txHash: tx.hash });
             break;
           }

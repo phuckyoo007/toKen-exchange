@@ -310,9 +310,12 @@ a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
   content: "↗"; flex-shrink: 0; align-self: flex-start;
   font-size: 12px; color: var(--text-faint); margin-left: 2px;
 }
-/* Every logged entry is currently an outgoing send -- a small circular
-   badge with an up-right arrow, the same visual shorthand MetaMask's own
-   activity feed uses to mark a send at a glance. */
+/* Outgoing sends: a small circular badge with an up-right arrow, the same
+   visual shorthand MetaMask's own activity feed uses to mark a send at a
+   glance. Incoming (best-effort, balance-delta-detected -- see
+   checkForIncomingBalance in app.js) gets the mirror-image treatment: a
+   down-left arrow in the app's success-green rather than gold, so the two
+   directions are distinguishable at a glance without reading the text. */
 .activity-icon {
   flex-shrink: 0;
   width: 32px; height: 32px; border-radius: 50%;
@@ -321,12 +324,29 @@ a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
   border: 1px solid var(--line-strong);
   color: var(--gold);
 }
+.activity-icon-in {
+  background: rgba(84, 196, 130, 0.15);
+  border-color: rgba(84, 196, 130, 0.35);
+  color: #6fd39a;
+}
 .activity-icon svg { width: 16px; height: 16px; }
 .activity-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .activity-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .activity-entry .activity-main { font-weight: 700; color: var(--text); font-size: 13.5px; }
 .activity-entry .activity-sub { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activity-entry .activity-time { font-size: 10.5px; color: var(--text-faint); }
+/* The small "detected from a balance change, not a real transaction record"
+   caveat shown under incoming entries -- see the long comment on
+   checkForIncomingBalance in app.js for the full reasoning. Deliberately
+   understated (same treatment as .activity-sub, just italic) rather than a
+   loud warning -- it's a normal, expected limitation of this feature, not
+   an error. Declared AFTER .activity-entry .activity-sub above so its
+   equal-specificity override of the ellipsis/nowrap rule actually wins --
+   CSS ties break on source order, not just specificity. */
+.activity-entry .activity-approx-note {
+  font-style: italic;
+  white-space: normal; overflow: visible; text-overflow: clip;
+}
 /* Confirmed-status pill -- every entry here already succeeded on-chain
    before it's recorded, so it always reads "Sent" in a positive/success
    color, matching a completed transaction's state in other wallets. */
@@ -543,10 +563,17 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    password, send confirmation, etc.) stay their plain solid selves. */
 .onboarding-intro-card {
   position: relative;
+  /* A single, deliberately-cropped strip of card-banner.jpg (the "GLOBAL
+     TOKEN EXCHANGE" scene) -- not the old bg-scene.jpg treatment this
+     replaced in round 3, which "cover"-scaled a much larger image against
+     each card's own (very different) rendered height, landing on a
+     different, often illegible crop each time. This source image was
+     pre-cropped specifically as a wide, short banner, so "cover" at a
+     typical card width lands close to the same framing everywhere. */
   background:
-    linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 44px, #2a2110 100%),
-    url(img/bg-scene.jpg) center top / cover no-repeat;
-  padding-top: 44px;
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 64px, #2a2110 100%),
+    url(img/card-banner.jpg) center top / 100% auto no-repeat;
+  padding-top: 64px;
 }
 .hint {
   color: var(--success); font-size: 12px; line-height: 1.5;
@@ -555,6 +582,27 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   padding: 9px 11px; border-radius: 7px;
   display: flex; align-items: center; gap: 8px;
 }
+
+/* ---------------- send speed (gas) selector ----------------
+   Three-way slow/standard/fast toggle shown under the amount field once
+   a fee estimate is available. */
+.send-speed-row {
+  display: flex; gap: 6px; margin: 2px 0 0;
+}
+.send-speed-btn {
+  flex: 1; text-align: center; cursor: pointer;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  color: var(--text-muted); border-radius: 8px;
+  padding: 8px 6px; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em; transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.send-speed-btn:hover { border-color: var(--line-strong); color: var(--text); }
+.send-speed-btn.active {
+  background: linear-gradient(180deg, #3a3018 0%, #241d10 100%);
+  border-color: var(--gold-deep); color: var(--gold);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.send-speed-btn:disabled { opacity: 0.55; cursor: default; }
 
 /* ---------------- send confirm / cancel-window card ----------------
    Shown after "Send" is tapped and before the transaction actually goes
@@ -567,6 +615,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 }
 .send-confirm-card .warn,
 .send-confirm-card .error { margin: 0; }
+/* Escalated beyond the generic "first time sending here" notice: this one
+   means a lookalike of an address already trusted on this device, which is
+   the specific pattern address-poisoning scams rely on. */
+.poison-warning {
+  border-width: 2px; border-color: var(--danger); font-weight: 600;
+}
 .send-confirm-summary {
   margin: 0; font-size: 13px; color: var(--text);
   font-family: var(--font-mono); word-break: break-all;
@@ -701,20 +755,35 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .actions-row { display: flex; gap: 8px; }
 .actions-row button { flex: 1; }
 .swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+/* #swap-form/#swap-quote-display are plain divs, not direct flex children
+   of .screen, so their buttons (Get quote / Approve token first / Swap)
+   were falling back to the browser's shrink-to-fit button sizing instead
+   of the full-width "chunky pill" every other screen's buttons get from
+   .screen's own flex column. Mirroring that same flex layout here fixes
+   it -- and stacking Approve/Swap top-to-bottom (rather than a Reject/
+   Confirm-style side-by-side split) matches how they're actually used:
+   sequential steps, not a pick-one choice, since both stay visible at
+   once when a token needs approval before it can swap. */
+#swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 11px; }
 
-/* A strip of the slot-machine artwork (the same source as #bg-scene)
-   across the top of a card, fading into the card's own solid fill by
-   44px down -- a small decorative callback to the backdrop, without
-   making any part of the card itself see-through. Real content starts
-   below the reserved padding, never overlapping the art. */
+/* A soft gold glow across the top of a card, fading into the card's own
+   solid fill by 44px down -- a small decorative accent, without making
+   any part of the card itself see-through. This used to be a cropped
+   strip of the slot-machine backdrop art, but that crop always caught
+   part of the "TOKEN EXCHANGE" wordmark baked into the artwork, so it
+   repeated illegibly above every single card on the main screen. A plain
+   gradient keeps the warm accent without the repeated, unreadable text.
+   Real content starts below the reserved padding either way. */
 .tokens-section {
   margin-top: 4px;
   position: relative;
+  /* See .onboarding-intro-card above for why this is a pre-cropped banner
+     image rather than the old cover-scaled full backdrop. */
   background:
-    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
-    url(img/bg-scene.jpg) center top / cover no-repeat;
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 64px, var(--bg-inset) 100%),
+    url(img/card-banner.jpg) center top / 100% auto no-repeat;
   border: 1px solid var(--line);
-  border-radius: 10px; padding: 44px 10px 10px;
+  border-radius: 10px; padding: 64px 10px 10px;
 }
 .tokens-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .tokens-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
@@ -845,11 +914,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    consistent. */
 .prices-card {
   position: relative;
+  /* Same card-banner.jpg treatment as .tokens-section above. */
   background:
-    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 44px, var(--bg-inset) 100%),
-    url(img/bg-scene.jpg) center top / cover no-repeat;
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 64px, var(--bg-inset) 100%),
+    url(img/card-banner.jpg) center top / 100% auto no-repeat;
   border: 1px solid var(--line);
-  border-radius: 10px; padding: 44px 10px 10px; margin-bottom: 10px;
+  border-radius: 10px; padding: 64px 10px 10px; margin-bottom: 10px;
 }
 .prices-card-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -885,6 +955,22 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   display: flex; flex-direction: column; gap: 7px;
   font-size: 13px;
 }
+
+/* Plain-language decode of a transaction's raw call data, shown above the
+   raw To/Value/Data box on the transaction-approval screen -- the same
+   "here's what this actually does" summary MetaMask/Coinbase show before
+   raw hex, built entirely from a small bundled dictionary of common ERC-20
+   function signatures (never a network call to a third-party simulation
+   service). Left un-styled beyond the shared .tx-details look except for
+   the one case worth visually raising: an unlimited-amount approval. */
+#approvals-list { display: flex; flex-direction: column; gap: 10px; }
+.approval-row .btn-revoke-approval { margin-top: 2px; }
+
+.decoded-tx { border-color: var(--gold-deep); }
+.decoded-tx .decoded-line { font-size: 13.5px; }
+.decoded-tx .decoded-unlimited { color: var(--danger); font-weight: 700; }
+.decoded-tx .decoded-arg { display: flex; gap: 6px; }
+.decoded-tx .decoded-arg .muted { flex-shrink: 0; }
 
 .back-btn { align-self: flex-start; }
 pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(--font-mono); }
@@ -995,6 +1081,14 @@ body.tm-web-wallet #app {
   min-height: 640px;
   border-radius: 20px;
   overflow: hidden;
+  /* Same gold-deep frame the splash screen already uses (see
+     body.tm-web-wallet #splash-screen below) -- previously #app dropped
+     back to a plain dark hairline the moment the splash handed off,
+     which broke the "gold-bordered phone floating on a dark desk" look
+     right when the real app appeared. Carrying the same border through
+     keeps that frame consistent for the whole session, not just the
+     first second. */
+  border: 2px solid var(--gold-deep);
   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
 }
 /* Back to the framed-card look on a wide window: the splash sits right
@@ -1040,5 +1134,5 @@ body.tm-web-wallet #splash-tagline .footer-lock { color: var(--gold-deep); font-
 }
 @media (max-width: 460px) {
   body.tm-web-wallet { padding: 0; }
-  body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; }
+  body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; border: none; }
 }
