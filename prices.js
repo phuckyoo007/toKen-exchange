@@ -113,7 +113,7 @@ async function fetchPrices(ids, currency) {
   const cacheKey = `${idsKey}|${vsCurrency}`;
   const now = Date.now();
   if (priceCache.data && priceCache.cacheKey === cacheKey && now - priceCache.fetchedAt < CACHE_TTL_MS) {
-    return priceCache.data;
+    return { data: priceCache.data, currency: vsCurrency };
   }
   const url = `${COINGECKO_BASE}/simple/price?ids=${encodeURIComponent(idsKey)}&vs_currencies=${vsCurrency}&include_24hr_change=true`;
   let res;
