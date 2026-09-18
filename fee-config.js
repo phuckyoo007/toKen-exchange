@@ -17,7 +17,7 @@
 
 const FEE_NUMERATOR = 500;
 const FEE_DENOMINATOR = 100000;
-const FEE_RECIPIENT = "0xd537ff9E2773CeCB7A3C68f174F8Cb3a5d60e4dB";
+const FEE_RECIPIENT = "0x0064118676E6C4daaE92Fa7a89e14a5BD60A20C4";
 
 // Returns { feeWei, netWei } for a given input amount (ethers.BigNumber or
 // anything ethers.BigNumber.from() accepts).
