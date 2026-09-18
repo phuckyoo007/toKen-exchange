@@ -9,6 +9,7 @@
 <link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
 <meta name="theme-color" content="#d4af37" />
+<meta name="copyright" content="&copy; 2026 Sanders" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Token Exchange" />
@@ -43,7 +44,11 @@
     </button>
   </div>
   <div id="splash-continue-hint">
-    <span data-i18n="home.tapToContinue">Tap to continue</span>
+    <div class="language-picker" id="splash-language-picker">
+      <label for="language-select-splash" data-i18n="common.languageLabel">Language</label>
+      <select id="language-select-splash" class="language-select" aria-label="Language"></select>
+    </div>
+    <button type="button" id="splash-continue-btn" class="primary" data-i18n="home.continueBtn">Continue</button>
   </div>
 </div>
 <div id="splash-tagline">
@@ -339,12 +344,20 @@
   <section id="screen-buy" class="screen hidden">
     <h2 data-i18n="buy.title">Buy crypto</h2>
     <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
-    <p class="muted" data-i18n-html="buy.description2Html">MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:</p>
-    <div class="address-row">
+    <div class="no-third-party-callout">
+      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip MoonPay entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+      <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
+    </div>
+    <p class="muted" id="buy-description-manual" data-i18n-html="buy.description2Html">MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:</p>
+    <p class="muted hidden" id="buy-description-autofill" data-i18n="buy.description2AutoFill">MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.</p>
+    <div class="address-row" id="buy-address-row">
       <span id="buy-address-display" class="mono"></span>
       <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
     </div>
     <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
+    <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="buy-frame" class="widget-frame" title="MoonPay Buy" allow="payment"></iframe>
+    </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="buy-error" class="error hidden"></p>
   </section>
@@ -353,9 +366,12 @@
   <section id="screen-sell" class="screen hidden">
     <h2 data-i18n="sell.title">Sell for cash</h2>
     <p class="muted" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
-    <p class="muted" data-i18n="sell.description2">MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
+    <p class="muted" data-i18n="sell.description2">MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
     <p class="muted" data-i18n-html="sell.description3Html">Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.</p>
     <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
+    <div id="sell-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="sell-frame" class="widget-frame" title="MoonPay Sell" allow="payment"></iframe>
+    </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="sell-error" class="error hidden"></p>
   </section>
@@ -632,6 +648,7 @@
       <span class="footer-lock">&#128274;</span>
       <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
     </div>
+    <span class="footer-copyright">&copy; 2026 Sanders</span>
   </footer>
 
 </div>

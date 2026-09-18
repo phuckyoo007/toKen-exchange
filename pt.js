@@ -75,7 +75,9 @@
 
     "buy.title": "Comprar cripto",
     "buy.description1": "A compra é processada pela MoonPay, um serviço terceirizado independente -- a Token Exchange nunca tem acesso aos seus dados de pagamento.",
-    "buy.description2Html": "A MoonPay abrirá em uma nova aba. Como esta carteira nunca envia seu endereço à MoonPay automaticamente (isso exigiria assinar solicitações com uma chave secreta, que jamais deve existir dentro de uma extensão de navegador -- veja <code>lib/buy-config.js</code>), <strong>cole você mesmo o seu endereço de recebimento</strong> assim que a aba da MoonPay abrir:",
+    "buy.noThirdPartyCallout": "Já tem alguma cripto? Pule a MoonPay por completo: troque diretamente on-chain pelo que precisar, sem terceiros e sem cadastro.",
+    "buy.noThirdPartySwapBtn": "Trocar em vez disso",
+    "buy.description2Html": "A MoonPay abre bem aqui, abaixo. Como esta carteira não pode assinar solicitações com segurança usando uma chave secreta (que jamais deve existir dentro de uma extensão de navegador -- veja <code>lib/buy-config.js</code>), <strong>cole você mesmo o seu endereço de recebimento</strong> assim que carregar:",
     "buy.continueBtn": "Continuar para a MoonPay",
 
     "support.title": "Ajuda e suporte",
@@ -202,6 +204,7 @@
     "home.tabActivity": "Atividade",
     "home.tabSend": "Enviar",
     "home.tapToContinue": "Toque para continuar",
+    "home.continueBtn": "Continuar",
 
     "activity.title": "Atividade",
     "activity.subtitle": "Um registro local dos envios feitos a partir desta carteira, além das transferências recebidas que este dispositivo percebeu -- nada aqui é obtido de um servidor.",

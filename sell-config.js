@@ -5,23 +5,25 @@
 // publishable key and its NETWORK_MOONPAY_CURRENCY_CODE mapping rather than
 // duplicating either.
 //
-// WHY THIS OPENS A NEW TAB INSTEAD OF EMBEDDING THE WIDGET
-// Same reasons as Buy: this app's CSP doesn't allow loading a third-party
-// script, and (for the Chrome extension build of this codebase) the Web
-// Store listing was submitted on the basis that nothing here fetches
-// remote code at runtime. See lib/buy-config.js for the full explanation.
+// EMBEDDING
+// Like Buy, this widget is embedded in an <iframe> right inside the Sell
+// screen instead of opening a new tab -- see lib/buy-config.js's "HOW THIS
+// WORKS" comment for why that's safe to do without loading any third-party
+// script or changing the extension's Chrome Web Store "no remote code"
+// answer.
 //
 // HOW SELLING ACTUALLY WORKS HERE
 // MoonPay's sell widget quotes a cash payout for an amount of crypto, then
 // gives you a MoonPay-controlled deposit address to send that crypto to --
 // once it arrives on-chain, MoonPay converts it and pays out to your linked
-// bank account/card. This wallet can't automate that on-chain send for you
-// (doing so would mean either shipping a secret key client-side to
-// pre-fill/sign the widget URL, or silently sending funds off-device
-// without the user reviewing the destination first -- both are worse than
-// one extra manual step): the widget shows you the deposit address and
-// amount, and you paste that address into this wallet's own Send screen
-// yourself, the same way you would send to any other address.
+// bank account/card. Unlike Buy, there's no wallet address of yours to
+// pre-fill here: MoonPay is the one handing you an address, not the other
+// way around. This wallet can't automate that on-chain send for you either
+// (doing so would mean silently sending funds off-device without the user
+// reviewing the destination first, which is worse than one extra manual
+// step): the widget shows you the deposit address and amount, and you
+// paste that address into this wallet's own Send screen yourself, the same
+// way you would send to any other address.
 //
 // SANDBOX VS PRODUCTION DOMAIN
 // Unlike a lot of hosted widgets, MoonPay's sell widget lives on a

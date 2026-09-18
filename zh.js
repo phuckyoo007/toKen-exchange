@@ -77,7 +77,9 @@
 
     "buy.title": "购买加密货币",
     "buy.description1": "购买功能由独立的第三方服务 MoonPay 提供支持——Token Exchange 不会接触您的支付信息。",
-    "buy.description2Html": "MoonPay 将在新标签页中打开。由于本钱包不会替您把收款地址发送给 MoonPay（这需要使用密钥对请求进行签名，而密钥绝不能存放在浏览器扩展中——详见 <code>lib/buy-config.js</code>），请在 MoonPay 标签页打开后<strong>自行粘贴您的收款地址</strong>：",
+    "buy.noThirdPartyCallout": "已经持有一些加密货币了?完全跳过 MoonPay——直接在链上兑换成您需要的资产,无需第三方,无需注册。",
+    "buy.noThirdPartySwapBtn": "改为兑换",
+    "buy.description2Html": "MoonPay 将在下方直接打开。由于本钱包无法使用密钥安全地对请求进行签名（密钥绝不能存放在浏览器扩展中——详见 <code>lib/buy-config.js</code>），请在加载完成后<strong>自行粘贴您的收款地址</strong>：",
     "buy.continueBtn": "前往 MoonPay",
 
     "support.title": "帮助与支持",
@@ -204,6 +206,7 @@
     "home.tabActivity": "动态",
     "home.tabSend": "发送",
     "home.tapToContinue": "点击继续",
+    "home.continueBtn": "继续",
 
     "activity.title": "动态",
     "activity.subtitle": "本钱包发送记录的本地记录，以及本设备察觉到的转入记录 -- 这里的内容都不是从服务器获取的。",

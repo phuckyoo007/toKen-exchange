@@ -77,7 +77,9 @@
 
     "buy.title": "Acheter des cryptos",
     "buy.description1": "L'achat est propulsé par MoonPay, un service tiers indépendant -- Token Exchange n'a jamais accès à vos informations de paiement.",
-    "buy.description2Html": "MoonPay s'ouvrira dans un nouvel onglet. Comme ce portefeuille n'envoie jamais votre adresse à MoonPay à votre place (cela nécessiterait de signer des requêtes avec une clé secrète, qui ne doit jamais se trouver dans une extension de navigateur -- voir <code>lib/buy-config.js</code>), <strong>collez vous-même votre adresse de réception</strong> une fois l'onglet MoonPay ouvert :",
+    "buy.noThirdPartyCallout": "Vous avez déjà des cryptos ? Passez complètement MoonPay : échangez-les directement on-chain contre ce dont vous avez besoin, sans tiers ni inscription.",
+    "buy.noThirdPartySwapBtn": "Échanger à la place",
+    "buy.description2Html": "MoonPay s'ouvre ici même, ci-dessous. Comme ce portefeuille ne peut pas signer les requêtes en toute sécurité avec une clé secrète (celle-ci ne doit jamais se trouver dans une extension de navigateur -- voir <code>lib/buy-config.js</code>), <strong>collez vous-même votre adresse de réception</strong> une fois le chargement terminé :",
     "buy.continueBtn": "Continuer vers MoonPay",
 
     "support.title": "Aide et assistance",
@@ -204,6 +206,7 @@
     "home.tabActivity": "Activité",
     "home.tabSend": "Envoyer",
     "home.tapToContinue": "Appuyez pour continuer",
+    "home.continueBtn": "Continuer",
 
     "activity.title": "Activité",
     "activity.subtitle": "Un historique local des envois effectués depuis ce portefeuille, ainsi que des transferts entrants remarqués par cet appareil -- rien ici n'est récupéré depuis un serveur.",

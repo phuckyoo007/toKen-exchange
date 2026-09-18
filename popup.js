@@ -112,10 +112,90 @@ function sendMsg(type, payload) {
   });
 }
 
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
-  $(id).classList.remove("hidden");
+// ---------------------------------------------------------------- CUBE NAV
+// Home, Activity and Send are the app's three "peer" destinations -- the
+// same three the splash screen's own tab bar already treats as equal
+// starting points (see activateSplashHome() below; Assets is the fourth
+// icon there, but it's always just been screen-main scrolled to the
+// tokens list, not a separate screen, so it stays that way here too).
+// Once inside the app these three now live as three faces of a rotating
+// cube (see cube-nav.js) instead of plain sibling screens that just swap
+// with a hard cut: clicking Send from Home, or hitting Back from Send,
+// turns the cube instead. Every other screen -- Settings, Swap, Buy, Add
+// token, the dapp-approval dialogs, and so on -- still shows/hides exactly
+// like before, as a plain overlay on top of the cube (its own Back button
+// always returns to screen-main, landing back on the cube's Home face).
+const CUBE_FACE_ORDER = ["screen-main", "screen-activity", "screen-send"];
+let cubeNav = null;
+
+function mountCubeNav() {
+  if (cubeNav || !window.CubeNav) return;
+  const stageRoot = $("cube-stage");
+  if (!stageRoot) return;
+  const faces = CUBE_FACE_ORDER.map((id) => ({ id, el: $(id) }));
+  if (faces.some((f) => !f.el)) return;
+  cubeNav = window.CubeNav.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
+  // The cube keeps every face permanently in the DOM (just rotated out of
+  // view) so the 3D transform has something to show on every side -- so
+  // these three stop being ".hidden"-toggled like a normal screen the
+  // moment the cube takes them over. CubeNav's own aria-hidden/inert/dim
+  // handles "not the current face" instead.
+  CUBE_FACE_ORDER.forEach((id) => $(id).classList.remove("hidden"));
+  stageRoot.addEventListener("facechange", updateCubeTabbarActive);
+  updateCubeTabbarActive();
 }
+
+function updateCubeTabbarActive() {
+  const bar = $("cube-tabbar");
+  if (!bar || !cubeNav) return;
+  const activeId = CUBE_FACE_ORDER[cubeNav.index];
+  bar.querySelectorAll(".cube-tab").forEach((btn) => {
+    const goto = btn.dataset.cubeGoto;
+    btn.classList.toggle("active", goto !== "assets" && CUBE_FACE_ORDER[Number(goto)] === activeId);
+  });
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach((el) => {
+    if (!CUBE_FACE_ORDER.includes(el.id)) el.classList.add("hidden");
+  });
+  const shell = $("cube-shell");
+  const faceIndex = CUBE_FACE_ORDER.indexOf(id);
+  if (faceIndex >= 0) {
+    mountCubeNav();
+    if (shell) shell.classList.remove("hidden");
+    if (cubeNav) cubeNav.go(faceIndex);
+    else $(id).classList.remove("hidden"); // CubeNav script missing/failed -- fall back to a plain screen
+  } else {
+    if (shell) shell.classList.add("hidden");
+    $(id).classList.remove("hidden");
+  }
+}
+
+// Persistent tab bar for the cube's three faces (plus the Assets shortcut),
+// visible only while a cube face is showing -- its own CSS follows
+// #cube-shell's hidden state, same as the cube itself.
+(function wireCubeTabbar() {
+  const bar = $("cube-tabbar");
+  if (!bar) return;
+  bar.querySelectorAll(".cube-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const goto = btn.dataset.cubeGoto;
+      if (goto === "assets") {
+        showScreen("screen-main");
+        const tokensHeader = document.querySelector("#screen-main .tokens-header");
+        if (tokensHeader) tokensHeader.scrollIntoView({ block: "start" });
+      } else if (goto === "1") {
+        renderActivity();
+        showScreen("screen-activity");
+      } else if (goto === "2") {
+        showScreen("screen-send");
+      } else {
+        showScreen("screen-main");
+      }
+    });
+  });
+})();
 
 function showError(id, message) {
   const el = $(id);
@@ -646,22 +726,53 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
+// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
+// of opening a new tab -- see lib/buy-config.js's header comment for why
+// that's safe. Each time the screen is (re)opened, this resets back to the
+// "not loaded yet" state: description text, address row and Continue
+// button visible, iframe hidden -- ready for a fresh click.
 function setupBuyScreen() {
   hideError("buy-error");
   $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+  $("buy-description-manual").classList.remove("hidden");
+  $("buy-description-autofill").classList.add("hidden");
+  $("buy-address-row").classList.remove("hidden");
+  $("btn-buy-open").classList.remove("hidden");
+  $("buy-frame-wrap").classList.add("hidden");
+  $("buy-frame").src = "about:blank";
 }
 
 $("btn-buy-copy-address").addEventListener("click", () => {
   navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
 });
 
-$("btn-buy-open").addEventListener("click", () => {
+$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+
+$("btn-buy-open").addEventListener("click", async () => {
   hideError("buy-error");
+  const btn = $("btn-buy-open");
+  btn.disabled = true;
   try {
-    const url = TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
-    chrome.tabs.create({ url });
+    // Try for a signed URL with the address already filled in first (see
+    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
+    // manual "paste your address" flow) if that backend isn't configured
+    // or can't be reached. Either way this always embeds in the iframe
+    // below rather than opening a new tab.
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
+    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    $("buy-frame").src = url;
+    $("buy-frame-wrap").classList.remove("hidden");
+    btn.classList.add("hidden");
+    if (signedUrl) {
+      $("buy-description-manual").classList.add("hidden");
+      $("buy-description-autofill").classList.remove("hidden");
+      $("buy-address-row").classList.add("hidden");
+    }
   } catch (e) {
     showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
@@ -1149,6 +1260,28 @@ function activateSplashHome() {
   });
 }
 
+// Onboarding/unlock: no wallet exists yet (or it's locked), so the splash
+// shouldn't auto-fade on a timer -- the user needs a deliberate moment to
+// land on before moving forward. Distinct from activateSplashHome(): the
+// Home/Assets/Activity/Send bar doesn't apply here (nothing to navigate to
+// yet), so instead this shows a language picker (populateLanguageSelects(),
+// called once during init(), already wires up any .language-select it
+// finds -- including this one, since it's in the static DOM from the
+// start) plus an explicit Continue button. Deliberately NOT a whole-screen
+// tap target anymore: that would swallow clicks meant for the language
+// <select> sitting on top of it.
+let splashLandingActivated = false;
+function activateSplashLanding() {
+  if (splashHomeActivated || splashLandingActivated) return;
+  splashLandingActivated = true;
+  clearSplashAutoTimers();
+  const el = $("splash-screen");
+  if (!el) return;
+  el.classList.add("splash-landing");
+  const continueBtn = $("splash-continue-btn");
+  if (continueBtn) continueBtn.addEventListener("click", () => hideSplash());
+}
+
 // ---------------------------------------------------------------- ACTIVITY
 // A small, honest local log -- not a real blockchain history (that would
 // need an explorer/indexer API and its own set of tradeoffs), just a
@@ -1420,10 +1553,10 @@ function renderActivity() {
   const status = await sendMsg("TM_GET_STATUS");
   if (!status.hasVault) {
     showScreen("screen-onboarding");
-    splashAutoTimers.push(setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStartedAt))));
+    activateSplashLanding();
   } else if (!status.unlocked) {
     showScreen("screen-unlock");
-    splashAutoTimers.push(setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStartedAt))));
+    activateSplashLanding();
   } else {
     await refreshMain();
     showScreen("screen-main");

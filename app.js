@@ -638,7 +638,7 @@ $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScre
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
 $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
-$("btn-goto-sell").addEventListener("click", () => { hideError("sell-error"); showScreen("screen-sell"); });
+$("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
 
 // ---------------------------------------------------------------- TOKENS
@@ -1119,31 +1119,73 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
+// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
+// of opening a new tab -- see lib/buy-config.js's header comment for why
+// that's safe. Each time the screen is (re)opened, this resets back to the
+// "not loaded yet" state: description text, address row and Continue
+// button visible, iframe hidden -- ready for a fresh click.
 function setupBuyScreen() {
   hideError("buy-error");
   $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+  $("buy-description-manual").classList.remove("hidden");
+  $("buy-description-autofill").classList.add("hidden");
+  $("buy-address-row").classList.remove("hidden");
+  $("btn-buy-open").classList.remove("hidden");
+  $("buy-frame-wrap").classList.add("hidden");
+  $("buy-frame").src = "about:blank";
 }
 
 $("btn-buy-copy-address").addEventListener("click", () => {
   navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
 });
 
-$("btn-buy-open").addEventListener("click", () => {
+$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+
+$("btn-buy-open").addEventListener("click", async () => {
   hideError("buy-error");
+  const btn = $("btn-buy-open");
+  btn.disabled = true;
   try {
-    const url = TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
-    chrome.tabs.create({ url });
+    // Try for a signed URL with the address already filled in first (see
+    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
+    // manual "paste your address" flow) if that backend isn't configured
+    // or can't be reached. Either way this always embeds in the iframe
+    // below rather than opening a new tab.
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
+    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    $("buy-frame").src = url;
+    $("buy-frame-wrap").classList.remove("hidden");
+    btn.classList.add("hidden");
+    if (signedUrl) {
+      $("buy-description-manual").classList.add("hidden");
+      $("buy-description-autofill").classList.remove("hidden");
+      $("buy-address-row").classList.add("hidden");
+    }
   } catch (e) {
     showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
 // ---------------------------------------------------------------- SELL
+// Same embedding change as Buy -- see lib/sell-config.js's header comment
+// for why there's no address to auto-fill here.
+function setupSellScreen() {
+  hideError("sell-error");
+  $("btn-sell-open").classList.remove("hidden");
+  $("sell-frame-wrap").classList.add("hidden");
+  $("sell-frame").src = "about:blank";
+}
+
 $("btn-sell-open").addEventListener("click", () => {
   hideError("sell-error");
   try {
     const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
-    chrome.tabs.create({ url });
+    $("sell-frame").src = url;
+    $("sell-frame-wrap").classList.remove("hidden");
+    $("btn-sell-open").classList.add("hidden");
   } catch (e) {
     showError("sell-error", e.message);
   }
@@ -2227,11 +2269,15 @@ function activateSplashLanding() {
   if (!el) return;
   // Distinct from splash-home: no wallet exists yet (or it's locked), so
   // the Home/Assets/Activity/Send bar doesn't apply here -- see the CSS
-  // for #splash-screen.splash-landing. The whole splash becomes one big
-  // "tap to continue" target instead of four nav icons that don't yet
-  // mean anything.
+  // for #splash-screen.splash-landing. Instead this shows a language
+  // picker (populateLanguageSelects(), called once during init(), already
+  // wires up any .language-select it finds -- including this one, since
+  // it's in the static DOM from the start) plus an explicit Continue
+  // button. Deliberately NOT a whole-screen tap target anymore: that would
+  // swallow clicks meant for the language <select> sitting on top of it.
   el.classList.add("splash-landing");
-  el.addEventListener("click", () => hideSplash());
+  const continueBtn = $("splash-continue-btn");
+  if (continueBtn) continueBtn.addEventListener("click", () => hideSplash());
 }
 
 // ---------------------------------------------------------------- ACTIVITY

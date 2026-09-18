@@ -76,7 +76,9 @@
 
     "buy.title": "Comprar criptomonedas",
     "buy.description1": "La función Comprar funciona con MoonPay, un servicio de terceros independiente -- Token Exchange nunca tiene acceso a tus datos de pago.",
-    "buy.description2Html": "MoonPay se abrirá en una pestaña nueva. Como esta billetera nunca envía tu dirección a MoonPay por ti (eso requeriría firmar solicitudes con una clave secreta, la cual nunca debe existir dentro de una extensión de navegador -- consulta <code>lib/buy-config.js</code>), <strong>pega tu dirección de recepción tú mismo</strong> una vez que se abra la pestaña de MoonPay:",
+    "buy.noThirdPartyCallout": "¿Ya tienes algo de cripto? Sáltate MoonPay por completo: intercámbialo directamente en la cadena por lo que necesites, sin terceros ni registro.",
+    "buy.noThirdPartySwapBtn": "Intercambiar en su lugar",
+    "buy.description2Html": "MoonPay se abre aquí mismo, abajo. Como esta billetera no puede firmar solicitudes de forma segura con una clave secreta (esa clave nunca debe existir dentro de una extensión de navegador -- consulta <code>lib/buy-config.js</code>), <strong>pega tu dirección de recepción tú mismo</strong> una vez que se cargue:",
     "buy.continueBtn": "Continuar a MoonPay",
 
     "support.title": "Ayuda y soporte",
@@ -203,6 +205,7 @@
     "home.tabActivity": "Actividad",
     "home.tabSend": "Enviar",
     "home.tapToContinue": "Toca para continuar",
+    "home.continueBtn": "Continuar",
 
     "activity.title": "Actividad",
     "activity.subtitle": "Un registro local de los envíos hechos desde esta wallet, más las transferencias entrantes que este dispositivo ha detectado -- nada aquí se obtiene de un servidor.",

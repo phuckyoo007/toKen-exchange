@@ -76,7 +76,9 @@
 
     "buy.title": "暗号資産を購入",
     "buy.description1": "購入機能は、独立した第三者サービスである MoonPay によって提供されています。Token Exchange がお客様の支払い情報に触れることは一切ありません。",
-    "buy.description2Html": "MoonPay が新しいタブで開きます。このウォレットは、お客様の代わりに受取アドレスを MoonPay に送信することはありません（それには秘密鍵で署名したリクエストが必要になりますが、秘密鍵をブラウザ拡張機能の内部に置くことは絶対にあってはなりません。詳しくは <code>lib/buy-config.js</code> をご覧ください）。MoonPay のタブが開いたら、<strong>受取アドレスはご自身で貼り付けて</strong>ください。",
+    "buy.noThirdPartyCallout": "すでに暗号資産をお持ちですか?MoonPayを使わずに、必要なものへ直接オンチェーンでスワップできます -- 第三者もサインアップも不要です。",
+    "buy.noThirdPartySwapBtn": "代わりにスワップする",
+    "buy.description2Html": "MoonPay はこのすぐ下に表示されます。このウォレットは秘密鍵を使ってリクエストに安全に署名することができないため（秘密鍵をブラウザ拡張機能の内部に置くことは絶対にあってはなりません。詳しくは <code>lib/buy-config.js</code> をご覧ください）、読み込みが終わったら<strong>受取アドレスはご自身で貼り付けて</strong>ください。",
     "buy.continueBtn": "MoonPay に進む",
 
     "support.title": "ヘルプ＆サポート",
@@ -203,6 +205,7 @@
     "home.tabActivity": "アクティビティ",
     "home.tabSend": "送金",
     "home.tapToContinue": "タップして続ける",
+    "home.continueBtn": "続ける",
 
     "activity.title": "アクティビティ",
     "activity.subtitle": "このウォレットから行った送金と、このデバイスが検知した入金の履歴をローカルに記録したものです -- サーバーから取得しているものは一切ありません。",

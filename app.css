@@ -269,7 +269,9 @@ body {
    guessing which nav icon dismisses a screen that never explained itself. */
 #splash-screen.splash-landing #splash-spinner { display: none; }
 #splash-screen.splash-landing #splash-tabbar { display: none; }
-#splash-screen.splash-landing { cursor: pointer; }
+/* Language picker + Continue button live inside this footer now (see
+   below) -- no longer a whole-screen tap target, since that would swallow
+   clicks meant for the <select> sitting on top of it. */
 #splash-continue-hint {
   display: none;
   position: absolute;
@@ -278,25 +280,32 @@ body {
   /* Same 132px min-height and gradient shape as #splash-tabbar above --
      this still has to fully cover the artwork's own baked-in tab-bar
      ghost (~45-95px up from the bottom) even though no real buttons
-     render here in landing mode. */
+     render here in landing mode. Grows taller than 132px to fit the
+     language row + Continue button, which only helps that coverage. */
   min-height: 132px;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
-  padding: 10px 10px calc(24px + env(safe-area-inset-bottom, 0px));
+  gap: 10px;
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top,
     rgba(9, 11, 17, 0.99) 0%,
     rgba(9, 11, 17, 0.99) 68%,
     rgba(9, 11, 17, 0.9) 82%,
     rgba(9, 11, 17, 0.4) 94%,
     transparent 100%);
+}
+#splash-screen.splash-landing #splash-continue-hint { display: flex; }
+#splash-continue-hint .language-picker { margin: 0; }
+#splash-continue-hint .language-picker label {
   color: var(--gold-bright);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-#splash-screen.splash-landing #splash-continue-hint { display: flex; }
+#splash-continue-btn { width: 100%; }
 .splash-tab {
   flex: 1;
   display: flex;
@@ -531,6 +540,7 @@ a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
 }
 #app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
+#app-footer .footer-copyright { font-size: 9.5px; color: var(--text-faint); opacity: 0.8; letter-spacing: 0.03em; }
 
 h2 {
   margin: 0 0 6px 0;
@@ -815,6 +825,26 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .balance-native-row.balance-lead-fallback #balance-symbol { font-size: 13px; }
 
 .address-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+/* Buy/Sell screens: MoonPay's widget embedded right here instead of
+   opening a new tab (see lib/buy-config.js). Fixed height since the
+   iframe's own content can't influence its parent's size across origins. */
+.widget-frame-wrap {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+}
+.widget-frame { display: block; width: 100%; height: 520px; border: none; }
+/* Buy screen: points at Swap as the fully non-custodial, no-signup
+   alternative to MoonPay for anyone who already holds some crypto. */
+.no-third-party-callout {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold-deep);
+  padding: 10px 12px; border-radius: 7px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
 /* QR codes need real light/dark contrast to stay scannable, so this stays
    a plain white card regardless of the app's own dark theme -- the same
    compromise every dark-themed wallet's QR view makes. */

@@ -109,12 +109,15 @@
 
     "buy.title": "Buy crypto",
     "buy.description1": "Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.",
-    "buy.description2Html": "MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:",
+    "buy.noThirdPartyCallout": "Already hold some crypto? Skip MoonPay entirely -- swap it for what you need directly on-chain, no third party, no signup.",
+    "buy.noThirdPartySwapBtn": "Swap instead",
+    "buy.description2Html": "MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:",
+    "buy.description2AutoFill": "MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.",
     "buy.continueBtn": "Continue to MoonPay",
 
     "sell.title": "Sell for cash",
     "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
-    "sell.description2": "MoonPay will open in a new tab and quote you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
+    "sell.description2": "MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
     "sell.description3Html": "Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.",
     "sell.continueBtn": "Continue to MoonPay",
 
@@ -312,6 +315,7 @@
     "home.tabActivity": "Activity",
     "home.tabSend": "Send",
     "home.tapToContinue": "Tap to continue",
+    "home.continueBtn": "Continue",
 
     "activity.title": "Activity",
     "activity.subtitle": "A local record of sends made from this wallet, plus incoming transfers this device has noticed -- nothing here is fetched from a server.",

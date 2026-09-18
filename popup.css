@@ -87,14 +87,13 @@ body {
 
 /* ---------------- full-bleed arcade-cabinet scene ----------------
    A fixed backdrop -- the user's own AI-generated "jackpot" reference
-   art -- sitting behind the whole popup on every screen, standing in
-   for the header-only SVG logo's cabinet. A dark scrim gradient is
-   baked into the same layer: strong enough near the top to reveal the
-   art's own slot-machine assembly, then quickly opaque enough that
-   real screen content (headings, inputs, buttons) stays fully
-   readable over it lower down. #app itself is transparent so this
-   shows through; individual cards/inputs keep their own solid
-   dark fills for contrast. */
+   art -- sitting behind the whole popup, visible only in the narrow
+   strip above #app (a brief brand moment on the onboarding/unlock
+   screens before #app's own opaque background takes over). #app is
+   fully opaque so this backdrop can never show through gaps between
+   real screen content (headings, inputs, buttons); individual
+   cards/inputs additionally keep their own solid dark fills for
+   contrast. */
 #bg-scene {
   position: fixed;
   inset: 0;
@@ -116,7 +115,32 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 480px;
-  background: transparent;
+  /* Fully opaque -- nothing behind this card shows through. A faint
+     copy of the splash artwork sits on the card's own face instead --
+     see #app::before below -- a self-contained watermark baked onto
+     this opaque card, not a window onto anything behind it. */
+  background: var(--bg);
+}
+/* A very faint copy of the splash art's coin/globe centerpiece,
+   printed directly onto the card's own face so it reads as more than
+   flat black. Static image living on #app itself, at z-index -1
+   (behind every real child of #app, including #app-header) -- never a
+   see-through hole onto anything behind it. Uses the cropped
+   card-watermark(-light).jpg rather than splash.jpg directly -- the
+   splash art has a fake bottom nav bar baked into the image itself,
+   which needs to stay out of a watermark sitting behind real content
+   everywhere in the app. Fully non-interactive. */
+#app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url(img/card-watermark.jpg) center / cover no-repeat;
+  opacity: 0.14;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: light) {
+  #app::before { background-image: url(img/card-watermark-light.jpg); }
 }
 
 /* ---------------- splash screen ----------------
@@ -221,6 +245,52 @@ body {
     transparent 100%);
 }
 #splash-screen.splash-home #splash-tabbar { display: flex; }
+/* Landing mode for onboarding/unlock: no wallet exists yet (or it's
+   locked), so the Home/Assets/Activity/Send bar doesn't apply here --
+   the whole splash becomes one big "tap to continue" target instead,
+   with a plain hint replacing the tab bar (see activateSplashLanding()
+   in popup.js). This is what makes the splash a deliberate stop the
+   user has to tap through, instead of auto-fading into onboarding or
+   unlock on its own. */
+#splash-screen.splash-landing #splash-spinner { display: none; }
+#splash-screen.splash-landing #splash-tabbar { display: none; }
+/* Language picker + Continue button live inside this footer now (see
+   below) -- no longer a whole-screen tap target, since that would swallow
+   clicks meant for the <select> sitting on top of it. */
+#splash-continue-hint {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  /* Same 132px min-height and gradient shape as #splash-tabbar above --
+     this still has to fully cover the artwork's own baked-in tab-bar
+     ghost even though no real buttons render here in landing mode. Grows
+     taller than 132px to fit the language row + Continue button, which
+     only helps that coverage. */
+  min-height: 132px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top,
+    rgba(9, 11, 17, 0.99) 0%,
+    rgba(9, 11, 17, 0.99) 68%,
+    rgba(9, 11, 17, 0.9) 82%,
+    rgba(9, 11, 17, 0.4) 94%,
+    transparent 100%);
+}
+#splash-screen.splash-landing #splash-continue-hint { display: flex; }
+#splash-continue-hint .language-picker { margin: 0; }
+#splash-continue-hint .language-picker label {
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#splash-continue-btn { width: 100%; }
 .splash-tab {
   flex: 1;
   display: flex;
@@ -339,15 +409,63 @@ body {
 }
 .hidden { display: none !important; }
 
+/* ---------------- cube nav (Home / Activity / Send) ----------------
+   These three screens live inside a rotating 3D cube (cube-nav.js) instead
+   of swapping with a hard cut. #cube-shell takes over the same flex:1 slot
+   .screen normally holds; #cube-stage is where CubeNav.mount() builds its
+   own .cn-stage/.cn-cube/.cn-face structure, sized via --cn-stage-h since
+   the cube needs a real, bounded viewport -- each face scrolls internally
+   instead (see .cn-face in cube-nav.js). The popup itself is small and
+   fixed-width, so this stays shorter than the website's version. */
+#cube-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#cube-stage {
+  --cn-stage-h: min(58vh, 360px);
+}
+#cube-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 5px 5px calc(5px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+.cube-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 4px 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.cube-tab:hover, .cube-tab:focus-visible { background: var(--bg-hover); color: var(--text); }
+.cube-tab.active { color: var(--gold-bright); }
+.cube-tab-icon { font-size: 16px; line-height: 1; }
+.cube-tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.01em; }
+
 /* ---------------- footer ---------------- */
 #app-footer {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   padding: 7px 16px; border-top: 1px solid var(--line);
   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
   flex-shrink: 0;
 }
+#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
+#app-footer .footer-copyright { font-size: 9.5px; color: var(--text-faint); opacity: 0.8; letter-spacing: 0.03em; }
 
 h2 {
   margin: 0 0 6px 0;
@@ -561,6 +679,27 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .balance-native-row.balance-lead-fallback #balance-symbol { font-size: 13px; }
 
 .address-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+/* Buy screen: MoonPay's widget embedded right here instead of opening a
+   new tab (see lib/buy-config.js). Fixed height since the iframe's own
+   content can't influence its parent's size across origins -- smaller
+   than the website's version to fit the popup's compact viewport. */
+.widget-frame-wrap {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+}
+.widget-frame { display: block; width: 100%; height: 380px; border: none; }
+/* Buy screen: points at Swap as the fully non-custodial, no-signup
+   alternative to MoonPay for anyone who already holds some crypto. */
+.no-third-party-callout {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold-deep);
+  padding: 10px 12px; border-radius: 7px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
 /* QR codes need real light/dark contrast to stay scannable, so this stays
    a plain white card regardless of the app's own dark theme -- the same
    compromise every dark-themed wallet's QR view makes. */
