@@ -115,13 +115,12 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 480px;
-  /* Still fully readable everywhere -- text and controls never sit
-     directly on the raw photo -- but a faint (~10%) hint of the same
-     backdrop art now shows through the card itself via this dark tint
-     over the image, instead of a flat solid fill. The backdrop art is
-     also visible around the outside of this card on wide/desktop
-     viewports (see the framed look below). */
-  background: linear-gradient(rgba(18, 16, 12, 0.9), rgba(18, 16, 12, 0.9)), url(img/bg-scene.jpg) center top / cover no-repeat;
+  /* Fully opaque -- no part of the app card lets the #bg-scene backdrop
+     show through anymore. The backdrop art is still visible around the
+     outside of this card on wide/desktop viewports (see the framed
+     look below), but nothing inside it -- header included -- is
+     see-through in any way. */
+  background: var(--bg);
 }
 
 /* ---------------- splash screen ----------------
