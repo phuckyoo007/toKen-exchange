@@ -464,6 +464,53 @@ a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
 }
 .hidden { display: none !important; }
 
+/* ---------------- cube nav (Home / Activity / Send) ----------------
+   These three screens live inside a rotating 3D cube (cube-nav.js) instead
+   of swapping with a hard cut -- clicking Send from Home, or hitting Back
+   from Send, turns the cube. #cube-shell takes over the same flex:1 slot
+   .screen normally holds; #cube-stage is where CubeNav.mount() builds its
+   own .cn-stage/.cn-cube/.cn-face structure, sized via --cn-stage-h since
+   the cube needs a real, bounded viewport rather than the auto-height
+   "grows to content, page scrolls" model every other screen uses -- each
+   face scrolls internally instead (see .cn-face in cube-nav.js). */
+#cube-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#cube-stage {
+  --cn-stage-h: min(60vh, 460px);
+}
+#cube-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+.cube-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 7px 4px 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.cube-tab:hover, .cube-tab:focus-visible { background: var(--bg-hover); color: var(--text); }
+.cube-tab.active { color: var(--gold-bright); }
+.cube-tab-icon { font-size: 17px; line-height: 1; }
+.cube-tab-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em; }
+
 /* ---------------- footer ----------------
    The circular "TOKEN EXCHANGE" badge (the same image used as the app
    icon) now sits down here at the bottom of every screen instead of up

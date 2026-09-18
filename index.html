@@ -122,7 +122,33 @@
     <button class="link" id="btn-goto-support-unlock" data-i18n="common.needHelp">Need help?</button>
   </section>
 
-  <!-- MAIN -->
+  <!-- HOME / ACTIVITY / SEND -- three faces of one rotating cube (see
+       cube-nav.js). Everything else (Settings, Swap, Buy, Add token, the
+       dapp-approval dialogs, etc.) still opens as a plain overlay on top
+       of this, exactly like before -- its own Back button always returns
+       to screen-main, which lands back on the cube's Home face. -->
+  <div id="cube-shell" class="hidden">
+    <div id="cube-stage"></div>
+    <nav id="cube-tabbar" aria-label="Main">
+      <button type="button" class="cube-tab" id="cube-tab-home" data-cube-goto="0" data-i18n-title="home.tabHome" title="Home">
+        <span class="cube-tab-icon" aria-hidden="true">&#8962;</span>
+        <span class="cube-tab-label" data-i18n="home.tabHome">Home</span>
+      </button>
+      <button type="button" class="cube-tab" id="cube-tab-assets" data-cube-goto="assets" data-i18n-title="home.tabAssets" title="Assets">
+        <span class="cube-tab-icon" aria-hidden="true">&#9679;</span>
+        <span class="cube-tab-label" data-i18n="home.tabAssets">Assets</span>
+      </button>
+      <button type="button" class="cube-tab" id="cube-tab-activity" data-cube-goto="1" data-i18n-title="home.tabActivity" title="Activity">
+        <span class="cube-tab-icon" aria-hidden="true">&#128202;</span>
+        <span class="cube-tab-label" data-i18n="home.tabActivity">Activity</span>
+      </button>
+      <button type="button" class="cube-tab" id="cube-tab-send" data-cube-goto="2" data-i18n-title="home.tabSend" title="Send">
+        <span class="cube-tab-icon" aria-hidden="true">&#10148;</span>
+        <span class="cube-tab-label" data-i18n="home.tabSend">Send</span>
+      </button>
+    </nav>
+  </div>
+
   <section id="screen-main" class="screen hidden">
     <div class="account-row">
       <div class="account-picker">
@@ -200,6 +226,56 @@
       </div>
     </div>
     <p id="main-error" class="error hidden"></p>
+  </section>
+
+  <!-- ACTIVITY (moved into #cube-stage as a cube face at runtime -- see
+       mountCubeNav() in app.js -- but lives here in the markup like any
+       other screen) -->
+  <section id="screen-activity" class="screen hidden">
+    <h2 data-i18n="activity.title">Activity</h2>
+    <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
+    <div id="activity-list"></div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- SEND (also a cube face -- see note above) -->
+  <section id="screen-send" class="screen hidden">
+    <h2 data-i18n="common.send">Send</h2>
+    <label data-i18n="send.assetLabel">Asset</label>
+    <select id="send-asset-select">
+      <option value="native" data-i18n="common.nativeCoinOption">Native coin</option>
+      <option value="token" data-i18n="send.assetToken">Token (enter contract address)</option>
+    </select>
+    <input type="text" id="send-token-address" class="hidden" data-i18n-placeholder="send.tokenAddressPlaceholder" placeholder="Token contract address (0x...)" />
+    <div class="send-to-label-row">
+      <label data-i18n="send.toLabel">To address</label>
+      <button type="button" id="btn-open-contacts" class="link" data-i18n="send.contactsBtn">Contacts</button>
+    </div>
+    <div class="send-to-row">
+      <span id="send-to-identicon" class="account-identicon hidden" aria-hidden="true"></span>
+      <input type="text" id="send-to" data-i18n-placeholder="send.toPlaceholder" placeholder="0x... or name.eth" />
+    </div>
+    <p id="send-to-resolved" class="muted hidden"></p>
+    <label data-i18n="send.amountLabel">Amount</label>
+    <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+    <div id="send-speed-row" class="send-speed-row hidden">
+      <button type="button" class="send-speed-btn" data-speed="slow" data-i18n="send.speedSlow">Slow</button>
+      <button type="button" class="send-speed-btn active" data-speed="standard" data-i18n="send.speedStandard">Standard</button>
+      <button type="button" class="send-speed-btn" data-speed="fast" data-i18n="send.speedFast">Fast</button>
+    </div>
+    <p id="send-fee-preview" class="muted hidden"></p>
+    <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
+    <div id="send-confirm-card" class="send-confirm-card hidden">
+      <p id="send-confirm-intro" class="warn"></p>
+      <p id="send-confirm-summary" class="send-confirm-summary"></p>
+      <p id="send-confirm-fee" class="muted hidden"></p>
+      <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
+      <p id="send-confirm-poison-warning" class="error poison-warning hidden"></p>
+      <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
+    </div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="send-status" class="hint hidden"></p>
+    <p id="send-error" class="error hidden"></p>
   </section>
 
   <!-- ADD TOKEN -->
@@ -295,54 +371,6 @@
       <button id="btn-support-send" class="primary" data-i18n="common.send">Send</button>
     </div>
     <button class="link" id="btn-support-back" data-i18n="common.back">Back</button>
-  </section>
-
-  <!-- SEND -->
-  <section id="screen-send" class="screen hidden">
-    <h2 data-i18n="common.send">Send</h2>
-    <label data-i18n="send.assetLabel">Asset</label>
-    <select id="send-asset-select">
-      <option value="native" data-i18n="common.nativeCoinOption">Native coin</option>
-      <option value="token" data-i18n="send.assetToken">Token (enter contract address)</option>
-    </select>
-    <input type="text" id="send-token-address" class="hidden" data-i18n-placeholder="send.tokenAddressPlaceholder" placeholder="Token contract address (0x...)" />
-    <div class="send-to-label-row">
-      <label data-i18n="send.toLabel">To address</label>
-      <button type="button" id="btn-open-contacts" class="link" data-i18n="send.contactsBtn">Contacts</button>
-    </div>
-    <div class="send-to-row">
-      <span id="send-to-identicon" class="account-identicon hidden" aria-hidden="true"></span>
-      <input type="text" id="send-to" data-i18n-placeholder="send.toPlaceholder" placeholder="0x... or name.eth" />
-    </div>
-    <p id="send-to-resolved" class="muted hidden"></p>
-    <label data-i18n="send.amountLabel">Amount</label>
-    <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
-    <div id="send-speed-row" class="send-speed-row hidden">
-      <button type="button" class="send-speed-btn" data-speed="slow" data-i18n="send.speedSlow">Slow</button>
-      <button type="button" class="send-speed-btn active" data-speed="standard" data-i18n="send.speedStandard">Standard</button>
-      <button type="button" class="send-speed-btn" data-speed="fast" data-i18n="send.speedFast">Fast</button>
-    </div>
-    <p id="send-fee-preview" class="muted hidden"></p>
-    <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
-    <div id="send-confirm-card" class="send-confirm-card hidden">
-      <p id="send-confirm-intro" class="warn"></p>
-      <p id="send-confirm-summary" class="send-confirm-summary"></p>
-      <p id="send-confirm-fee" class="muted hidden"></p>
-      <p id="send-confirm-new-address-warning" class="error hidden" data-i18n="send.newAddressWarning">You haven't sent to this address from this device before -- double check it's correct.</p>
-      <p id="send-confirm-poison-warning" class="error poison-warning hidden"></p>
-      <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
-    </div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-    <p id="send-status" class="hint hidden"></p>
-    <p id="send-error" class="error hidden"></p>
-  </section>
-
-  <!-- ACTIVITY -->
-  <section id="screen-activity" class="screen hidden">
-    <h2 data-i18n="activity.title">Activity</h2>
-    <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
-    <div id="activity-list"></div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
   </section>
 
   <!-- SWAP -->
@@ -635,6 +663,7 @@
 <script src="lib/walletconnect-config.js"></script>
 <script src="shim.js"></script>
 <script src="wallet-engine.js"></script>
+<script src="cube-nav.js"></script>
 <script src="app.js"></script>
 <script src="lib/feature-requests.js"></script>
 </body>

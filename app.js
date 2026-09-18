@@ -175,10 +175,92 @@ function sendMsg(type, payload) {
   });
 }
 
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
-  $(id).classList.remove("hidden");
+// ---------------------------------------------------------------- CUBE NAV
+// Home, Activity and Send are the app's three "peer" destinations -- the
+// same three the splash screen's own tab bar already treats as equal
+// starting points (see activateSplashHome() below; Assets is the fourth
+// icon there, but it's always just been screen-main scrolled to the
+// tokens list, not a separate screen, so it stays that way here too).
+// Once inside the app these three now live as three faces of a rotating
+// cube (see cube-nav.js) instead of plain sibling screens that just swap
+// with a hard cut: clicking Send from Home, or hitting Back from Send,
+// turns the cube instead. Every other screen -- Settings, Swap, Buy, Add
+// token, the dapp-approval dialogs, and so on -- still shows/hides exactly
+// like before, as a plain overlay on top of the cube (its own Back button
+// always returns to screen-main, landing back on the cube's Home face).
+const CUBE_FACE_ORDER = ["screen-main", "screen-activity", "screen-send"];
+let cubeNav = null;
+
+function mountCubeNav() {
+  if (cubeNav || !window.CubeNav) return;
+  const stageRoot = $("cube-stage");
+  if (!stageRoot) return;
+  const faces = CUBE_FACE_ORDER.map((id) => ({ id, el: $(id) }));
+  if (faces.some((f) => !f.el)) return;
+  cubeNav = window.CubeNav.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
+  // The cube keeps every face permanently in the DOM (just rotated out of
+  // view) so the 3D transform has something to show on every side -- so
+  // these three stop being ".hidden"-toggled like a normal screen the
+  // moment the cube takes them over. CubeNav's own aria-hidden/inert/dim
+  // handles "not the current face" instead.
+  CUBE_FACE_ORDER.forEach((id) => $(id).classList.remove("hidden"));
+  stageRoot.addEventListener("facechange", updateCubeTabbarActive);
+  updateCubeTabbarActive();
 }
+
+function updateCubeTabbarActive() {
+  const bar = $("cube-tabbar");
+  if (!bar || !cubeNav) return;
+  const activeId = CUBE_FACE_ORDER[cubeNav.index];
+  bar.querySelectorAll(".cube-tab").forEach((btn) => {
+    const goto = btn.dataset.cubeGoto;
+    btn.classList.toggle("active", goto !== "assets" && CUBE_FACE_ORDER[Number(goto)] === activeId);
+  });
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach((el) => {
+    if (!CUBE_FACE_ORDER.includes(el.id)) el.classList.add("hidden");
+  });
+  const shell = $("cube-shell");
+  const faceIndex = CUBE_FACE_ORDER.indexOf(id);
+  if (faceIndex >= 0) {
+    mountCubeNav();
+    if (shell) shell.classList.remove("hidden");
+    if (cubeNav) cubeNav.go(faceIndex);
+    else $(id).classList.remove("hidden"); // CubeNav script missing/failed -- fall back to a plain screen
+  } else {
+    if (shell) shell.classList.add("hidden");
+    $(id).classList.remove("hidden");
+  }
+}
+
+// Persistent tab bar for the cube's three faces (plus the Assets shortcut),
+// visible only while a cube face is showing -- its own CSS follows
+// #cube-shell's hidden state, same as the cube itself.
+(function wireCubeTabbar() {
+  const bar = $("cube-tabbar");
+  if (!bar) return;
+  bar.querySelectorAll(".cube-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const goto = btn.dataset.cubeGoto;
+      if (goto === "assets") {
+        showScreen("screen-main");
+        const tokensHeader = document.querySelector("#screen-main .tokens-header");
+        if (tokensHeader) tokensHeader.scrollIntoView({ block: "start" });
+      } else if (goto === "1") {
+        renderActivity();
+        showScreen("screen-activity");
+      } else if (goto === "2") {
+        setSendSpeed("standard");
+        showScreen("screen-send");
+        refreshSendFeePreview();
+      } else {
+        showScreen("screen-main");
+      }
+    });
+  });
+})();
 
 // Most errors shown in this app are already this app's OWN plain-language
 // text (e.g. "That doesn't look like a valid contract address.") -- those

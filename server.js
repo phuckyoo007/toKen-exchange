@@ -13,7 +13,7 @@ const FONTS_DIR = path.join(PUBLIC_DIR, "fonts");
 const IMG_DIR = path.join(PUBLIC_DIR, "img");
 const PORT = process.env.PORT || 3000;
 
-const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "manifest.json"];
+const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "manifest.json"];
 const LIB_FILES = [
 "buy-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
 "identicon.js", "networks.js", "polymarket.js", "prices.js", "sell-config.js",
