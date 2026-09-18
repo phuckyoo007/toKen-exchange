@@ -25,6 +25,7 @@ const FONT_FILES = ["fredoka-400.woff2", "fredoka-500.woff2", "fredoka-600.woff2
 const IMG_FILES = [
 "bg-scene.jpg", "spinner-coin.png", "splash.jpg", "splash-light.jpg",
 "apple-touch-icon.png", "icon-192.png", "icon-512.png", "favicon-32.png",
+"card-banner.jpg", "card-watermark.jpg", "card-watermark-light.jpg",
 ];
 
 function copyIfExists(srcName, destDir) {
