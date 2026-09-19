@@ -336,6 +336,42 @@
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
   </section>
 
+  <!-- COIN DETAIL (opened from a Live prices row) -->
+  <section id="screen-coin" class="screen hidden">
+    <div class="coin-head">
+      <span id="coin-icon" class="coin-icon"></span>
+      <div class="coin-title">
+        <h2 id="coin-name"></h2>
+        <span id="coin-symbol" class="muted"></span>
+      </div>
+      <span id="coin-rank" class="coin-rank hidden"></span>
+    </div>
+    <div class="coin-price-block">
+      <div id="coin-price" class="coin-price"></div>
+      <span id="coin-change" class="price-change hidden"></span>
+    </div>
+    <div id="coin-chart" class="coin-chart"></div>
+    <p id="coin-chart-readout" class="muted small coin-chart-readout"></p>
+    <div class="coin-ranges" role="tablist">
+      <button type="button" class="coin-range" data-days="1">24H</button>
+      <button type="button" class="coin-range active" data-days="7">7D</button>
+      <button type="button" class="coin-range" data-days="30">1M</button>
+      <button type="button" class="coin-range" data-days="365">1Y</button>
+    </div>
+    <div class="coin-swap-card">
+      <p id="coin-holding" class="muted small hidden"></p>
+      <button type="button" id="btn-coin-swap" class="primary"></button>
+      <p id="coin-swap-note" class="hint hidden"></p>
+    </div>
+    <h3 data-i18n="coin.statsTitle">Market stats</h3>
+    <div id="coin-stats" class="coin-stats"></div>
+    <h3 data-i18n="coin.aboutTitle">About</h3>
+    <p id="coin-about" class="muted"></p>
+    <p><a id="coin-link-cg" class="link" target="_blank" rel="noopener noreferrer" data-i18n="coin.viewCoingecko">View on CoinGecko</a></p>
+    <p id="coin-error" class="error hidden"></p>
+    <button id="coin-back" class="link back-btn" data-back="screen-prices" data-i18n="common.back">Back</button>
+  </section>
+
   <!-- PREDICTIONS (read-only) -->
   <section id="screen-predictions" class="screen hidden">
     <h2 data-i18n="predictions.title">Trending Markets</h2>

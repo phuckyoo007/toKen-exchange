@@ -36,6 +36,12 @@ Chrome today.
   denominations (BTC, ETH, BNB, SOL, XRP). All powered by CoinGecko's free
   public API (see "Live prices" below). Extra coins whose CoinGecko id isn't
   returned are quietly left out rather than shown as "n/a".
+  Tapping a coin opens an in-app coin screen (price chart with 24H/7D/1M/1Y
+  ranges, market stats, a short description) with a **Swap for <coin>**
+  button. Swap is only offered when the coin is the selected network's native
+  coin or a token the user has added (matched by symbol) -- the wallet never
+  guesses token contract addresses -- and the Swap screen's From list shows
+  only what the user actually holds.
 - Buy crypto: a "Buy" button opens MoonPay's hosted on-ramp widget in a new
   tab so you can purchase crypto with a card or bank transfer and send it to
   your wallet address (see "Buy crypto (MoonPay)" below).

@@ -225,6 +225,15 @@ const SUPPORTED_CURRENCIES = {
 };
 const DEFAULT_CURRENCY = "usd";
 
+// Compact form for big numbers (market cap, volume): $1.2T, CHF 340B, 12.5M.
+function formatMoneyCompact(amount, currency) {
+  const info = SUPPORTED_CURRENCIES[currency] || SUPPORTED_CURRENCIES[DEFAULT_CURRENCY];
+  const symbol = /^[A-Za-z]{2,}$/.test(info.symbol) ? info.symbol + "\u00A0" : info.symbol;
+  const n = Number(amount);
+  if (!isFinite(n)) return symbol + "0";
+  return symbol + n.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 });
+}
+
 // Formats an amount in the given display currency code. `opts.price` is for
 // per-unit coin prices, which keep extra precision under 1 (a $0.0000123
 // meme coin shouldn't read as $0.00). Alphabetic symbols ("CHF", "SAR") get
@@ -339,9 +348,108 @@ async function getPriceBoard(currency) {
       price: entry ? entry.current_price : null,
       change24h: entry && typeof entry.price_change_percentage_24h === "number" ? entry.price_change_percentage_24h : null,
       image: entry ? entry.image : null,
+      // Public CoinGecko page for this coin; the Prices screen links each row to it.
+      url: `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}`,
     });
   });
   return rows;
+}
+
+// ---- In-app coin detail (the screen a Prices row opens) ---------------
+// One CoinGecko /coins/{id} call per coin gives price, market stats and a
+// text description; a second /market_chart call draws the price chart.
+// Both are keyless, cached briefly, and only fired when someone opens a coin.
+const coinDetailCache = new Map();
+const coinChartCache = new Map();
+
+function plainTextFromHtml(html) {
+  return String(html || "")
+    .replace(/<(br|\/p|\/li)[^>]*>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// First couple of sentences, capped in length -- this is a summary card,
+// not the whole write-up (the CoinGecko link has the rest).
+function shortDescription(text, maxLen) {
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  const lastStop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  return (lastStop > maxLen * 0.5 ? cut.slice(0, lastStop + 1) : cut.replace(/\s+\S*$/, "") + "...").trim();
+}
+
+async function getCoinDetail(symbol, currency) {
+  const id = COINGECKO_IDS[symbol];
+  if (!id) throw new Error("Unknown coin.");
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const key = id + "|" + vs;
+  const now = Date.now();
+  const hit = coinDetailCache.get(key);
+  if (hit && now - hit.fetchedAt < CACHE_TTL_MS) return hit.data;
+
+  let res;
+  try {
+    res = await fetch(`${COINGECKO_BASE}/coins/${encodeURIComponent(id)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`);
+  } catch (e) {
+    throw new Error("Couldn't reach CoinGecko. Check your internet connection.");
+  }
+  if (!res.ok) throw new Error(`CoinGecko request failed (HTTP ${res.status}).`);
+  const json = await res.json();
+  const md = json.market_data || {};
+  const pick = (o) => (o && typeof o[vs] === "number" ? o[vs] : null);
+  const change = md.price_change_percentage_24h_in_currency && typeof md.price_change_percentage_24h_in_currency[vs] === "number"
+    ? md.price_change_percentage_24h_in_currency[vs]
+    : (typeof md.price_change_percentage_24h === "number" ? md.price_change_percentage_24h : null);
+  const homepage = json.links && Array.isArray(json.links.homepage)
+    ? json.links.homepage.find((u) => typeof u === "string" && /^https:\/\//i.test(u)) || null
+    : null;
+  const data = {
+    id,
+    rank: typeof json.market_cap_rank === "number" ? json.market_cap_rank : null,
+    price: pick(md.current_price),
+    change24h: change,
+    marketCap: pick(md.market_cap),
+    volume: pick(md.total_volume),
+    high24h: pick(md.high_24h),
+    low24h: pick(md.low_24h),
+    ath: pick(md.ath),
+    athChange: pick(md.ath_change_percentage),
+    circulatingSupply: typeof md.circulating_supply === "number" ? md.circulating_supply : null,
+    description: shortDescription(plainTextFromHtml(json.description && json.description.en), 420),
+    homepage,
+  };
+  coinDetailCache.set(key, { fetchedAt: now, data });
+  return data;
+}
+
+// days: 1 (24H), 7, 30, or 365. Returns [[timestampMs, price], ...] thinned
+// to at most ~120 points, plenty for a phone-width line chart.
+async function getCoinChart(symbol, currency, days) {
+  const id = COINGECKO_IDS[symbol];
+  if (!id) throw new Error("Unknown coin.");
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const key = id + "|" + vs + "|" + days;
+  const now = Date.now();
+  const hit = coinChartCache.get(key);
+  if (hit && now - hit.fetchedAt < CACHE_TTL_MS) return hit.data;
+
+  let res;
+  try {
+    res = await fetch(`${COINGECKO_BASE}/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${vs}&days=${days}`);
+  } catch (e) {
+    throw new Error("Couldn't reach CoinGecko. Check your internet connection.");
+  }
+  if (!res.ok) throw new Error(`CoinGecko chart request failed (HTTP ${res.status}).`);
+  const json = await res.json();
+  const raw = Array.isArray(json.prices) ? json.prices.filter((p) => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1])) : [];
+  const step = Math.max(1, Math.ceil(raw.length / 120));
+  const data = raw.filter((_, i) => i % step === 0 || i === raw.length - 1);
+  coinChartCache.set(key, { fetchedAt: now, data });
+  return data;
 }
 
 // Fiat exchange rates: what 1 unit of each supported national currency is
@@ -447,7 +555,10 @@ if (typeof self !== "undefined") {
   self.TM_PRICES = {
     getPriceBoard,
     getFiatRates,
+    getCoinDetail,
+    getCoinChart,
     formatMoney,
+    formatMoneyCompact,
     getNativePriceForNetwork,
     getTokenPricesByContract,
     COINGECKO_IDS,
