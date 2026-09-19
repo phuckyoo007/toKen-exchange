@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Token Exchange -- Admin</title>
+<link rel="icon" href="favicon-32.png" />
+<style>
+@font-face { font-family: 'Fredoka'; src: url('fonts/fredoka-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fonts/fredoka-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fonts/fredoka-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Fredoka'; src: url('fonts/fredoka-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
+:root {
+  --bg: #12100c;
+  --bg-raised: #1d1810;
+  --bg-inset: #0b0a07;
+  --bg-hover: #241e14;
+  --line: #362d1c;
+  --line-strong: #4d4025;
+  --text: #f2ead9;
+  --text-muted: #a3987d;
+  --text-faint: #766c56;
+  --gold: #ddac4d;
+  --gold-bright: #f3d488;
+  --gold-deep: #9c701f;
+  --gold-ink: #241a06;
+  --danger: #e2685a;
+  --danger-bg: #2c1712;
+  --danger-line: #5c2c22;
+  --success: #7fc99a;
+  --success-bg: #142621;
+  --success-line: #234a3c;
+  --font-display: 'Fredoka', Georgia, serif;
+  --font-body: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  background: radial-gradient(1200px 600px at 15% -10%, #201a10 0%, var(--bg) 55%);
+  color: var(--text);
+}
+
+.wrap { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
+
+header.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+header.top h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0;
+  letter-spacing: 0.2px;
+}
+header.top h1 .dot { color: var(--gold); }
+header.top .env {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* -------- gate -------- */
+#gate {
+  max-width: 380px;
+  margin: 14vh auto 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: center;
+}
+#gate h1 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; }
+#gate p.sub { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+#gate input {
+  width: 100%;
+  background: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  outline: none;
+}
+#gate input:focus { border-color: var(--gold); }
+#gate .err { color: var(--danger); font-size: 12.5px; min-height: 18px; margin-top: 10px; }
+
+button {
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+}
+.btn-gold {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: var(--gold-ink);
+  padding: 11px 18px;
+  font-size: 14px;
+  width: 100%;
+  margin-top: 14px;
+}
+.btn-gold:hover { filter: brightness(1.05); }
+.btn-gold:disabled { opacity: 0.55; cursor: default; }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.btn-ghost:hover { border-color: var(--gold); color: var(--text); }
+
+.btn-danger {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-line);
+  color: var(--danger);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.btn-danger:hover { filter: brightness(1.15); }
+
+/* -------- dashboard -------- */
+#dash { display: none; }
+
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.stat-card .n { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold-bright); }
+.stat-card .l { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.panel .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.panel .panel-head h2 { font-family: var(--font-display); font-size: 15px; margin: 0; }
+.panel .panel-head .hint { color: var(--text-faint); font-size: 12px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+td { padding: 11px 18px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg-hover); }
+td.mono, th.mono { font-family: var(--font-mono); font-size: 12.5px; }
+td.muted { color: var(--text-muted); }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.badge.ok { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-line); }
+.badge.off { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-line); }
+
+.empty { padding: 28px 18px; text-align: center; color: var(--text-faint); font-size: 13px; }
+
+.toolbar { display: flex; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.toolbar input {
+  flex: 1;
+  background: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  outline: none;
+}
+.toolbar input:focus { border-color: var(--gold); }
+
+.toast {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; }
+.toast.err { border-color: var(--danger-line); color: var(--danger); }
+
+.modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-backdrop.show { display: flex; }
+.modal {
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 22px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+}
+.modal h3 { font-family: var(--font-display); margin: 0 0 8px; font-size: 16px; }
+.modal p { color: var(--text-muted); font-size: 13px; margin: 0 0 18px; }
+.modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+.modal .row button { padding: 8px 14px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>Admin access</h1>
+  <p class="sub">Paste the ADMIN_TOKEN for this server.</p>
+  <input id="tokenInput" type="password" placeholder="Admin token" autocomplete="off" spellcheck="false" />
+  <button class="btn-gold" id="unlockBtn">Unlock</button>
+  <div class="err" id="gateErr"></div>
+</div>
+
+<div class="wrap" id="dash">
+  <header class="top">
+    <h1>Token Exchange<span class="dot"> &middot; </span>Admin</h1>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="env" id="envLabel"></span>
+      <button class="btn-ghost" id="lockBtn">Lock</button>
+    </div>
+  </header>
+
+  <div class="stat-row" id="statRow">
+    <div class="stat-card"><div class="n" id="statUsers">--</div><div class="l">Accounts</div></div>
+    <div class="stat-card"><div class="n" id="statSessions">--</div><div class="l">Active sessions</div></div>
+    <div class="stat-card"><div class="n" id="statDisabled">--</div><div class="l">Disabled</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Accounts</h2>
+      <span class="hint" id="refreshHint">Auto-refreshes every 30s</span>
+    </div>
+    <div class="toolbar">
+      <input id="search" type="text" placeholder="Filter by username..." />
+      <button class="btn-ghost" id="refreshBtn">Refresh</button>
+    </div>
+    <div id="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Status</th>
+            <th>Signed up</th>
+            <th>Last backup</th>
+            <th class="mono">Vault v</th>
+            <th>Sessions</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="emptyState" style="display:none;">No accounts yet.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Rate limits</h2>
+      <span class="hint">Clears the in-memory throttle early -- useful after locking yourself or a user out while testing</span>
+    </div>
+    <div style="padding: 16px 18px; display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 220px;">
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Reset failed-login lockout for a username</div>
+        <div style="display:flex; gap: 8px;">
+          <input id="rlUsername" type="text" placeholder="username" style="flex:1; background: var(--bg-inset); border: 1px solid var(--line-strong); color: var(--text); font-size: 13px; padding: 8px 10px; border-radius: 8px;" />
+          <button class="btn-ghost" id="rlUserBtn">Reset</button>
+        </div>
+      </div>
+      <div style="flex: 1; min-width: 220px;">
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Reset per-IP limit (login + sign-up)</div>
+        <div style="display:flex; gap: 8px;">
+          <input id="rlIp" type="text" placeholder="IP address" style="flex:1; background: var(--bg-inset); border: 1px solid var(--line-strong); color: var(--text); font-size: 13px; padding: 8px 10px; border-radius: 8px;" />
+          <button class="btn-ghost" id="rlIpBtn">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="confirmBackdrop">
+  <div class="modal">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmBody"></p>
+    <div class="row">
+      <button class="btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn-danger" id="confirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "tm_admin_token"; // sessionStorage only -- cleared on tab close, never persisted to disk
+  var state = { token: "", users: [], refreshTimer: null };
+
+  var gate = document.getElementById("gate");
+  var dash = document.getElementById("dash");
+  var tokenInput = document.getElementById("tokenInput");
+  var gateErr = document.getElementById("gateErr");
+
+  function showToast(msg, isErr) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show" + (isErr ? " err" : "");
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.className = "toast"; }, 3200);
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = Object.assign({ "Authorization": "Bearer " + state.token }, opts.headers || {});
+    if (opts.body) headers["Content-Type"] = "application/json";
+    return fetch(path, {
+      method: opts.method || "GET",
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || ("Request failed (" + res.status + ")"));
+        return data;
+      });
+    });
+  }
+
+  function fmtDate(ms) {
+    if (!ms) return "--";
+    var d = new Date(ms);
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
+      " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function render() {
+    var q = document.getElementById("search").value.trim().toLowerCase();
+    var users = state.users.filter(function (u) { return !q || u.username.toLowerCase().indexOf(q) !== -1; });
+
+    var totalDisabled = state.users.filter(function (u) { return u.disabled; }).length;
+    document.getElementById("statUsers").textContent = state.users.length;
+    document.getElementById("statDisabled").textContent = totalDisabled;
+
+    var tbody = document.getElementById("tbody");
+    var emptyState = document.getElementById("emptyState");
+    tbody.innerHTML = "";
+
+    if (!users.length) {
+      emptyState.style.display = "block";
+      emptyState.textContent = state.users.length ? "No accounts match \"" + q + "\"." : "No accounts yet.";
+      return;
+    }
+    emptyState.style.display = "none";
+
+    users.forEach(function (u) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono">' + esc(u.username) + '</td>' +
+        '<td>' + (u.disabled ? '<span class="badge off">Disabled</span>' : '<span class="badge ok">Active</span>') + '</td>' +
+        '<td class="muted">' + fmtDate(u.createdAt) + '</td>' +
+        '<td class="muted">' + fmtDate(u.updatedAt) + '</td>' +
+        '<td class="mono muted">' + (u.vaultVersion || 0) + '</td>' +
+        '<td class="muted">' + (u.activeSessions || 0) + '</td>' +
+        '<td class="actions">' +
+          '<button class="btn-ghost" data-act="signout" data-u="' + esc(u.username) + '">Sign out</button>' +
+          '<button class="btn-ghost" data-act="toggle" data-u="' + esc(u.username) + '" data-disabled="' + (u.disabled ? "1" : "0") + '">' + (u.disabled ? "Enable" : "Disable") + '</button>' +
+          '<button class="btn-danger" data-act="delete" data-u="' + esc(u.username) + '">Delete</button>' +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function confirmAction(title, body) {
+    return new Promise(function (resolve) {
+      var backdrop = document.getElementById("confirmBackdrop");
+      document.getElementById("confirmTitle").textContent = title;
+      document.getElementById("confirmBody").textContent = body;
+      backdrop.className = "modal-backdrop show";
+      function cleanup(result) {
+        backdrop.className = "modal-backdrop";
+        okBtn.removeEventListener("click", onOk);
+        cancelBtn.removeEventListener("click", onCancel);
+        resolve(result);
+      }
+      var okBtn = document.getElementById("confirmOk");
+      var cancelBtn = document.getElementById("confirmCancel");
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+      okBtn.addEventListener("click", onOk);
+      cancelBtn.addEventListener("click", onCancel);
+    });
+  }
+
+  function loadStats() {
+    return api("/api/admin/stats").then(function (data) {
+      state.users = data.users || [];
+      document.getElementById("statSessions").textContent = data.totalActiveSessions || 0;
+      render();
+    });
+  }
+
+  function scheduleRefresh() {
+    clearInterval(state.refreshTimer);
+    state.refreshTimer = setInterval(function () {
+      loadStats().catch(function () { /* silent background refresh failure */ });
+    }, 30000);
+  }
+
+  function unlock(token) {
+    state.token = token;
+    return api("/api/admin/stats").then(function (data) {
+      sessionStorage.setItem(STORAGE_KEY, token);
+      gate.style.display = "none";
+      dash.style.display = "block";
+      state.users = data.users || [];
+      document.getElementById("statSessions").textContent = data.totalActiveSessions || 0;
+      render();
+      scheduleRefresh();
+    });
+  }
+
+  document.getElementById("unlockBtn").addEventListener("click", function () {
+    var v = tokenInput.value.trim();
+    if (!v) return;
+    gateErr.textContent = "";
+    unlock(v).catch(function (e) {
+      gateErr.textContent = e.message || "Could not verify token.";
+    });
+  });
+  tokenInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("unlockBtn").click();
+  });
+
+  document.getElementById("lockBtn").addEventListener("click", function () {
+    sessionStorage.removeItem(STORAGE_KEY);
+    clearInterval(state.refreshTimer);
+    state.token = "";
+    tokenInput.value = "";
+    dash.style.display = "none";
+    gate.style.display = "block";
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", function () {
+    loadStats().catch(function (e) { showToast(e.message, true); });
+  });
+  document.getElementById("search").addEventListener("input", render);
+
+  document.getElementById("tbody").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var username = btn.getAttribute("data-u");
+    var act = btn.getAttribute("data-act");
+
+    if (act === "signout") {
+      api("/api/admin/sign-out-all", { method: "POST", body: { username: username } })
+        .then(function (r) { showToast("Signed " + username + " out of " + r.sessionsRemoved + " session(s)."); return loadStats(); })
+        .catch(function (e) { showToast(e.message, true); });
+      return;
+    }
+
+    if (act === "toggle") {
+      var currentlyDisabled = btn.getAttribute("data-disabled") === "1";
+      api("/api/admin/set-disabled", { method: "POST", body: { username: username, disabled: !currentlyDisabled } })
+        .then(function () { showToast((currentlyDisabled ? "Enabled " : "Disabled ") + username + "."); return loadStats(); })
+        .catch(function (e) { showToast(e.message, true); });
+      return;
+    }
+
+    if (act === "delete") {
+      confirmAction("Delete " + username + "?", "This permanently deletes the account and its encrypted backup. The person keeps their wallet if they have the 12-word phrase -- this only removes the server-side backup.").then(function (ok) {
+        if (!ok) return;
+        api("/api/admin/delete-account", { method: "POST", body: { username: username } })
+          .then(function () { showToast("Deleted " + username + "."); return loadStats(); })
+          .catch(function (e) { showToast(e.message, true); });
+      });
+      return;
+    }
+  });
+
+  document.getElementById("rlUserBtn").addEventListener("click", function () {
+    var u = document.getElementById("rlUsername").value.trim();
+    if (!u) return;
+    api("/api/admin/reset-login-limits", { method: "POST", body: { username: u } })
+      .then(function (r) { showToast(r.hadLimit ? "Cleared login lockout for " + u + "." : "No active lockout for " + u + "."); })
+      .catch(function (e) { showToast(e.message, true); });
+  });
+
+  document.getElementById("rlIpBtn").addEventListener("click", function () {
+    var ip = document.getElementById("rlIp").value.trim();
+    if (!ip) return;
+    api("/api/admin/reset-ip-limits", { method: "POST", body: { ip: ip } })
+      .then(function (r) { showToast(r.hadLimit ? "Cleared IP limit for " + ip + "." : "No active limit for " + ip + "."); })
+      .catch(function (e) { showToast(e.message, true); });
+  });
+
+  // Auto-unlock if this tab already had a valid token this session.
+  var saved = sessionStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    tokenInput.value = saved;
+    unlock(saved).catch(function () { sessionStorage.removeItem(STORAGE_KEY); });
+  }
+})();
+</script>
+</body>
+</html>
