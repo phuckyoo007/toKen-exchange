@@ -921,3 +921,34 @@ html[dir="rtl"] .mono { direction: ltr; unicode-bidi: embed; text-align: right; 
 }
 .prices-search:focus { outline: none; border-color: var(--gold); }
 #prices-tab-note { margin: 0 0 8px; font-size: 12px; }
+
+/* Prices screen polish: symbol stacked under the name, price with a 24h
+   change pill stacked on the right, star in its own fixed column so every
+   row lines up regardless of how long the price text is. */
+.price-left { flex: 1; min-width: 0; }
+.price-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.price-id .price-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-row .price-id .price-symbol,
+html[dir="rtl"] .price-row .price-id .price-symbol { margin: 0; font-size: 11px; letter-spacing: 0.02em; }
+.price-right { flex-shrink: 0; gap: 6px; }
+.price-quote { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.price-quote .price-change,
+html[dir="rtl"] .price-quote .price-change {
+  margin: 0; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; line-height: 1.5;
+}
+.price-quote .price-change.up { background: rgba(127, 201, 154, 0.14); }
+.price-quote .price-change.down { background: rgba(226, 104, 90, 0.14); }
+.price-right .star-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 32px; padding: 0; font-size: 16px;
+}
+.prices-search {
+  padding-inline-start: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23766c56' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 11px center; background-size: 15px;
+}
+html[dir="rtl"] .prices-search { background-position: right 11px center; }
+.prices-tab.active { box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+/* Keep numbers and +/- signs reading correctly inside right-to-left layouts. */
+.price-quote .price-change, .price-quote .price-usd { direction: ltr; unicode-bidi: isolate; }

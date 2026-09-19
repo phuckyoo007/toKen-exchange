@@ -1003,8 +1003,8 @@ function renderPriceRow(c) {
   }
   const starred = isWatchlisted(c.symbol);
   row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
-    <span class="price-right"><button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button><span class="price-usd">${priceText}</span>${changeHtml}</span>
+    <span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
+    <span class="price-right"><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span><button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button></span>
   `;
   row.querySelector(".star-btn").addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1025,8 +1025,8 @@ function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
   row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(r.code)}<span><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
-    <span class="price-right"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span>
+    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
+    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
   `;
   return row;
 }
