@@ -379,6 +379,24 @@ body {
   flex-shrink: 0;
 }
 #brand-logo { display: none; }
+/* Global language switcher: reachable from every screen because the header
+   sits above all of them (mirrors the website build's #app-header). Just a
+   normal .language-select, so populateLanguageSelects() fills it and
+   lib/i18n.js keeps it in sync with the onboarding/Settings pickers. */
+.global-lang-select {
+  align-self: flex-end;
+  width: auto; max-width: 128px; min-width: 0; margin: 0 0 2px;
+  font-size: 12px; line-height: 1.2;
+  padding: 4px 22px 4px 10px;
+  border-radius: 999px;
+  background-color: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  box-shadow: none;
+  cursor: pointer;
+}
+html[dir="rtl"] .global-lang-select { padding: 4px 10px 4px 22px; }
+.global-lang-select:focus { outline: none; box-shadow: 0 0 0 3px rgba(221, 172, 77, 0.15); }
 #network-badge {
   font-family: var(--font-body);
   font-weight: 600;
