@@ -74,6 +74,11 @@
     "prices.description": "美元价格来自 CoinGecko 的公共 API，仅供参考——查询过程中不会发送任何与您钱包相关的信息。",
     "prices.loading": "加载中...",
     "prices.naText": "无数据",
+    "prices.tabCrypto": "加密货币",
+    "prices.tabCurrencies": "法定货币",
+    "prices.searchPlaceholder": "搜索...",
+    "prices.currenciesNote": "每种货币 1 单位按您所选显示货币折算的价值。",
+    "prices.noResults": "没有结果。",
 
     "buy.title": "购买加密货币",
     "buy.description1": "购买功能由独立的第三方服务 MoonPay 提供支持——Token Exchange 不会接触您的支付信息。",

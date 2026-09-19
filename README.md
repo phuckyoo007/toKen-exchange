@@ -27,10 +27,15 @@ Chrome today.
 - Sanctioned-address screening: sends and swaps are checked against a bundled
   OFAC sanctions list before they go out (see "Sanctioned-address screening"
   below).
-- Live prices: a "Live prices" screen shows current USD prices (and 24h
-  change) for 18 widely-tracked cryptocurrencies, and the main screen shows
-  roughly what your connected account's balance is worth in USD -- both
-  powered by CoinGecko's free public API (see "Live prices" below).
+- Live prices: a "Live prices" screen has a **Crypto** tab (18 core coins plus ~50
+  more, searchable, with 24h change and a star-to-pin watchlist) and a
+  **Currencies** tab (what 1 unit of each of 42 national currencies is worth
+  in your display currency). The main screen shows roughly what your connected
+  account's balance is worth. Settings -> Display currency offers 42 fiat
+  currencies (USD, EUR, GBP, JPY, CHF, CNY, MXN, NGN, ...) and 5 crypto
+  denominations (BTC, ETH, BNB, SOL, XRP). All powered by CoinGecko's free
+  public API (see "Live prices" below). Extra coins whose CoinGecko id isn't
+  returned are quietly left out rather than shown as "n/a".
 - Buy crypto: a "Buy" button opens MoonPay's hosted on-ramp widget in a new
   tab so you can purchase crypto with a card or bank transfer and send it to
   your wallet address (see "Buy crypto (MoonPay)" below).

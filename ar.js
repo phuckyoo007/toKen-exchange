@@ -73,6 +73,11 @@
     "prices.description": "أسعار الدولار الأمريكي مأخوذة من واجهة CoinGecko العامة. لأغراض إعلامية فقط -- لا يتم إرسال أي بيانات عن محفظتك للحصول عليها.",
     "prices.loading": "جارٍ التحميل...",
     "prices.naText": "غير متاح",
+    "prices.tabCrypto": "العملات الرقمية",
+    "prices.tabCurrencies": "العملات",
+    "prices.searchPlaceholder": "بحث...",
+    "prices.currenciesNote": "قيمة وحدة واحدة من كل عملة بعملة العرض التي اخترتها.",
+    "prices.noResults": "لا توجد نتائج.",
 
     "buy.title": "شراء عملات رقمية",
     "buy.description1": "خدمة الشراء مقدَّمة عبر MoonPay، وهي خدمة خارجية منفصلة -- لا تطّلع Token Exchange مطلقًا على بيانات الدفع الخاصة بك.",

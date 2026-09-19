@@ -324,6 +324,12 @@
   <section id="screen-prices" class="screen hidden">
     <h2 data-i18n="common.livePrices">Live prices</h2>
     <p class="muted" data-i18n="prices.description">USD prices from CoinGecko's public API. Purely informational -- nothing about your wallet is sent to look these up.</p>
+    <div class="prices-tabs" role="tablist">
+      <button type="button" class="prices-tab active" data-prices-tab="crypto" data-i18n="prices.tabCrypto">Crypto</button>
+      <button type="button" class="prices-tab" data-prices-tab="currencies" data-i18n="prices.tabCurrencies">Currencies</button>
+    </div>
+    <input type="search" id="prices-search" class="prices-search" data-i18n-placeholder="prices.searchPlaceholder" placeholder="Search..." autocomplete="off" />
+    <p id="prices-tab-note" class="muted hidden" data-i18n="prices.currenciesNote">What 1 unit of each currency is worth in your display currency.</p>
     <div id="prices-list" class="prices-list"></div>
     <p id="prices-error" class="error hidden"></p>
     <p id="prices-status" class="hint hidden"></p>

@@ -73,6 +73,11 @@
     "prices.description": "Цены в USD берутся из публичного API CoinGecko. Это справочная информация — при её получении никакие данные вашего кошелька никуда не отправляются.",
     "prices.loading": "Загрузка...",
     "prices.naText": "н/д",
+    "prices.tabCrypto": "Крипто",
+    "prices.tabCurrencies": "Валюты",
+    "prices.searchPlaceholder": "Поиск...",
+    "prices.currenciesNote": "Стоимость 1 единицы каждой валюты в выбранной вами валюте отображения.",
+    "prices.noResults": "Ничего не найдено.",
 
     "buy.title": "Купить криптовалюту",
     "buy.description1": "Покупка осуществляется через MoonPay — независимый сторонний сервис. Token Exchange никогда не получает доступа к данным вашей оплаты.",

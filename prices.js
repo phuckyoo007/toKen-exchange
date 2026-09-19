@@ -40,6 +40,62 @@ const COINGECKO_IDS = {
   LTC: "litecoin",
   SHIB: "shiba-inu",
   TON: "the-open-network", // NOT "toncoin" -- CoinGecko's own quirk, verified on their coin page
+
+  // ---- Extra coins (added later; see EXTRA_PRICE_BOARD below) ----
+  // These follow CoinGecko's usual id conventions but were NOT each checked
+  // against a live coin page the way the 18 above were, so they are flagged
+  // `optional` on the board: if CoinGecko doesn't return one of them (a wrong
+  // or retired id), that row is quietly left out instead of showing "n/a".
+  BCH: "bitcoin-cash",
+  XLM: "stellar",
+  XMR: "monero",
+  ATOM: "cosmos",
+  NEAR: "near",
+  APT: "aptos",
+  ARB: "arbitrum",
+  OP: "optimism",
+  SUI: "sui",
+  ICP: "internet-computer",
+  FIL: "filecoin",
+  HBAR: "hedera-hashgraph",
+  VET: "vechain",
+  ALGO: "algorand",
+  AAVE: "aave",
+  MKR: "maker",
+  GRT: "the-graph",
+  INJ: "injective-protocol",
+  RENDER: "render-token",
+  PEPE: "pepe",
+  DAI: "dai",
+  WBTC: "wrapped-bitcoin",
+  ETC: "ethereum-classic",
+  KAS: "kaspa",
+  XTZ: "tezos",
+  EOS: "eos",
+  BONK: "bonk",
+  FLOKI: "floki",
+  SAND: "the-sandbox",
+  MANA: "decentraland",
+  LDO: "lido-dao",
+  CRV: "curve-dao-token",
+  STX: "blockstack",
+  CRO: "crypto-com-chain",
+  WIF: "dogwifcoin",
+  TAO: "bittensor",
+  WLD: "worldcoin-wld",
+  PAXG: "pax-gold",
+  TIA: "celestia",
+  SEI: "sei-network",
+  MNT: "mantle",
+  PYTH: "pyth-network",
+  ONDO: "ondo-finance",
+  FET: "fetch-ai",
+  THETA: "theta-token",
+  FLOW: "flow",
+  GALA: "gala",
+  CHZ: "chiliz",
+  COMP: "compound-governance-token",
+  SNX: "havven",
 };
 
 // Maps this wallet's internal network `key` (see lib/networks.js) to the
@@ -83,21 +139,118 @@ const PRICE_BOARD = [
   { symbol: "TON", name: "Toncoin" },
 ];
 
+// Extra coins shown on the Prices screen (searchable). `optional: true` means
+// "leave this row out if CoinGecko doesn't return it" -- see the note above.
+const EXTRA_PRICE_BOARD = [
+  ["BCH", "Bitcoin Cash"], ["XLM", "Stellar"], ["XMR", "Monero"], ["ATOM", "Cosmos"],
+  ["NEAR", "NEAR Protocol"], ["APT", "Aptos"], ["ARB", "Arbitrum"], ["OP", "Optimism"],
+  ["SUI", "Sui"], ["ICP", "Internet Computer"], ["FIL", "Filecoin"], ["HBAR", "Hedera"],
+  ["VET", "VeChain"], ["ALGO", "Algorand"], ["AAVE", "Aave"], ["MKR", "Maker"],
+  ["GRT", "The Graph"], ["INJ", "Injective"], ["RENDER", "Render"], ["PEPE", "Pepe"],
+  ["DAI", "Dai"], ["WBTC", "Wrapped Bitcoin"], ["ETC", "Ethereum Classic"], ["KAS", "Kaspa"],
+  ["XTZ", "Tezos"], ["EOS", "EOS"], ["BONK", "Bonk"], ["FLOKI", "Floki"],
+  ["SAND", "The Sandbox"], ["MANA", "Decentraland"], ["LDO", "Lido DAO"], ["CRV", "Curve DAO"],
+  ["STX", "Stacks"], ["CRO", "Cronos"], ["WIF", "dogwifhat"], ["TAO", "Bittensor"],
+  ["WLD", "Worldcoin"], ["PAXG", "PAX Gold"], ["TIA", "Celestia"], ["SEI", "Sei"],
+  ["MNT", "Mantle"], ["PYTH", "Pyth Network"], ["ONDO", "Ondo"], ["FET", "Fetch.ai"],
+  ["THETA", "Theta Network"], ["FLOW", "Flow"], ["GALA", "Gala"], ["CHZ", "Chiliz"],
+  ["COMP", "Compound"], ["SNX", "Synthetix"],
+].map(([symbol, name]) => ({ symbol, name, optional: true }));
+
+const FULL_PRICE_BOARD = PRICE_BOARD.concat(EXTRA_PRICE_BOARD);
+
 // Fiat currencies this wallet offers in Settings, all of which CoinGecko's
 // keyless API can price directly (no separate FX-rate lookup needed) -- see
 // https://docs.coingecko.com/reference/simple-supported-vs-currencies.
 // Symbol is just for display; the code is what's actually sent to CoinGecko.
 const SUPPORTED_CURRENCIES = {
-  usd: { symbol: "$", label: "USD" },
-  eur: { symbol: "€", label: "EUR" },
-  gbp: { symbol: "£", label: "GBP" },
-  jpy: { symbol: "¥", label: "JPY" },
-  cad: { symbol: "CA$", label: "CAD" },
-  aud: { symbol: "AU$", label: "AUD" },
-  inr: { symbol: "₹", label: "INR" },
-  brl: { symbol: "R$", label: "BRL" },
+  // ---- Fiat (national currencies). Every code below is in CoinGecko's own
+  // /simple/supported_vs_currencies list (checked Sept 2026). `decimals`
+  // defaults to 2; currencies with no minor unit in everyday use show 0,
+  // and the Gulf dinars that split into 1000ths show 3.
+  usd: { symbol: "$", label: "USD", name: "US Dollar", type: "fiat" },
+  eur: { symbol: "€", label: "EUR", name: "Euro", type: "fiat" },
+  gbp: { symbol: "£", label: "GBP", name: "British Pound", type: "fiat" },
+  jpy: { symbol: "¥", label: "JPY", name: "Japanese Yen", type: "fiat", decimals: 0 },
+  cad: { symbol: "CA$", label: "CAD", name: "Canadian Dollar", type: "fiat" },
+  aud: { symbol: "AU$", label: "AUD", name: "Australian Dollar", type: "fiat" },
+  inr: { symbol: "₹", label: "INR", name: "Indian Rupee", type: "fiat" },
+  brl: { symbol: "R$", label: "BRL", name: "Brazilian Real", type: "fiat" },
+  aed: { symbol: "AED", label: "AED", name: "UAE Dirham", type: "fiat" },
+  ars: { symbol: "AR$", label: "ARS", name: "Argentine Peso", type: "fiat" },
+  bdt: { symbol: "৳", label: "BDT", name: "Bangladeshi Taka", type: "fiat" },
+  bhd: { symbol: "BHD", label: "BHD", name: "Bahraini Dinar", type: "fiat", decimals: 3 },
+  bmd: { symbol: "BD$", label: "BMD", name: "Bermudian Dollar", type: "fiat" },
+  chf: { symbol: "CHF", label: "CHF", name: "Swiss Franc", type: "fiat" },
+  clp: { symbol: "CL$", label: "CLP", name: "Chilean Peso", type: "fiat", decimals: 0 },
+  cny: { symbol: "CN¥", label: "CNY", name: "Chinese Yuan", type: "fiat" },
+  czk: { symbol: "Kč", label: "CZK", name: "Czech Koruna", type: "fiat" },
+  dkk: { symbol: "kr", label: "DKK", name: "Danish Krone", type: "fiat" },
+  gel: { symbol: "₾", label: "GEL", name: "Georgian Lari", type: "fiat" },
+  hkd: { symbol: "HK$", label: "HKD", name: "Hong Kong Dollar", type: "fiat" },
+  huf: { symbol: "Ft", label: "HUF", name: "Hungarian Forint", type: "fiat", decimals: 0 },
+  idr: { symbol: "Rp", label: "IDR", name: "Indonesian Rupiah", type: "fiat", decimals: 0 },
+  ils: { symbol: "₪", label: "ILS", name: "Israeli Shekel", type: "fiat" },
+  krw: { symbol: "₩", label: "KRW", name: "South Korean Won", type: "fiat", decimals: 0 },
+  kwd: { symbol: "KWD", label: "KWD", name: "Kuwaiti Dinar", type: "fiat", decimals: 3 },
+  lkr: { symbol: "Rs", label: "LKR", name: "Sri Lankan Rupee", type: "fiat" },
+  mmk: { symbol: "K", label: "MMK", name: "Myanmar Kyat", type: "fiat", decimals: 0 },
+  mxn: { symbol: "MX$", label: "MXN", name: "Mexican Peso", type: "fiat" },
+  myr: { symbol: "RM", label: "MYR", name: "Malaysian Ringgit", type: "fiat" },
+  ngn: { symbol: "₦", label: "NGN", name: "Nigerian Naira", type: "fiat" },
+  nok: { symbol: "kr", label: "NOK", name: "Norwegian Krone", type: "fiat" },
+  nzd: { symbol: "NZ$", label: "NZD", name: "New Zealand Dollar", type: "fiat" },
+  php: { symbol: "₱", label: "PHP", name: "Philippine Peso", type: "fiat" },
+  pkr: { symbol: "Rs", label: "PKR", name: "Pakistani Rupee", type: "fiat" },
+  pln: { symbol: "zł", label: "PLN", name: "Polish Zloty", type: "fiat" },
+  rub: { symbol: "₽", label: "RUB", name: "Russian Ruble", type: "fiat" },
+  sar: { symbol: "SAR", label: "SAR", name: "Saudi Riyal", type: "fiat" },
+  sek: { symbol: "kr", label: "SEK", name: "Swedish Krona", type: "fiat" },
+  sgd: { symbol: "S$", label: "SGD", name: "Singapore Dollar", type: "fiat" },
+  thb: { symbol: "฿", label: "THB", name: "Thai Baht", type: "fiat" },
+  try: { symbol: "₺", label: "TRY", name: "Turkish Lira", type: "fiat" },
+  twd: { symbol: "NT$", label: "TWD", name: "New Taiwan Dollar", type: "fiat" },
+  uah: { symbol: "₴", label: "UAH", name: "Ukrainian Hryvnia", type: "fiat" },
+  vnd: { symbol: "₫", label: "VND", name: "Vietnamese Dong", type: "fiat", decimals: 0 },
+  zar: { symbol: "R", label: "ZAR", name: "South African Rand", type: "fiat" },
+
+  // ---- Crypto (also valid CoinGecko vs_currencies, so balances and prices
+  // can be shown in them directly). Shown with significant digits rather
+  // than fixed decimals -- see formatMoney().
+  btc: { symbol: "₿", label: "BTC", name: "Bitcoin", type: "crypto" },
+  eth: { symbol: "Ξ", label: "ETH", name: "Ethereum", type: "crypto" },
+  bnb: { symbol: "BNB", label: "BNB", name: "BNB", type: "crypto" },
+  sol: { symbol: "SOL", label: "SOL", name: "Solana", type: "crypto" },
+  xrp: { symbol: "XRP", label: "XRP", name: "XRP", type: "crypto" },
 };
 const DEFAULT_CURRENCY = "usd";
+
+// Formats an amount in the given display currency code. `opts.price` is for
+// per-unit coin prices, which keep extra precision under 1 (a $0.0000123
+// meme coin shouldn't read as $0.00). Alphabetic symbols ("CHF", "SAR") get
+// a space before the number; symbol-style ones ("$", "€") don't.
+function formatMoney(amount, currency, opts) {
+  const info = SUPPORTED_CURRENCIES[currency] || SUPPORTED_CURRENCIES[DEFAULT_CURRENCY];
+  const symbol = /^[A-Za-z]{2,}$/.test(info.symbol) ? info.symbol + "\u00A0" : info.symbol;
+  const n = Number(amount);
+  if (!isFinite(n)) return symbol + "0";
+  let body;
+  if (info.type === "crypto") {
+    body = n.toLocaleString(undefined, { maximumSignificantDigits: 6 });
+  } else {
+    const base = typeof info.decimals === "number" ? info.decimals : 2;
+    const isPrice = opts && opts.price;
+    if (isPrice && n !== 0 && Math.abs(n) < 0.01) {
+      // Sub-cent unit prices (PEPE, SHIB, BONK...) need significant digits,
+      // not fixed decimals, or they collapse to 0.0000.
+      body = n.toLocaleString(undefined, { maximumSignificantDigits: 4 });
+    } else {
+      const digits = isPrice && Math.abs(n) < 1 ? Math.max(base, 4) : base;
+      body = n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+  }
+  return symbol + body;
+}
 
 // Small in-memory cache. CoinGecko's keyless tier is IP-rate-limited to
 // roughly 10-30 requests/minute -- a 45s TTL keeps normal use (opening the
@@ -147,7 +300,7 @@ async function fetchPriceBoardMarkets(ids, currency) {
   if (priceBoardCache.data && priceBoardCache.cacheKey === cacheKey && now - priceBoardCache.fetchedAt < CACHE_TTL_MS) {
     return priceBoardCache.data;
   }
-  const url = `${COINGECKO_BASE}/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&price_change_percentage=24h`;
+  const url = `${COINGECKO_BASE}/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&per_page=250&price_change_percentage=24h`;
   let res;
   try {
     res = await fetch(url);
@@ -171,19 +324,63 @@ async function fetchPriceBoardMarkets(ids, currency) {
 // real logo image URL straight from CoinGecko (null for any of these if
 // CoinGecko didn't return that coin, e.g. a request that partially fails).
 async function getPriceBoard(currency) {
-  const ids = PRICE_BOARD.map((c) => COINGECKO_IDS[c.symbol]);
+  const ids = FULL_PRICE_BOARD.map((c) => COINGECKO_IDS[c.symbol]);
   const byId = await fetchPriceBoardMarkets(ids, currency);
-  return PRICE_BOARD.map((c) => {
+  const rows = [];
+  FULL_PRICE_BOARD.forEach((c) => {
     const id = COINGECKO_IDS[c.symbol];
     const entry = byId[id];
-    return {
+    // An optional (extra) coin CoinGecko didn't return is left out entirely
+    // rather than shown as "n/a" -- see the note on the extra ids above.
+    if (!entry && c.optional) return;
+    rows.push({
       symbol: c.symbol,
       name: c.name,
       price: entry ? entry.current_price : null,
       change24h: entry && typeof entry.price_change_percentage_24h === "number" ? entry.price_change_percentage_24h : null,
       image: entry ? entry.image : null,
-    };
+    });
   });
+  return rows;
+}
+
+// Fiat exchange rates: what 1 unit of each supported national currency is
+// worth in the given display currency. Uses CoinGecko's keyless
+// /exchange_rates endpoint, which prices everything against 1 BTC, so any
+// pair is just a ratio: 1 X = rates[display].value / rates[X].value.
+// Purely informational, same as the coin prices. Cached like the others.
+let fiatRatesCache = { fetchedAt: 0, data: null };
+
+async function fetchExchangeRates() {
+  const now = Date.now();
+  if (fiatRatesCache.data && now - fiatRatesCache.fetchedAt < CACHE_TTL_MS) return fiatRatesCache.data;
+  let res;
+  try {
+    res = await fetch(`${COINGECKO_BASE}/exchange_rates`);
+  } catch (e) {
+    throw new Error("Couldn't reach CoinGecko for currency rates. Check your internet connection.");
+  }
+  if (!res.ok) throw new Error(`CoinGecko exchange-rate request failed (HTTP ${res.status}).`);
+  const json = await res.json();
+  const rates = (json && json.rates) || {};
+  fiatRatesCache = { fetchedAt: now, data: rates };
+  return rates;
+}
+
+async function getFiatRates(currency) {
+  const display = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const rates = await fetchExchangeRates();
+  const base = rates[display];
+  if (!base || !base.value) return [];
+  const out = [];
+  Object.keys(SUPPORTED_CURRENCIES).forEach((code) => {
+    const info = SUPPORTED_CURRENCIES[code];
+    if (info.type !== "fiat" || code === display) return;
+    const r = rates[code];
+    if (!r || !r.value) return;
+    out.push({ code: info.label, name: info.name, rate: base.value / r.value });
+  });
+  return out;
 }
 
 // Returns the live price of the given network's native coin (in the given
@@ -249,6 +446,8 @@ async function getTokenPricesByContract(networkKey, addresses, currency) {
 if (typeof self !== "undefined") {
   self.TM_PRICES = {
     getPriceBoard,
+    getFiatRates,
+    formatMoney,
     getNativePriceForNetwork,
     getTokenPricesByContract,
     COINGECKO_IDS,

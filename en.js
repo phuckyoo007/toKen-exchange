@@ -99,6 +99,11 @@
     "prices.naText": "n/a",
     "prices.watchlistToggle": "Star to pin to top",
     "prices.cardUnavailable": "Prices unavailable right now.",
+    "prices.tabCrypto": "Crypto",
+    "prices.tabCurrencies": "Currencies",
+    "prices.searchPlaceholder": "Search...",
+    "prices.currenciesNote": "What 1 unit of each currency is worth in your display currency.",
+    "prices.noResults": "No results.",
 
     "predictions.title": "Trending Markets",
     "predictions.description": "Public odds from Polymarket's prediction markets -- informational only. Token Exchange does not place bets or hold positions on your behalf; nothing about your wallet is sent to look these up.",

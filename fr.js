@@ -74,6 +74,11 @@
     "prices.description": "Cours en USD fournis par l'API publique de CoinGecko. À titre purement informatif -- aucune information sur votre portefeuille n'est envoyée pour obtenir ces données.",
     "prices.loading": "Chargement...",
     "prices.naText": "n/d",
+    "prices.tabCrypto": "Crypto",
+    "prices.tabCurrencies": "Devises",
+    "prices.searchPlaceholder": "Rechercher...",
+    "prices.currenciesNote": "Ce que vaut 1 unité de chaque devise dans votre devise d'affichage.",
+    "prices.noResults": "Aucun résultat.",
 
     "buy.title": "Acheter des cryptos",
     "buy.description1": "L'achat est propulsé par MoonPay, un service tiers indépendant -- Token Exchange n'a jamais accès à vos informations de paiement.",

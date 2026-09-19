@@ -72,6 +72,11 @@
     "prices.description": "Preços em dólar (USD) da API pública da CoinGecko. Apenas informativo -- nenhum dado da sua carteira é enviado para essa consulta.",
     "prices.loading": "Carregando...",
     "prices.naText": "n/d",
+    "prices.tabCrypto": "Cripto",
+    "prices.tabCurrencies": "Moedas",
+    "prices.searchPlaceholder": "Pesquisar...",
+    "prices.currenciesNote": "Quanto vale 1 unidade de cada moeda na sua moeda de exibição.",
+    "prices.noResults": "Nenhum resultado.",
 
     "buy.title": "Comprar cripto",
     "buy.description1": "A compra é processada pela MoonPay, um serviço terceirizado independente -- a Token Exchange nunca tem acesso aos seus dados de pagamento.",

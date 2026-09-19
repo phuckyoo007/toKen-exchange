@@ -73,6 +73,11 @@
     "prices.description": "CoinGecko の公開 API による米ドル建て価格です。あくまで参考情報であり、この価格取得のためにウォレットの情報が送信されることはありません。",
     "prices.loading": "読み込み中...",
     "prices.naText": "該当なし",
+    "prices.tabCrypto": "暗号資産",
+    "prices.tabCurrencies": "通貨",
+    "prices.searchPlaceholder": "検索...",
+    "prices.currenciesNote": "各通貨 1 単位が、表示通貨でいくらになるかを示します。",
+    "prices.noResults": "結果がありません。",
 
     "buy.title": "暗号資産を購入",
     "buy.description1": "購入機能は、独立した第三者サービスである MoonPay によって提供されています。Token Exchange がお客様の支払い情報に触れることは一切ありません。",

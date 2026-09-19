@@ -38,7 +38,7 @@ function currencySymbol() {
 }
 
 function formatCurrency(amount) {
-  return `${currencySymbol()}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return TM_PRICES.formatMoney(amount, currentCurrency);
 }
 
 // ---------------------------------------------------------------- NETWORK COLORS
@@ -601,7 +601,7 @@ function renderPriceRow(c) {
   const priceText =
     c.price == null
       ? TM_I18N.t("prices.naText")
-      : `${currencySymbol()}${c.price.toLocaleString(undefined, { minimumFractionDigits: c.price < 1 ? 4 : 2, maximumFractionDigits: c.price < 1 ? 4 : 2 })}`;
+      : TM_PRICES.formatMoney(c.price, currentCurrency, { price: true });
   let changeHtml = "";
   if (typeof c.change24h === "number") {
     const cls = c.change24h >= 0 ? "up" : "down";
@@ -621,15 +621,67 @@ function renderPriceRow(c) {
   return row;
 }
 
+// Prices screen state: two tabs (crypto coins / fiat currencies) sharing one
+// search box. Data is fetched once per refresh and filtered client-side as
+// the person types, so searching never triggers another CoinGecko request.
+let pricesTab = "crypto";
+let pricesBoardData = [];
+let pricesRatesData = [];
+
+function renderCurrencyRow(r) {
+  const row = document.createElement("div");
+  row.className = "price-row";
+  row.innerHTML = `
+    <span class="price-left">${tokenIconHtml(r.code)}<span><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
+    <span class="price-right"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span>
+  `;
+  return row;
+}
+
+function renderPricesList() {
+  const list = $("prices-list");
+  const q = ($("prices-search").value || "").trim().toLowerCase();
+  list.innerHTML = "";
+  let count = 0;
+  if (pricesTab === "crypto") {
+    sortByWatchlist(pricesBoardData).forEach((c) => {
+      if (q && !(c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q))) return;
+      list.appendChild(renderPriceRow(c));
+      count++;
+    });
+  } else {
+    pricesRatesData.forEach((r) => {
+      if (q && !(r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))) return;
+      list.appendChild(renderCurrencyRow(r));
+      count++;
+    });
+  }
+  if (!count) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = TM_I18N.t("prices.noResults");
+    list.appendChild(p);
+  }
+}
+
+function setPricesTab(tab) {
+  pricesTab = tab;
+  document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
+  $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
+  refreshPrices();
+}
+
+document.querySelectorAll(".prices-tab").forEach((b) => b.addEventListener("click", () => setPricesTab(b.dataset.pricesTab)));
+$("prices-search").addEventListener("input", renderPricesList);
+
 async function refreshPrices() {
   hideError("prices-error");
   $("prices-status").innerHTML = coinSpinnerHtml(TM_I18N.t("prices.loading"));
   $("prices-status").classList.remove("hidden");
   try {
-    const board = sortByWatchlist(await TM_PRICES.getPriceBoard(currentCurrency));
-    const list = $("prices-list");
-    list.innerHTML = "";
-    board.forEach((c) => list.appendChild(renderPriceRow(c)));
+    if (pricesTab === "crypto") pricesBoardData = await TM_PRICES.getPriceBoard(currentCurrency);
+    else pricesRatesData = await TM_PRICES.getFiatRates(currentCurrency);
+    renderPricesList();
     $("prices-status").classList.add("hidden");
   } catch (e) {
     $("prices-status").classList.add("hidden");
@@ -1163,12 +1215,18 @@ function populateLanguageSelects() {
 function populateCurrencySelect() {
   const sel = $("currency-select-settings");
   sel.innerHTML = "";
+  const groups = { fiat: document.createElement("optgroup"), crypto: document.createElement("optgroup") };
+  groups.fiat.label = "Currencies";
+  groups.crypto.label = "Crypto";
   Object.keys(TM_PRICES.SUPPORTED_CURRENCIES).forEach((code) => {
+    const info = TM_PRICES.SUPPORTED_CURRENCIES[code];
     const opt = document.createElement("option");
     opt.value = code;
-    opt.textContent = `${TM_PRICES.SUPPORTED_CURRENCIES[code].symbol} ${TM_PRICES.SUPPORTED_CURRENCIES[code].label}`;
-    sel.appendChild(opt);
+    opt.textContent = `${info.label} - ${info.name} (${info.symbol})`;
+    (groups[info.type] || groups.fiat).appendChild(opt);
   });
+  sel.appendChild(groups.fiat);
+  sel.appendChild(groups.crypto);
   sel.value = currentCurrency;
   sel.addEventListener("change", async (e) => {
     currentCurrency = e.target.value;

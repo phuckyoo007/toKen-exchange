@@ -36,6 +36,8 @@
 const MOONPAY_SELL_WIDGET_BASE_URL_SANDBOX = "https://sell-sandbox.moonpay.com/";
 const MOONPAY_SELL_WIDGET_BASE_URL_LIVE = "https://sell.moonpay.com/";
 
+const MOONPAY_SELL_QUOTE_CURRENCIES = new Set(["usd", "eur", "gbp", "jpy", "cad", "aud", "inr", "brl"]);
+
 function moonpaySellApiKey() {
   return (self.TM_BUY_CONFIG && self.TM_BUY_CONFIG.MOONPAY_PUBLISHABLE_API_KEY) || "";
 }
@@ -66,7 +68,14 @@ function buildSellUrl(networkKey, quoteCurrency) {
   const baseCurrencyCode =
     self.TM_BUY_CONFIG && self.TM_BUY_CONFIG.NETWORK_MOONPAY_CURRENCY_CODE[networkKey];
   if (baseCurrencyCode) params.set("baseCurrencyCode", baseCurrencyCode);
-  if (quoteCurrency) params.set("quoteCurrencyCode", quoteCurrency);
+  // Only pass fiat codes MoonPay's sell widget is known to accept here (the
+  // original eight). The wallet's display currency list is much longer now
+  // (any CoinGecko-priced currency, plus crypto), and an unsupported
+  // quoteCurrencyCode could break the widget -- for anything else the
+  // widget's own currency picker takes over.
+  if (quoteCurrency && MOONPAY_SELL_QUOTE_CURRENCIES.has(String(quoteCurrency).toLowerCase())) {
+    params.set("quoteCurrencyCode", quoteCurrency);
+  }
   return `${sellWidgetBaseUrl(apiKey)}?${params.toString()}`;
 }
 

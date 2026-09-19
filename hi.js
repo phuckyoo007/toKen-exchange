@@ -74,6 +74,11 @@
     "prices.description": "CoinGecko के पब्लिक API से USD में कीमतें। यह पूरी तरह जानकारी के लिए है -- इन्हें देखने के लिए आपके वॉलेट की कोई भी जानकारी कहीं नहीं भेजी जाती।",
     "prices.loading": "लोड हो रहा है...",
     "prices.naText": "उपलब्ध नहीं",
+    "prices.tabCrypto": "क्रिप्टो",
+    "prices.tabCurrencies": "मुद्राएँ",
+    "prices.searchPlaceholder": "खोजें...",
+    "prices.currenciesNote": "आपकी चुनी हुई डिस्प्ले मुद्रा में हर मुद्रा की 1 इकाई का मूल्य।",
+    "prices.noResults": "कोई परिणाम नहीं।",
 
     "buy.title": "क्रिप्टो खरीदें",
     "buy.description1": "खरीदारी की सुविधा MoonPay द्वारा संचालित है, जो एक अलग थर्ड-पार्टी सेवा है -- Token Exchange आपकी भुगतान जानकारी को कभी नहीं छूता।",
