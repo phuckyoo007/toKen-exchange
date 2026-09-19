@@ -231,6 +231,13 @@ function csrfOk(req) {
 const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 const AUTHKEY_RE = /^[A-Za-z0-9+/]{43}=$/; // base64 of exactly 32 bytes
 const B64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+// Mirrors TM_I18N_LANGS in lib/i18n.js. Kept as a plain list here (rather than
+// importing the browser-side file) since this is the one place server-side
+// code needs it, and it changes rarely.
+const LANGUAGE_CODES = ["en", "ar", "zh", "es", "fr", "hi", "pt", "ja", "ru"];
+function validLanguage(l) {
+  return typeof l === "string" && LANGUAGE_CODES.includes(l);
+}
 
 function normUsername(u) {
   return String(u == null ? "" : u).normalize("NFKC").trim().toLowerCase();
@@ -341,7 +348,7 @@ async function handle(req, res, url) {
   if (url === "/api/auth/me" && method === "GET") {
     const s = sessionFromReq(req);
     if (!s) return sendJson(req, res, 401, { error: "Not signed in." });
-    return sendJson(req, res, 200, { username: s.username, version: s.user.vault.version, updatedAt: s.user.vault.updatedAt });
+    return sendJson(req, res, 200, { username: s.username, version: s.user.vault.version, updatedAt: s.user.vault.updatedAt, language: s.user.language || null });
   }
 
   if (url === "/api/vault" && method === "GET") {
@@ -372,12 +379,13 @@ async function handle(req, res, url) {
     const { salt, verifier } = await makeVerifier(body.authKey);
     // Re-check after the await: two simultaneous sign-ups for one name.
     if (Object.prototype.hasOwnProperty.call(db.users, username)) return sendJson(req, res, 409, { error: "That username is taken." });
-    const user = { salt, verifier, createdAt: Date.now(), vault: null, history: [] };
+    const language = validLanguage(body.language) ? body.language : null;
+    const user = { salt, verifier, createdAt: Date.now(), vault: null, history: [], language };
     pushVault(user, body.bundle);
     db.users[username] = user;
     const token = createSession(username);
     persist();
-    return sendJson(req, res, 201, { username, version: user.vault.version, updatedAt: user.vault.updatedAt }, {
+    return sendJson(req, res, 201, { username, version: user.vault.version, updatedAt: user.vault.updatedAt, language: user.language }, {
       "Set-Cookie": sessionCookie(req, token, SESSION_TTL_MS / 1000),
     });
   }
@@ -408,7 +416,7 @@ async function handle(req, res, url) {
     buckets.delete("loginfail:" + username);
     const token = createSession(username);
     persist();
-    return sendJson(req, res, 200, { username, version: user.vault.version, updatedAt: user.vault.updatedAt }, {
+    return sendJson(req, res, 200, { username, version: user.vault.version, updatedAt: user.vault.updatedAt, language: user.language || null }, {
       "Set-Cookie": sessionCookie(req, token, SESSION_TTL_MS / 1000),
     });
   }
@@ -435,6 +443,17 @@ async function handle(req, res, url) {
     pushVault(s.user, body.bundle);
     persist();
     return sendJson(req, res, 200, { version: s.user.vault.version, updatedAt: s.user.vault.updatedAt });
+  }
+
+  // A plain UI preference, not part of the encrypted vault -- stored as
+  // plaintext on the account (same trust level as the username) so it can
+  // follow the person to a new device on sign-in, even before that device
+  // has restored the vault.
+  if (url === "/api/auth/language" && method === "POST") {
+    if (!validLanguage(body.language)) return sendJson(req, res, 400, { error: "Unsupported language." });
+    s.user.language = body.language;
+    persist();
+    return sendJson(req, res, 200, { ok: true, language: s.user.language });
   }
 
   // Re-authentication for sensitive actions. Shares the login throttles so it
