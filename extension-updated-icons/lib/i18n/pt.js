@@ -1,0 +1,293 @@
+// lib/i18n/pt.js
+// Portuguese localization. Must define the exact same `strings` keys and
+// the exact same FAQ `id`s as lib/i18n/en.js.
+(function () {
+  const strings = {
+    "common.needHelp": "Precisa de ajuda?",
+    "common.languageLabel": "Idioma",
+    "common.back": "Voltar",
+    "common.cancel": "Cancelar",
+    "common.copy": "Copiar",
+    "common.send": "Enviar",
+    "common.swap": "Trocar",
+    "common.buy": "Comprar",
+    "common.livePrices": "Preços em tempo real",
+    "common.reject": "Rejeitar",
+    "common.passwordPlaceholder": "Senha",
+    "common.confirmPasswordPlaceholder": "Confirmar senha",
+    "common.newPasswordLabel": "Nova senha (mínimo de 8 caracteres)",
+    "common.addressPlaceholder0x": "0x...",
+    "common.tokenAddressPlaceholderParen": "Endereço do token (0x...)",
+    "common.amountPlaceholder": "0.0",
+    "common.nativeCoinOption": "Moeda nativa",
+
+    "onboarding.title": "Bem-vindo",
+    "onboarding.subtitle": "Configure sua carteira para começar.",
+    "onboarding.createBtn": "Criar uma nova carteira",
+    "onboarding.importBtn": "Importar uma carteira existente",
+
+    "create.title": "Criar carteira",
+    "create.passwordLabel": "Nova senha (mínimo de 8 caracteres)",
+    "create.passwordWarning": "Essa senha desbloqueia sua carteira apenas neste dispositivo. Não há como recuperá-la -- somente sua frase de recuperação pode restaurar seus fundos.",
+    "create.continueBtn": "Continuar",
+    "create.backupWarning": "Anote esta frase de recuperação e guarde-a em um local seguro. Qualquer pessoa que tiver acesso a ela pode levar tudo o que há nesta carteira. A Token Exchange não consegue recuperá-la para você.",
+    "create.backupCheckbox": "Já salvei minha frase de recuperação",
+    "create.finishBtn": "Concluir",
+
+    "import.title": "Importar carteira",
+    "import.mnemonicLabel": "Frase de recuperação (12 ou 24 palavras)",
+    "import.mnemonicPlaceholder": "palavra1 palavra2 palavra3 ...",
+    "import.submitBtn": "Importar",
+
+    "unlock.title": "Desbloquear",
+    "unlock.submitBtn": "Desbloquear",
+    "unlock.resetInsteadBtn": "Redefinir carteira em vez disso",
+
+    "main.settingsTitle": "Configurações",
+    "main.tokensTitle": "Tokens",
+    "main.addTokenBtn": "+ Adicionar token",
+    "main.tokensEmpty": "Nenhum token adicionado ainda -- toque em “+ Adicionar token” e informe o endereço de um contrato para acompanhá-lo.",
+    "main.networkLabel": "Rede",
+    "main.balanceFetchErrorPrefix": "Não foi possível obter o saldo: ",
+
+    "tokens.loadError": "Não foi possível carregar o saldo",
+    "tokens.removeTitle": "Remover",
+
+    "addToken.title": "Adicionar token",
+    "addToken.description": "Informe o endereço do contrato do token na rede atual. Adicione apenas um token cujo endereço de contrato tenha vindo de uma fonte confiável -- uma carteira não consegue distinguir um token verdadeiro de uma falsificação com o mesmo nome.",
+    "addToken.addressLabel": "Endereço do contrato do token",
+    "addToken.lookupBtn": "Consultar",
+    "addToken.nameLabel": "Nome:",
+    "addToken.symbolLabel": "Símbolo:",
+    "addToken.decimalsLabel": "Casas decimais:",
+    "addToken.confirmBtn": "Adicionar à minha carteira",
+    "addToken.invalidAddress": "Informe um endereço de contrato válido.",
+    "addToken.noName": "(sem nome)",
+    "addToken.swapUnavailableSuffix": " (troca indisponível)",
+
+    "prices.description": "Preços em dólar (USD) da API pública da CoinGecko. Apenas informativo -- nenhum dado da sua carteira é enviado para essa consulta.",
+    "prices.loading": "Carregando...",
+    "prices.naText": "n/d",
+
+    "buy.title": "Comprar cripto",
+    "buy.description1": "A compra é processada pela MoonPay, um serviço terceirizado independente -- a Token Exchange nunca tem acesso aos seus dados de pagamento.",
+    "buy.description2Html": "A MoonPay abrirá em uma nova aba. Como esta carteira nunca envia seu endereço à MoonPay automaticamente (isso exigiria assinar solicitações com uma chave secreta, que jamais deve existir dentro de uma extensão de navegador -- veja <code>lib/buy-config.js</code>), <strong>cole você mesmo o seu endereço de recebimento</strong> assim que a aba da MoonPay abrir:",
+    "buy.continueBtn": "Continuar para a MoonPay",
+
+    "support.title": "Ajuda e suporte",
+    "support.description": "Faça uma pergunta ou toque em um dos tópicos abaixo. Isso é processado inteiramente no seu dispositivo -- nada do que você digitar aqui é enviado a lugar nenhum.",
+    "support.inputPlaceholder": "Digite uma pergunta...",
+
+    "send.title": "Enviar",
+    "send.assetLabel": "Ativo",
+    "send.assetToken": "Token (informe o endereço do contrato)",
+    "send.tokenAddressPlaceholder": "Endereço do contrato do token (0x...)",
+    "send.toLabel": "Endereço de destino",
+    "send.amountLabel": "Valor",
+    "send.invalidRecipient": "Informe um endereço de destinatário válido.",
+    "send.invalidTokenAddress": "Informe um endereço de contrato de token válido.",
+    "send.sentStatus": "Enviado! Hash da transação: {txHash}",
+
+    "swap.unsupportedWarning": "A troca ainda não está habilitada nesta rede -- nenhum roteador verificado foi configurado. Adicione um em Configurações → Redes primeiro.",
+    "swap.fromLabel": "De",
+    "swap.toLabel": "Para",
+    "swap.getQuoteBtn": "Obter cotação",
+    "swap.appFeeLine": "Taxa do app ({percent}): {amount}",
+    "swap.netAmountLine": "Valor líquido trocado: {amount}",
+    "swap.estimatedOutLine": "Estimativa de saída: {amount}",
+    "swap.slippageLabel": "Tolerância de slippage",
+    "swap.approveBtn": "Aprovar token primeiro",
+    "swap.approvingStatus": "Aprovando...",
+    "swap.approvedStatus": "Aprovado. Você já pode trocar.",
+    "swap.sendingStatus": "Enviando taxa e trocando...",
+    "swap.swappedStatus": "Troca concluída! Tx da taxa: {feeTx} | Tx da troca: {tx}",
+    "swap.feeTxNa": "n/d",
+
+    "settings.title": "Configurações",
+    "settings.addAccountBtn": "Adicionar conta",
+    "settings.importKeyBtn": "Importar chave privada",
+    "settings.addNetworkBtn": "Adicionar rede",
+    "settings.viewSeedBtn": "Ver frase de recuperação",
+    "settings.helpBtn": "Ajuda e suporte",
+    "settings.lockBtn": "Bloquear carteira",
+    "settings.resetBtn": "Redefinir carteira",
+
+    "importKey.title": "Importar chave privada",
+    "importKey.placeholder": "Chave privada 0x",
+
+    "addNetwork.title": "Adicionar rede",
+    "addNetwork.namePlaceholder": "Nome da rede",
+    "addNetwork.chainIdPlaceholder": "ID da rede (número)",
+    "addNetwork.rpcPlaceholder": "URL do RPC",
+    "addNetwork.symbolPlaceholder": "Símbolo da moeda nativa",
+    "addNetwork.explorerPlaceholder": "URL do explorador de blocos (opcional)",
+    "addNetwork.routerPlaceholder": "Endereço do roteador de troca verificado (opcional)",
+    "addNetwork.routerWarning": "Preencha o endereço do roteador somente se você mesmo o tiver verificado na documentação oficial do projeto ou no explorador de blocos da rede. Deixe em branco se tiver dúvida -- a troca simplesmente ficará desativada nesta rede até que você adicione um.",
+    "addNetwork.addBtn": "Adicionar",
+
+    "viewSeed.title": "Frase de recuperação",
+    "viewSeed.passwordPlaceholder": "Digite a senha para revelar",
+    "viewSeed.revealBtn": "Revelar",
+
+    "reset.title": "Redefinir carteira",
+    "reset.warning": "Isso exclui a carteira criptografada deste navegador. Certifique-se de ter feito backup da sua frase de recuperação -- essa ação não pode ser desfeita.",
+    "reset.confirmBtn": "Sim, excluir tudo",
+
+    "approve.unlockTitle": "Desbloqueie para continuar",
+    "approve.unlockOriginText": "{origin} está solicitando acesso.",
+    "approve.connectTitle": "Solicitação de conexão",
+    "approve.connectWantsText": "{origin} quer se conectar à sua carteira.",
+    "approve.accountLabel": "Conta: ",
+    "approve.acceptConnectBtn": "Conectar",
+    "approve.txTitle": "Solicitação de transação",
+    "approve.toLabel": "Para:",
+    "approve.valueLabel": "Valor:",
+    "approve.dataLabel": "Dados:",
+    "approve.txWarning": "Só aprove isto se você confia no site e entende o que está sendo solicitado que você assine.",
+    "approve.confirmBtn": "Confirmar",
+    "approve.signTitle": "Solicitação de assinatura",
+    "approve.signBtn": "Assinar",
+    "approve.addNetTitle": "Solicitação para adicionar rede",
+    "approve.addNetNameLabel": "Nome:",
+    "approve.addNetChainIdLabel": "ID da rede:",
+    "approve.addNetRpcLabel": "RPC:",
+    "approve.addNetWarning": "A rede sugerida por este site não possui um roteador de troca verificado. A troca continuará desativada nela até que você mesmo adicione um em Configurações.",
+    "approve.addNetBtn": "Adicionar rede",
+    "approve.contractCreation": "(criação de contrato)",
+    "approve.nativeSuffix": " (nativa)",
+
+    "loading.text": "Carregando...",
+
+    "footer.nonCustodial": "Não custodial — suas chaves nunca saem deste dispositivo",
+
+    "errors.passwordTooShort": "A senha deve ter pelo menos 8 caracteres.",
+    "errors.passwordMismatch": "As senhas não coincidem.",
+    "errors.unknownError": "Erro desconhecido",
+  };
+
+  const faq = [
+    {
+      id: "create-wallet",
+      chip: "Como eu crio uma carteira?",
+      keywords: ["criar carteira", "criar uma carteira", "nova carteira", "configurar carteira", "primeira vez", "começar agora"],
+      answer: "Toque em “Criar uma nova carteira” na tela de boas-vindas, escolha uma senha (ela só desbloqueia a carteira neste dispositivo -- não recupera seus fundos) e você verá uma frase de recuperação de 12 palavras. Anote-a em um local seguro antes de continuar -- essa frase é a única forma de recuperar seus fundos caso este dispositivo seja perdido.",
+    },
+    {
+      id: "import-wallet",
+      chip: "Como eu importo uma carteira existente?",
+      keywords: ["importar carteira", "importar carteira existente", "restaurar carteira", "carteira existente", "importar frase de recuperação", "importar seed"],
+      answer: "Na tela de boas-vindas, toque em “Importar uma carteira existente”, digite sua frase de recuperação de 12 ou 24 palavras exatamente como está escrita (minúsculas, separadas por espaço) e defina uma nova senha para este dispositivo. A frase em si nunca sai do seu dispositivo -- ela é usada localmente para derivar suas contas.",
+    },
+    {
+      id: "forgot-password",
+      chip: "Esqueci minha senha",
+      keywords: ["esqueci minha senha", "esqueci a senha", "senha errada", "não consigo desbloquear", "nao consigo desbloquear", "bloqueado", "senha não funciona", "senha nao funciona"],
+      answer: "Sua senha só desbloqueia a carteira neste dispositivo -- a Token Exchange nunca a armazena em lugar nenhum e não consegue redefini-la para você. Se você não se lembra dela, toque em “Redefinir carteira em vez disso” na tela de desbloqueio e importe sua carteira novamente usando sua frase de recuperação de 12 palavras. Se você não tiver essa frase salva, os fundos desta carteira infelizmente não podem ser recuperados -- essa é a contrapartida de uma carteira não custodial: ninguém além de você consegue desbloqueá-la, o que também significa que ninguém além de você consegue resgatá-la.",
+    },
+    {
+      id: "lost-seed-phrase",
+      chip: "Perdi minha frase de recuperação",
+      keywords: ["perdi minha seed", "perdi minha frase", "perdi a frase de recuperação", "não tenho minha frase", "nao tenho minha frase", "esqueci minha frase", "nunca anotei", "não salvei"],
+      answer: "Se você ainda estiver conectado, vá em Configurações → “Ver frase de recuperação”, digite sua senha novamente e anote a frase agora em um local seguro. Se você estiver bloqueado E nunca tiver salvado a frase, não há como recuperar a carteira nem os fundos nela. A Token Exchange nunca armazena sua frase em lugar nenhum -- em um servidor, na nuvem, em qualquer lugar -- então ninguém, nem mesmo o desenvolvedor, consegue recuperá-la para você.",
+    },
+    {
+      id: "balance-not-showing",
+      chip: "Meu saldo não está aparecendo",
+      keywords: ["saldo", "saldo zerado", "0,00", "não está aparecendo", "nao esta aparecendo", "saldo errado", "saldo travado", "ainda carregando", "saldo é 0"],
+      answer: "Um saldo travado em “...” geralmente significa que o endpoint RPC dessa rede está lento ou momentaneamente fora do ar -- esta carteira tenta automaticamente um endpoint alternativo depois de alguns segundos, então geralmente se resolve sozinho. Se ele se estabilizar em 0 e isso parecer errado, verifique se você está na rede certa e na conta certa (os dois menus suspensos ficam na tela principal) -- os saldos são controlados separadamente por rede e por conta, então fundos na Base não vão aparecer enquanto a Ethereum Mainnet estiver selecionada, por exemplo.",
+    },
+    {
+      id: "swap-failed",
+      chip: "Minha troca falhou",
+      keywords: ["troca falhou", "swap falhou", "troca travada", "troca não funciona", "erro na troca", "cotação falhou", "swap não funcionou"],
+      answer: "As trocas acontecem on-chain por meio de um roteador público de exchange descentralizada, então uma falha costuma ser uma destas três coisas: saldo insuficiente para cobrir o valor mais a taxa de gas da rede, uma tolerância de slippage definida de forma muito rígida para um preço que se move rápido (tente 1% ou 3% em vez de 0,5%), ou aquele par de tokens ainda não ter liquidez suficiente no roteador dessa rede. O erro exibido na tela de Troca após “Obter cotação” geralmente indica qual é o caso -- se não estiver claro, tente novamente com um valor menor primeiro.",
+    },
+    {
+      id: "swap-fee",
+      chip: "Quanto custa uma troca?",
+      keywords: ["taxa de troca", "quanto custa", "0,5%", "cobrança na troca", "taxa do swap", "qual é a taxa", "qual e a taxa"],
+      answer: "As trocas têm uma taxa fixa de 0,5% sobre o valor trocado, mostrada claramente na cotação antes de você confirmar -- ela faz parte da própria transação de troca, nunca é uma margem escondida embutida na taxa de câmbio. Isso é separado da taxa de gas da rede, que vai para a blockchain, não para a Token Exchange.",
+    },
+    {
+      id: "gas-fees",
+      chip: "O que é taxa de gas?",
+      keywords: ["taxa de gas", "taxa da rede", "taxa de transação", "taxa de transacao", "o que é gas", "o que e gas", "custo do gas"],
+      answer: "Gas é a taxa que a própria rede blockchain cobra para processar uma transação -- é separada da taxa de troca de 0,5% da Token Exchange e vai inteiramente para a rede, não para nós. O valor varia conforme o congestionamento da rede no momento. Certifique-se de ter o suficiente da moeda nativa daquela rede (ETH, BNB, POL etc.) para cobrir o gas, mesmo ao enviar um token em vez da moeda nativa.",
+    },
+    {
+      id: "add-network",
+      chip: "Como eu adiciono uma rede?",
+      keywords: ["adicionar rede", "nova rede", "rede personalizada", "outra chain", "outra rede", "rede diferente"],
+      answer: "Vá em Configurações → “Adicionar rede” e preencha o nome da rede, o chain ID, a URL do RPC e o símbolo da moeda nativa. Se você também adicionar ali um endereço de roteador de troca verificado, a troca funcionará nessa rede também -- caso contrário, ela só cuidará de envios e recebimentos. Use apenas valores que você mesmo tenha verificado na documentação oficial dessa rede ou no explorador de blocos.",
+    },
+    {
+      id: "add-token",
+      chip: "Como eu acompanho um token?",
+      keywords: ["adicionar token", "acompanhar token", "novo token", "token personalizado", "erc-20", "erc20", "rastrear token"],
+      answer: "Na tela principal, toque em “+ Adicionar token”, cole o endereço do contrato do token na rede atual e toque em “Consultar” -- isso lê o nome, o símbolo e as casas decimais do token diretamente do contrato, para você confirmar antes de adicioná-lo. Adicione apenas um token cujo endereço de contrato tenha vindo de uma fonte confiável; uma carteira não consegue distinguir um token verdadeiro de uma falsificação com o mesmo nome e símbolo.",
+    },
+    {
+      id: "send-crypto",
+      chip: "Como eu envio cripto?",
+      keywords: ["como eu envio", "enviar cripto", "enviar tokens", "transferir cripto", "enviar eth", "enviar fundos"],
+      answer: "Toque em “Enviar” na tela principal, escolha a moeda nativa ou um token (pelo endereço do contrato), informe o endereço do destinatário e um valor, e confirme. Confira o endereço com atenção antes de confirmar -- envios nessas redes são irreversíveis assim que são concluídos.",
+    },
+    {
+      id: "connect-dapp",
+      chip: "Como eu me conecto a um site?",
+      keywords: ["conectar dapp", "conectar a um site", "botão de conectar carteira", "botao de conectar carteira", "conectar ao site", "não conecta", "nao conecta"],
+      answer: "Qualquer site com um botão “Connect Wallet” que ofereça suporte a extensões de carteira no navegador deve exibir a Token Exchange da mesma forma que exibiria a MetaMask ou a Coinbase Wallet. Se um site não mostrar essa opção, tente atualizar a página depois que a carteira estiver instalada e desbloqueada -- alguns sites só detectam extensões de carteira ao carregar a página.",
+    },
+    {
+      id: "buy-not-working",
+      chip: "A compra não está funcionando",
+      keywords: ["botão de comprar", "botao de comprar", "compra não funciona", "compra nao funciona", "compra não configurada", "moonpay", "não consigo comprar", "nao consigo comprar"],
+      answer: "O botão Comprar abre a MoonPay, um serviço de on-ramp terceirizado, em uma nova aba. Se aparecer “Buy isn't configured yet”, isso significa que o desenvolvedor desta carteira ainda não adicionou uma chave de API da MoonPay -- não é algo que você possa corrigir de dentro da carteira. Depois de configurado, você mesmo colará seu próprio endereço de recebimento na página da MoonPay; a Token Exchange nunca o envia em seu nome.",
+    },
+    {
+      id: "reset-wallet",
+      chip: "Como eu redefino minha carteira?",
+      keywords: ["redefinir carteira", "excluir carteira", "começar de novo", "comecar de novo", "remover carteira", "apagar carteira"],
+      answer: "Configurações → “Redefinir carteira” exclui permanentemente a carteira criptografada deste navegador. Certifique-se absolutamente de ter feito backup da sua frase de recuperação antes -- isso não pode ser desfeito, e não há como recuperar a carteira depois sem essa frase.",
+    },
+    {
+      id: "is-it-safe",
+      chip: "Esta carteira é segura?",
+      keywords: ["é seguro", "e seguro", "isso é seguro", "confio nisso", "não custodial", "nao custodial", "custodial", "isso é confiável", "isso é golpe", "é golpe", "é confiável"],
+      answer: "A Token Exchange é não custodial: sua frase de recuperação e suas chaves privadas são criptografadas e armazenadas apenas no seu navegador -- nunca são enviadas a nenhum servidor, porque não existe um. Isso também significa que ninguém, nem mesmo o desenvolvedor, consegue recuperar seus fundos se você perder a senha e a frase de recuperação ao mesmo tempo. Envios e trocas também são verificados contra uma lista de sanções incluída no próprio aplicativo antes de serem enviados, tudo no dispositivo, e as taxas de troca são sempre mostradas antecipadamente, antes de você confirmar.",
+    },
+    {
+      id: "pending-transaction",
+      chip: "Minha transação está travada",
+      keywords: ["pendente", "transação travada", "transacao travada", "transação não confirma", "ainda pendente", "transação presa"],
+      answer: "Uma transação pode ficar “pendente” se a rede estiver congestionada ou se a taxa de gas usada estiver baixa demais para as condições atuais. Ela deve confirmar por conta própria com o tempo. Se estiver travada há muito tempo, você pode consultar a transação no explorador de blocos dessa rede usando o endereço da sua conta para ver o status em tempo real.",
+    },
+    {
+      id: "wrong-network",
+      chip: "Quais redes são suportadas?",
+      keywords: ["qual rede", "rede errada", "trocar de rede", "redes suportadas", "quais chains", "chains suportadas", "quais redes"],
+      answer: "Já incluídas: Ethereum, Base, Polygon, BNB Chain, Arbitrum One e OP Mainnet, selecionáveis no menu suspenso perto da parte inferior da tela principal -- seu saldo, seus tokens e as opções de troca são específicos da rede selecionada ali. Você pode adicionar qualquer outra rede compatível com EVM em Configurações → “Adicionar rede”.",
+    },
+    {
+      id: "contact-human",
+      chip: "Preciso de mais ajuda",
+      keywords: ["falar com uma pessoa", "atendente humano", "contatar suporte", "falar com vocês", "ainda preciso de ajuda", "preciso de mais ajuda", "falar com alguém"],
+      answer: "__CONTACT_FALLBACK__",
+    },
+  ];
+
+  const greeting = "Oi! Sou um assistente de ajuda simples e embutido -- só consigo responder perguntas de uma lista fixa definida com antecedência, nada além disso. Toque em um tópico abaixo ou digite sua própria pergunta.";
+  const fallbackWithEmail = "Ainda não tenho uma resposta pronta para isso. Você pode falar com uma pessoa em {email} -- ajuda mencionar em qual tela você estava e o que esperava que acontecesse.";
+  const fallbackNoEmail = "Ainda não tenho uma resposta pronta para isso, e esta carteira também ainda não tem um canal de suporte humano configurado. Tente reformular sua pergunta ou consulte o README da extensão para mais detalhes sobre como cada recurso funciona.";
+
+  self.TM_I18N_DATA = self.TM_I18N_DATA || {};
+  self.TM_I18N_DATA.pt = {
+    name: "Português",
+    dir: "ltr",
+    strings,
+    faq,
+    greeting,
+    fallbackWithEmail,
+    fallbackNoEmail,
+  };
+})();

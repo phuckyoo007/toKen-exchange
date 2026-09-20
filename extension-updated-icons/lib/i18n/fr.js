@@ -1,0 +1,295 @@
+// lib/i18n/fr.js
+// French localization. Must define the exact same `strings` keys and the
+// exact same FAQ `id`s as lib/i18n/en.js (the canonical source) --
+// lib/i18n.js falls back to en.js for anything missing here, and
+// test-i18n.js checks the key sets match.
+(function () {
+  const strings = {
+    "common.needHelp": "Besoin d'aide ?",
+    "common.languageLabel": "Langue",
+    "common.back": "Retour",
+    "common.cancel": "Annuler",
+    "common.copy": "Copier",
+    "common.send": "Envoyer",
+    "common.swap": "Échanger",
+    "common.buy": "Acheter",
+    "common.livePrices": "Cours en direct",
+    "common.reject": "Refuser",
+    "common.passwordPlaceholder": "Mot de passe",
+    "common.confirmPasswordPlaceholder": "Confirmer le mot de passe",
+    "common.newPasswordLabel": "Nouveau mot de passe (8 caractères minimum)",
+    "common.addressPlaceholder0x": "0x...",
+    "common.tokenAddressPlaceholderParen": "Adresse du token (0x...)",
+    "common.amountPlaceholder": "0.0",
+    "common.nativeCoinOption": "Monnaie native",
+
+    "onboarding.title": "Bienvenue",
+    "onboarding.subtitle": "Configurez votre portefeuille pour commencer.",
+    "onboarding.createBtn": "Créer un nouveau portefeuille",
+    "onboarding.importBtn": "Importer un portefeuille existant",
+
+    "create.title": "Créer un portefeuille",
+    "create.passwordLabel": "Nouveau mot de passe (8 caractères minimum)",
+    "create.passwordWarning": "Ce mot de passe déverrouille votre portefeuille sur cet appareil. Il ne peut pas être récupéré -- seule votre phrase de récupération peut restaurer vos fonds.",
+    "create.continueBtn": "Continuer",
+    "create.backupWarning": "Notez cette phrase de récupération et conservez-la en lieu sûr. Toute personne qui la possède peut s'emparer de tout ce qui se trouve dans ce portefeuille. Token Exchange ne peut pas la récupérer pour vous.",
+    "create.backupCheckbox": "J'ai sauvegardé ma phrase de récupération",
+    "create.finishBtn": "Terminer",
+
+    "import.title": "Importer un portefeuille",
+    "import.mnemonicLabel": "Phrase de récupération (12 ou 24 mots)",
+    "import.mnemonicPlaceholder": "mot1 mot2 mot3 ...",
+    "import.submitBtn": "Importer",
+
+    "unlock.title": "Déverrouiller",
+    "unlock.submitBtn": "Déverrouiller",
+    "unlock.resetInsteadBtn": "Réinitialiser le portefeuille à la place",
+
+    "main.settingsTitle": "Paramètres",
+    "main.tokensTitle": "Tokens",
+    "main.addTokenBtn": "+ Ajouter un token",
+    "main.tokensEmpty": "Aucun token ajouté pour l'instant -- appuyez sur « + Ajouter un token » et saisissez une adresse de contrat pour en suivre un.",
+    "main.networkLabel": "Réseau",
+    "main.balanceFetchErrorPrefix": "Impossible de récupérer le solde : ",
+
+    "tokens.loadError": "Impossible de charger le solde",
+    "tokens.removeTitle": "Supprimer",
+
+    "addToken.title": "Ajouter un token",
+    "addToken.description": "Saisissez l'adresse du contrat du token sur le réseau actuel. N'ajoutez un token que si vous avez obtenu son adresse de contrat d'une source de confiance -- un portefeuille ne peut pas distinguer un vrai token d'un faux portant le même nom.",
+    "addToken.addressLabel": "Adresse du contrat du token",
+    "addToken.lookupBtn": "Rechercher",
+    "addToken.nameLabel": "Nom :",
+    "addToken.symbolLabel": "Symbole :",
+    "addToken.decimalsLabel": "Décimales :",
+    "addToken.confirmBtn": "Ajouter à mon portefeuille",
+    "addToken.invalidAddress": "Saisissez une adresse de contrat valide.",
+    "addToken.noName": "(sans nom)",
+    "addToken.swapUnavailableSuffix": " (échange indisponible)",
+
+    "prices.description": "Cours en USD fournis par l'API publique de CoinGecko. À titre purement informatif -- aucune information sur votre portefeuille n'est envoyée pour obtenir ces données.",
+    "prices.loading": "Chargement...",
+    "prices.naText": "n/d",
+
+    "buy.title": "Acheter des cryptos",
+    "buy.description1": "L'achat est propulsé par MoonPay, un service tiers indépendant -- Token Exchange n'a jamais accès à vos informations de paiement.",
+    "buy.description2Html": "MoonPay s'ouvrira dans un nouvel onglet. Comme ce portefeuille n'envoie jamais votre adresse à MoonPay à votre place (cela nécessiterait de signer des requêtes avec une clé secrète, qui ne doit jamais se trouver dans une extension de navigateur -- voir <code>lib/buy-config.js</code>), <strong>collez vous-même votre adresse de réception</strong> une fois l'onglet MoonPay ouvert :",
+    "buy.continueBtn": "Continuer vers MoonPay",
+
+    "support.title": "Aide et assistance",
+    "support.description": "Posez une question ou appuyez sur un sujet ci-dessous. Cela fonctionne entièrement sur votre appareil -- rien de ce que vous saisissez ici n'est envoyé où que ce soit.",
+    "support.inputPlaceholder": "Saisissez une question...",
+
+    "send.title": "Envoyer",
+    "send.assetLabel": "Actif",
+    "send.assetToken": "Token (saisir l'adresse du contrat)",
+    "send.tokenAddressPlaceholder": "Adresse du contrat du token (0x...)",
+    "send.toLabel": "Adresse de destination",
+    "send.amountLabel": "Montant",
+    "send.invalidRecipient": "Saisissez une adresse de destinataire valide.",
+    "send.invalidTokenAddress": "Saisissez une adresse de contrat de token valide.",
+    "send.sentStatus": "Envoyé ! Hash de transaction : {txHash}",
+
+    "swap.unsupportedWarning": "L'échange n'est pas encore activé sur ce réseau -- aucun routeur vérifié n'est configuré. Ajoutez-en un dans Paramètres → Réseaux d'abord.",
+    "swap.fromLabel": "De",
+    "swap.toLabel": "Vers",
+    "swap.getQuoteBtn": "Obtenir un devis",
+    "swap.appFeeLine": "Frais de l'application ({percent}) : {amount}",
+    "swap.netAmountLine": "Montant net échangé : {amount}",
+    "swap.estimatedOutLine": "Montant estimé reçu : {amount}",
+    "swap.slippageLabel": "Tolérance de glissement",
+    "swap.approveBtn": "Approuver le token d'abord",
+    "swap.approvingStatus": "Approbation en cours...",
+    "swap.approvedStatus": "Approuvé. Vous pouvez maintenant échanger.",
+    "swap.sendingStatus": "Envoi des frais et échange en cours...",
+    "swap.swappedStatus": "Échangé ! Tx des frais : {feeTx} | Tx de l'échange : {tx}",
+    "swap.feeTxNa": "n/d",
+
+    "settings.title": "Paramètres",
+    "settings.addAccountBtn": "Ajouter un compte",
+    "settings.importKeyBtn": "Importer une clé privée",
+    "settings.addNetworkBtn": "Ajouter un réseau",
+    "settings.viewSeedBtn": "Afficher la phrase de récupération",
+    "settings.helpBtn": "Aide et assistance",
+    "settings.lockBtn": "Verrouiller le portefeuille",
+    "settings.resetBtn": "Réinitialiser le portefeuille",
+
+    "importKey.title": "Importer une clé privée",
+    "importKey.placeholder": "Clé privée 0x",
+
+    "addNetwork.title": "Ajouter un réseau",
+    "addNetwork.namePlaceholder": "Nom du réseau",
+    "addNetwork.chainIdPlaceholder": "ID de chaîne (nombre)",
+    "addNetwork.rpcPlaceholder": "URL RPC",
+    "addNetwork.symbolPlaceholder": "Symbole de la monnaie native",
+    "addNetwork.explorerPlaceholder": "URL de l'explorateur de blocs (facultatif)",
+    "addNetwork.routerPlaceholder": "Adresse du routeur d'échange vérifié (facultatif)",
+    "addNetwork.routerWarning": "Ne renseignez l'adresse du routeur que si vous l'avez personnellement vérifiée par rapport à la documentation officielle du projet ou à l'explorateur de blocs de la chaîne. Laissez vide en cas de doute -- l'échange sera simplement désactivé sur ce réseau jusqu'à ce que vous en ajoutiez un.",
+    "addNetwork.addBtn": "Ajouter",
+
+    "viewSeed.title": "Phrase de récupération",
+    "viewSeed.passwordPlaceholder": "Saisissez le mot de passe pour l'afficher",
+    "viewSeed.revealBtn": "Afficher",
+
+    "reset.title": "Réinitialiser le portefeuille",
+    "reset.warning": "Cette action supprime le portefeuille chiffré de ce navigateur. Assurez-vous d'avoir sauvegardé votre phrase de récupération -- cette action est irréversible.",
+    "reset.confirmBtn": "Oui, tout supprimer",
+
+    "approve.unlockTitle": "Déverrouiller pour continuer",
+    "approve.unlockOriginText": "{origin} demande l'accès.",
+    "approve.connectTitle": "Demande de connexion",
+    "approve.connectWantsText": "{origin} souhaite se connecter à votre portefeuille.",
+    "approve.accountLabel": "Compte : ",
+    "approve.acceptConnectBtn": "Connecter",
+    "approve.txTitle": "Demande de transaction",
+    "approve.toLabel": "À :",
+    "approve.valueLabel": "Valeur :",
+    "approve.dataLabel": "Données :",
+    "approve.txWarning": "N'approuvez cette demande que si vous faites confiance au site et que vous comprenez ce qu'il vous demande de signer.",
+    "approve.confirmBtn": "Confirmer",
+    "approve.signTitle": "Demande de signature",
+    "approve.signBtn": "Signer",
+    "approve.addNetTitle": "Demande d'ajout de réseau",
+    "approve.addNetNameLabel": "Nom :",
+    "approve.addNetChainIdLabel": "ID de chaîne :",
+    "approve.addNetRpcLabel": "RPC :",
+    "approve.addNetWarning": "Le réseau suggéré par ce site n'a pas de routeur d'échange vérifié. L'échange y restera désactivé jusqu'à ce que vous en ajoutiez un vous-même dans les Paramètres.",
+    "approve.addNetBtn": "Ajouter le réseau",
+    "approve.contractCreation": "(création de contrat)",
+    "approve.nativeSuffix": " (natif)",
+
+    "loading.text": "Chargement...",
+
+    "footer.nonCustodial": "Non dépositaire — vos clés ne quittent jamais cet appareil",
+
+    "errors.passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères.",
+    "errors.passwordMismatch": "Les mots de passe ne correspondent pas.",
+    "errors.unknownError": "Erreur inconnue",
+  };
+
+  const faq = [
+    {
+      id: "create-wallet",
+      chip: "Comment créer un portefeuille ?",
+      keywords: ["créer un portefeuille", "créer portefeuille", "nouveau portefeuille", "configurer le portefeuille", "configuration du portefeuille", "pour commencer", "première fois"],
+      answer: "Appuyez sur « Créer un nouveau portefeuille » sur l'écran d'accueil, choisissez un mot de passe (celui-ci ne fait que déverrouiller le portefeuille sur cet appareil -- il ne peut pas récupérer vos fonds), puis une phrase de récupération de 12 mots vous sera présentée. Notez-la en lieu sûr avant de continuer -- cette phrase est le seul moyen de récupérer vos fonds si cet appareil venait à être perdu.",
+    },
+    {
+      id: "import-wallet",
+      chip: "Comment importer un portefeuille existant ?",
+      keywords: ["importer un portefeuille", "importer un portefeuille existant", "restaurer un portefeuille", "portefeuille existant", "importer la phrase de récupération", "importer la seed"],
+      answer: "Sur l'écran d'accueil, appuyez sur « Importer un portefeuille existant », saisissez votre phrase de récupération de 12 ou 24 mots exactement comme elle a été notée (en minuscules, séparée par des espaces), puis définissez un nouveau mot de passe pour cet appareil. La phrase elle-même ne quitte jamais votre appareil -- elle est utilisée localement pour dériver vos comptes.",
+    },
+    {
+      id: "forgot-password",
+      chip: "J'ai oublié mon mot de passe",
+      keywords: ["mot de passe oublié", "j'ai oublié mon mot de passe", "mauvais mot de passe", "impossible de déverrouiller", "verrouillé", "le mot de passe ne fonctionne pas"],
+      answer: "Votre mot de passe ne fait que déverrouiller le portefeuille sur cet appareil -- Token Exchange ne le stocke nulle part et ne peut pas le réinitialiser pour vous. Si vous ne vous en souvenez plus, appuyez sur « Réinitialiser le portefeuille à la place » sur l'écran de déverrouillage, puis réimportez votre portefeuille à l'aide de votre phrase de récupération de 12 mots. Si vous n'avez pas sauvegardé cette phrase, les fonds de ce portefeuille ne pourront malheureusement pas être récupérés -- c'est la contrepartie d'un portefeuille non dépositaire : personne d'autre que vous ne peut le déverrouiller, ce qui signifie aussi que personne d'autre que vous ne peut le sauver.",
+    },
+    {
+      id: "lost-seed-phrase",
+      chip: "J'ai perdu ma phrase de récupération",
+      keywords: ["seed perdue", "j'ai perdu ma seed", "phrase de récupération perdue", "j'ai perdu ma phrase de récupération", "je n'ai pas ma phrase", "j'ai oublié ma phrase", "je ne l'ai jamais notée", "pas sauvegardé"],
+      answer: "Si vous êtes toujours connecté, allez dans Paramètres → « Afficher la phrase de récupération », ressaisissez votre mot de passe, et notez-la dès maintenant en lieu sûr. Si vous êtes verrouillé ET que vous n'avez jamais sauvegardé la phrase, il n'existe aucun moyen de récupérer le portefeuille ou les fonds qu'il contient. Token Exchange ne stocke jamais votre phrase où que ce soit -- ni sur un serveur, ni dans le cloud, nulle part -- de sorte que personne, pas même le développeur, ne peut la récupérer pour vous.",
+    },
+    {
+      id: "balance-not-showing",
+      chip: "Mon solde ne s'affiche pas",
+      keywords: ["solde", "solde nul", "0,00", "ne s'affiche pas", "mauvais solde", "solde bloqué", "chargement en cours", "solde à 0"],
+      answer: "Un solde bloqué sur « ... » signifie généralement que le point d'accès RPC de ce réseau est lent ou temporairement indisponible -- ce portefeuille réessaie automatiquement avec un point d'accès de secours après quelques secondes, donc le problème se résout généralement de lui-même. S'il affiche 0 et que cela vous semble incorrect, vérifiez que vous êtes sur le bon réseau et le bon compte (les deux menus déroulants se trouvent sur l'écran principal) -- les soldes sont suivis séparément par réseau et par compte, donc les fonds sur Base ne s'afficheront pas tant qu'Ethereum Mainnet est sélectionné, par exemple.",
+    },
+    {
+      id: "swap-failed",
+      chip: "Mon échange a échoué",
+      keywords: ["échange échoué", "échange bloqué", "l'échange ne fonctionne pas", "erreur d'échange", "devis échoué", "le swap a échoué", "le swap ne fonctionne pas"],
+      answer: "Les échanges se font on-chain via le routeur public d'un exchange décentralisé, donc un échec s'explique généralement par l'une de ces trois raisons : un solde insuffisant pour couvrir le montant plus les frais de gas du réseau, une tolérance de glissement trop stricte pour un prix qui évolue rapidement (essayez 1 % ou 3 % au lieu de 0,5 %), ou cette paire de tokens qui n'a pas encore assez de liquidité sur le routeur de ce réseau. L'erreur affichée sur l'écran d'échange après « Obtenir un devis » indique généralement de laquelle il s'agit -- si ce n'est pas clair, réessayez d'abord avec un montant plus petit.",
+    },
+    {
+      id: "swap-fee",
+      chip: "Combien coûte un échange ?",
+      keywords: ["frais d'échange", "combien ça coûte", "0,5 %", "frais sur l'échange", "frais du swap", "quels sont les frais"],
+      answer: "Les échanges appliquent des frais fixes de 0,5 % sur le montant échangé, clairement indiqués dans le devis avant que vous ne confirmiez -- ils font partie intégrante de la transaction d'échange, jamais d'une majoration cachée dissimulée dans le taux de change. Cela est distinct des frais de gas du réseau, qui reviennent à la blockchain, pas à Token Exchange.",
+    },
+    {
+      id: "gas-fees",
+      chip: "Qu'est-ce que les frais de gas ?",
+      keywords: ["frais de gas", "frais de réseau", "frais de transaction", "qu'est-ce que le gas", "coût du gas"],
+      answer: "Le gas correspond aux frais que le réseau blockchain lui-même facture pour traiter une transaction -- ils sont distincts des frais d'échange de 0,5 % de Token Exchange et reviennent entièrement au réseau, pas à nous. Le montant varie selon la congestion du réseau au moment de la transaction. Assurez-vous de détenir suffisamment de la monnaie native de ce réseau (ETH, BNB, POL, etc.) pour couvrir le gas, même lorsque vous envoyez un token plutôt que la monnaie native.",
+    },
+    {
+      id: "add-network",
+      chip: "Comment ajouter un réseau ?",
+      keywords: ["ajouter un réseau", "nouveau réseau", "réseau personnalisé", "autre chaîne", "chaîne différente"],
+      answer: "Allez dans Paramètres → « Ajouter un réseau » et renseignez le nom du réseau, l'ID de chaîne, l'URL RPC et le symbole de la monnaie native. Si vous ajoutez également une adresse de routeur d'échange vérifiée, l'échange fonctionnera aussi sur ce réseau -- sinon, il ne gérera que l'envoi et la réception. N'utilisez que des valeurs que vous avez personnellement vérifiées par rapport à la documentation officielle ou à l'explorateur de blocs de ce réseau.",
+    },
+    {
+      id: "add-token",
+      chip: "Comment suivre un token ?",
+      keywords: ["ajouter un token", "suivre un token", "nouveau token", "token personnalisé", "erc-20", "erc20", "suivre un jeton"],
+      answer: "Sur l'écran principal, appuyez sur « + Ajouter un token », collez l'adresse du contrat du token pour votre réseau actuel, puis appuyez sur « Rechercher » -- cela lit le nom, le symbole et les décimales du token directement depuis le contrat afin que vous puissiez vérifier avant de l'ajouter. N'ajoutez un token que si son adresse de contrat provient d'une source de confiance ; un portefeuille ne peut pas distinguer un vrai token d'un faux portant le même nom et le même symbole.",
+    },
+    {
+      id: "send-crypto",
+      chip: "Comment envoyer des cryptos ?",
+      keywords: ["comment envoyer", "envoyer des cryptos", "envoyer des tokens", "transférer des cryptos", "envoyer de l'eth", "envoyer des fonds"],
+      answer: "Appuyez sur « Envoyer » sur l'écran principal, choisissez la monnaie native ou un token (via son adresse de contrat), saisissez l'adresse du destinataire et un montant, puis confirmez. Vérifiez bien l'adresse avant de confirmer -- les envois sur ces réseaux sont irréversibles une fois validés.",
+    },
+    {
+      id: "connect-dapp",
+      chip: "Comment me connecter à un site web ?",
+      keywords: ["connecter dapp", "se connecter à un site", "bouton connecter le portefeuille", "se connecter à un site web", "ça ne se connecte pas", "ne se connecte pas"],
+      answer: "Tout site disposant d'un bouton « Connect Wallet » compatible avec les extensions de portefeuille du navigateur devrait proposer Token Exchange de la même façon qu'il proposerait MetaMask ou Coinbase Wallet. Si un site ne l'affiche pas comme option, essayez d'actualiser la page une fois le portefeuille installé et déverrouillé -- certains sites ne détectent les extensions de portefeuille qu'au chargement de la page.",
+    },
+    {
+      id: "buy-not-working",
+      chip: "Acheter ne fonctionne pas",
+      keywords: ["bouton acheter", "acheter ne fonctionne pas", "achat non configuré", "moonpay", "impossible d'acheter", "je ne peux pas acheter"],
+      answer: "Le bouton Acheter ouvre MoonPay, un service d'achat tiers indépendant, dans un nouvel onglet. S'il indique « L'achat n'est pas encore configuré », cela signifie que le développeur de ce portefeuille n'a pas encore ajouté de clé API MoonPay -- ce n'est pas quelque chose que vous pouvez corriger depuis le portefeuille lui-même. Une fois configuré, vous collerez vous-même votre adresse de réception sur la page de MoonPay ; Token Exchange ne l'envoie jamais à votre place.",
+    },
+    {
+      id: "reset-wallet",
+      chip: "Comment réinitialiser mon portefeuille ?",
+      keywords: ["réinitialiser le portefeuille", "supprimer le portefeuille", "recommencer", "retirer le portefeuille", "effacer le portefeuille"],
+      answer: "Paramètres → « Réinitialiser le portefeuille » supprime définitivement le portefeuille chiffré de ce navigateur. Assurez-vous absolument d'avoir sauvegardé votre phrase de récupération au préalable -- cette action est irréversible, et il n'existe aucun moyen de récupérer le portefeuille par la suite sans cette phrase.",
+    },
+    {
+      id: "is-it-safe",
+      chip: "Ce portefeuille est-il sûr ?",
+      keywords: ["est-ce sûr", "c'est sûr", "faire confiance", "non dépositaire", "dépositaire", "est-ce sécurisé", "est-ce une arnaque", "c'est légitime"],
+      answer: "Token Exchange est non dépositaire : votre phrase de récupération et vos clés privées sont chiffrées et stockées uniquement dans votre navigateur -- jamais envoyées à un serveur, car il n'y en a pas. Cela signifie également que personne, pas même le développeur, ne peut récupérer vos fonds si vous perdez à la fois votre mot de passe et votre phrase de récupération. Les envois et les échanges sont également vérifiés par rapport à une liste de sanctions intégrée avant d'être exécutés, entièrement sur l'appareil, et les frais d'échange sont toujours affichés à l'avance, avant que vous ne confirmiez.",
+    },
+    {
+      id: "pending-transaction",
+      chip: "Ma transaction est bloquée",
+      keywords: ["en attente", "transaction bloquée", "transaction ne se confirme pas", "toujours en attente", "transaction coincée"],
+      answer: "Une transaction peut rester « en attente » si le réseau est congestionné ou si le prix du gas utilisé était trop bas pour les conditions actuelles. Elle devrait finir par se confirmer d'elle-même. Si elle reste bloquée depuis longtemps, vous pouvez consulter la transaction sur l'explorateur de blocs de ce réseau à l'aide de l'adresse de votre compte pour voir son statut en temps réel.",
+    },
+    {
+      id: "wrong-network",
+      chip: "Quels réseaux sont pris en charge ?",
+      keywords: ["quel réseau", "mauvais réseau", "changer de réseau", "réseaux pris en charge", "quelles chaînes", "chaînes prises en charge", "quels réseaux"],
+      answer: "Intégrés : Ethereum, Base, Polygon, BNB Chain, Arbitrum One et OP Mainnet, sélectionnables depuis le menu déroulant en bas de l'écran principal -- votre solde, vos tokens et vos options d'échange sont tous spécifiques au réseau sélectionné à cet endroit. Vous pouvez ajouter vous-même n'importe quel autre réseau compatible EVM depuis Paramètres → « Ajouter un réseau ».",
+    },
+    {
+      id: "contact-human",
+      chip: "J'ai besoin d'aide supplémentaire",
+      keywords: ["parler à un humain", "vraie personne", "contacter le support", "vous contacter", "j'ai encore besoin d'aide", "besoin d'aide supplémentaire", "parler à quelqu'un"],
+      answer: "__CONTACT_FALLBACK__",
+    },
+  ];
+
+  const greeting = "Bonjour ! Je suis un simple robot d'assistance intégré -- je ne peux répondre qu'à des questions issues d'une liste fixe préétablie, rien de plus. Appuyez sur un sujet ci-dessous ou saisissez votre propre question.";
+  const fallbackWithEmail = "Je n'ai pas encore de réponse écrite pour cela. Vous pouvez joindre une personne à {email} -- il est utile de préciser sur quel écran vous étiez et ce que vous attendiez.";
+  const fallbackNoEmail = "Je n'ai pas encore de réponse écrite pour cela, et ce portefeuille ne dispose pas non plus d'une assistance humaine en direct pour le moment. Essayez de reformuler votre question, ou consultez le README de l'extension pour plus de détails sur le fonctionnement de chaque fonctionnalité.";
+
+  self.TM_I18N_DATA = self.TM_I18N_DATA || {};
+  self.TM_I18N_DATA.fr = {
+    name: "Français",
+    dir: "ltr",
+    strings,
+    faq,
+    greeting,
+    fallbackWithEmail,
+    fallbackNoEmail,
+  };
+})();
