@@ -4,6 +4,7 @@ const fs = require("fs");
 const handler = require("serve-handler");
 const { handleFeatureRequestsApi } = require("./feature-requests-api");
 const { handleMoonpaySignApi } = require("./moonpay-sign-api");
+const { handleSwapQuoteApi } = require("./swap-quote-api");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -77,6 +78,7 @@ copyVendorFiles();
 const server = http.createServer((req, res) => {
 if (handleFeatureRequestsApi(req, res)) return;
 if (handleMoonpaySignApi(req, res)) return;
+if (handleSwapQuoteApi(req, res)) return;
 handler(req, res, { public: PUBLIC_DIR });
 });
 server.listen(PORT, () => console.log("Serving on port " + PORT));

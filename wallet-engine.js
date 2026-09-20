@@ -70,6 +70,36 @@ let unlockedSecret = null; // { mnemonic, importedKeys }
 let unlockedPassword = null;
 let selectedAddress = null;
 
+// Set by TM_SWAP_QUOTE, read by TM_SWAP_ALLOWANCE/TM_SWAP_APPROVE/
+// TM_SWAP_EXECUTE so those steps use whichever spender/transaction the
+// quote actually used (the 0x aggregator, or this network's own router)
+// without app.js's swap-screen code needing to know or care which. See
+// swapRouteKey()/aggregatorRouteMatches() below for how staleness (a
+// network switch, or the user changing the pair) is guarded against.
+let lastSwapRoute = null;
+
+// Loose key (chain + input token only) -- safe for picking WHICH SPENDER
+// to approve, since approving the real 0x allowance-holder contract for a
+// token is harmless even if the trade that prompted it never happens.
+function swapRouteKey(network, tokenIn) {
+  return `${network.chainId}:${(tokenIn || "native").toLowerCase()}`;
+}
+
+// Strict match -- required before ever broadcasting the aggregator's
+// saved transaction, since that calldata encodes an exact
+// tokenIn/tokenOut/amount. Anything less exact and we fall back to the
+// direct router path instead of risking a swap into the wrong asset.
+function aggregatorRouteMatches(route, network, tokenIn, tokenOut, netAmountInWei) {
+  return !!(
+    route &&
+    route.kind === "aggregator" &&
+    route.chainId === network.chainId &&
+    route.tokenIn === (tokenIn || "native").toLowerCase() &&
+    route.tokenOut === (tokenOut || "native").toLowerCase() &&
+    route.netAmountInWei === netAmountInWei.toString()
+  );
+}
+
 const pendingRequests = new Map(); // requestId -> { resolve, reject, type, payload, origin }
 
 function newRequestId() {
@@ -898,8 +928,47 @@ async function handleMessage(msg) {
           case "TM_SWAP_QUOTE": {
             const network = await getActiveNetwork();
             const provider = await getProviderFor(network);
+            const meta = await getSelectedAccountMeta();
             const totalWei = ethers.BigNumber.from(msg.amountInWei);
             const { feeWei, netWei } = TM_FEE.computeFee(totalWei);
+
+            const aggQuote = meta
+              ? await TM_SWAP.tryAggregatorQuote({
+                  network,
+                  tokenIn: msg.tokenIn,
+                  tokenOut: msg.tokenOut,
+                  amountInWei: netWei,
+                  taker: meta.address,
+                  slippageBps: msg.slippageBps || 100,
+                })
+              : null;
+
+            if (aggQuote) {
+              lastSwapRoute = {
+                key: swapRouteKey(network, msg.tokenIn),
+                chainId: network.chainId,
+                tokenIn: (msg.tokenIn || "native").toLowerCase(),
+                tokenOut: (msg.tokenOut || "native").toLowerCase(),
+                netAmountInWei: netWei.toString(),
+                kind: "aggregator",
+                spender: aggQuote.allowanceTarget || network.swapRouter,
+                transaction: aggQuote.transaction,
+                amountOutWei: aggQuote.amountOutWei.toString(),
+                minAmountOutWei: aggQuote.minAmountOutWei.toString(),
+              };
+              sendResponse({
+                ok: true,
+                amountOutWei: aggQuote.amountOutWei.toString(),
+                path: null,
+                feeWei: feeWei.toString(),
+                netAmountInWei: netWei.toString(),
+                feePercentLabel: TM_FEE.feePercentLabel(),
+                route: "aggregator",
+              });
+              break;
+            }
+
+            lastSwapRoute = { key: swapRouteKey(network, msg.tokenIn), chainId: network.chainId, kind: "router" };
             const { amountOutWei, path } = await TM_SWAP.getQuote({
               network,
               provider,
@@ -914,6 +983,7 @@ async function handleMessage(msg) {
               feeWei: feeWei.toString(),
               netAmountInWei: netWei.toString(),
               feePercentLabel: TM_FEE.feePercentLabel(),
+              route: "router",
             });
             break;
           }
@@ -922,8 +992,13 @@ async function handleMessage(msg) {
             const network = await getActiveNetwork();
             const provider = await getProviderFor(network);
             const meta = await getSelectedAccountMeta();
-            const allowance = await TM_SWAP.getAllowance({ provider, tokenAddress: msg.tokenAddress, owner: meta.address, spender: network.swapRouter });
-            sendResponse({ ok: true, allowanceWei: allowance.toString() });
+            const routeKey = swapRouteKey(network, msg.tokenAddress);
+            const spender =
+              lastSwapRoute && lastSwapRoute.key === routeKey && lastSwapRoute.kind === "aggregator" && lastSwapRoute.spender
+                ? lastSwapRoute.spender
+                : network.swapRouter;
+            const allowance = await TM_SWAP.getAllowance({ provider, tokenAddress: msg.tokenAddress, owner: meta.address, spender });
+            sendResponse({ ok: true, allowanceWei: allowance.toString(), spender });
             break;
           }
 
@@ -933,7 +1008,12 @@ async function handleMessage(msg) {
             const meta = await getSelectedAccountMeta();
             assertNotSanctioned(meta.address, "account");
             const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
-            const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender: network.swapRouter, amountWei: ethers.BigNumber.from(msg.amountWei) });
+            const routeKey = swapRouteKey(network, msg.tokenAddress);
+            const spender =
+              lastSwapRoute && lastSwapRoute.key === routeKey && lastSwapRoute.kind === "aggregator" && lastSwapRoute.spender
+                ? lastSwapRoute.spender
+                : network.swapRouter;
+            const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender, amountWei: ethers.BigNumber.from(msg.amountWei) });
             sendResponse({ ok: true, txHash: tx.hash });
             break;
           }
@@ -1038,6 +1118,29 @@ async function handleMessage(msg) {
               }
             }
 
+            if (aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, netWei)) {
+              try {
+                const aggTx = await TM_SWAP.executeAggregatorSwap({ signer: wallet, transaction: lastSwapRoute.transaction });
+                sendResponse({
+                  ok: true,
+                  feeTxHash,
+                  feeWei: feeWei.toString(),
+                  txHash: aggTx.hash,
+                  quotedAmountOutWei: lastSwapRoute.amountOutWei,
+                  minAmountOutWei: lastSwapRoute.minAmountOutWei,
+                  route: "aggregator",
+                });
+                break;
+              } catch (e) {
+                // The aggregator's saved transaction failed to broadcast
+                // (stale quote, a gas re-estimate mismatch, etc). The fee
+                // is already paid at this point either way, so fall
+                // through to the direct router path below rather than
+                // leaving the user stuck having paid the fee with nothing
+                // to show for it -- same slippage tolerance either way.
+              }
+            }
+
             const { tx, quotedAmountOutWei, minAmountOutWei } = await TM_SWAP.executeSwap({
               network,
               signer: wallet,
@@ -1054,6 +1157,7 @@ async function handleMessage(msg) {
               txHash: tx.hash,
               quotedAmountOutWei: quotedAmountOutWei.toString(),
               minAmountOutWei: minAmountOutWei.toString(),
+              route: "router",
             });
             break;
           }
