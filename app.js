@@ -1231,6 +1231,7 @@ async function openCoinDetail(c, fromScreen) {
   btn.disabled = true;
   $("coin-holding").classList.add("hidden");
   $("coin-swap-note").classList.add("hidden");
+  $("btn-coin-add-token").classList.add("hidden");
   document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
   showScreen("screen-coin");
   loadCoinChart(gen);
@@ -1382,6 +1383,10 @@ async function loadCoinSwapState(gen) {
   const match = held.find((a) => normalizeCoinSymbol(a.symbol) === want);
   if (!match) {
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
+    // Not a dead end -- this is almost always the reason a coin shows as
+    // unswappable (see the note above), so put the fix one tap away instead
+    // of making the person go find "+ Add token" back on the main screen.
+    $("btn-coin-add-token").classList.remove("hidden");
     return;
   }
   coinDetail.swapTarget = match;
@@ -1402,6 +1407,11 @@ $("btn-coin-swap").addEventListener("click", () => {
   if (!m) return;
   setupSwapScreen({ toKey: m.key });
   showScreen("screen-swap");
+});
+
+$("btn-coin-add-token").addEventListener("click", () => {
+  resetAddTokenScreen();
+  showScreen("screen-add-token");
 });
 
 // Compact live-prices card on the main screen -- just the first handful of
