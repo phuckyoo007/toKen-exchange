@@ -879,18 +879,14 @@ $("btn-nft-confirm-add").addEventListener("click", async () => {
   }
 });
 
-function resetAddTokenScreen() {
-  hideError("add-token-error");
-  $("add-token-address").value = "";
-  $("add-token-preview").classList.add("hidden");
-  delete $("add-token-preview").dataset.address;
-}
-
-$("btn-token-lookup").addEventListener("click", async () => {
+// Pulled out of the lookup button's own click handler so a known-good
+// contract address (see KNOWN_BTC_TOKENS_BY_CHAIN above) can trigger the
+// exact same lookup+preview path automatically, instead of needing its own
+// separate, easier-to-drift-from-the-real-thing copy of this logic.
+async function lookupTokenForAddress(address) {
   hideError("add-token-error");
   $("add-token-preview").classList.add("hidden");
   try {
-    const address = $("add-token-address").value.trim();
     if (!ethers.utils.isAddress(address)) throw new Error(TM_I18N.t("addToken.invalidAddress"));
     const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: address });
     $("add-token-name").textContent = info.name || TM_I18N.t("addToken.noName");
@@ -905,6 +901,24 @@ $("btn-token-lookup").addEventListener("click", async () => {
   } catch (e) {
     showError("add-token-error", e.message);
   }
+}
+
+// `prefillAddress` is only ever a contract address this wallet's own code
+// picked (KNOWN_BTC_TOKENS_BY_CHAIN), never anything from the coin's own
+// (CoinGecko-sourced) data -- looking it up automatically still shows the
+// normal preview card before anything is added, so the on-chain name/
+// symbol/decimals are always visible for a real look before confirming,
+// exactly as if it had been pasted in by hand.
+async function resetAddTokenScreen(prefillAddress) {
+  hideError("add-token-error");
+  $("add-token-address").value = prefillAddress || "";
+  $("add-token-preview").classList.add("hidden");
+  delete $("add-token-preview").dataset.address;
+  if (prefillAddress) await lookupTokenForAddress(prefillAddress);
+}
+
+$("btn-token-lookup").addEventListener("click", () => {
+  lookupTokenForAddress($("add-token-address").value.trim());
 });
 
 $("btn-token-confirm-add").addEventListener("click", async () => {
@@ -1030,8 +1044,11 @@ let pricesRatesData = [];
 function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
+  const stablecoinTag = r.stablecoin
+    ? `<span class="currency-stablecoin-tag" title="${escapeHtml(TM_I18N.t("prices.stablecoinTagTitle", { stablecoin: r.stablecoin, currency: r.name }))}">${escapeHtml(r.stablecoin)}</span>`
+    : "";
   row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
+    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}${stablecoinTag}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
     <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
   `;
   return row;
@@ -1067,6 +1084,7 @@ function setPricesTab(tab) {
   pricesTab = tab;
   document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
   $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
+  $("prices-stablecoin-note").classList.toggle("hidden", tab !== "currencies");
   refreshPrices();
 }
 
@@ -1096,7 +1114,7 @@ async function refreshPrices() {
 // the native coin or as a token the person has added (matched by symbol) --
 // this wallet never guesses a token contract address. The Swap screen then
 // lets them choose which of their own holdings to pay with.
-let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null };
+let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null, prefillTokenAddress: null };
 
 function normalizeCoinSymbol(s) {
   const up = String(s || "").toUpperCase();
@@ -1217,6 +1235,7 @@ async function openCoinDetail(c, fromScreen) {
   coinDetail.coin = c;
   coinDetail.swapTarget = null;
   coinDetail.switchNetworkTarget = null;
+  coinDetail.prefillTokenAddress = null;
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
   $("coin-icon").innerHTML = tokenIconHtml(c.symbol, c.image);
@@ -1366,11 +1385,46 @@ document.querySelectorAll(".coin-range").forEach((b) => {
   });
 });
 
+// This wallet has no real Bitcoin-network support at all (Bitcoin's own
+// chain doesn't do smart contracts, so there's nothing to "switch to" the
+// way POL -> Polygon or BNB -> BSC works) -- BTC on the Prices screen is
+// informational only. But every network this wallet DOES support has one
+// single, dominant, verifiable Bitcoin-backed token already circulating on
+// it, so "+ Add token" can point straight at that instead of leaving
+// someone to go find a contract address themselves. Getting one of these
+// wrong would mean prefilling someone's wallet with the wrong token, so
+// each address below was checked directly against that chain's own block
+// explorer (name/symbol/decimals matching) on 2026-09-20 -- not just
+// recalled -- and picked for being the most established/liquid option on
+// that specific chain, not necessarily the same brand everywhere (e.g.
+// BSC's own BTCB long predates and outweighs any bridged WBTC there; Base
+// is Coinbase's own chain, so Coinbase's own cbBTC is the obvious pick
+// over a bridged WBTC of uncertain provenance).
+const KNOWN_BTC_TOKENS_BY_CHAIN = {
+  1: { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", symbol: "WBTC" }, // Ethereum
+  137: { address: "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6", symbol: "WBTC" }, // Polygon
+  42161: { address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", symbol: "WBTC" }, // Arbitrum
+  10: { address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095", symbol: "WBTC" }, // Optimism
+  56: { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", symbol: "BTCB" }, // BNB Smart Chain
+  8453: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC" }, // Base
+};
+
 async function loadCoinSwapState(gen) {
   const c = coinDetail.coin;
   const btn = $("btn-coin-swap");
   const note = $("coin-swap-note");
   const showNote = (text) => { note.textContent = text; note.classList.remove("hidden"); };
+  // This can re-run on the same coin-detail screen (e.g. right after
+  // "Switch to Polygon to swap" changes currentNetwork), not just once on
+  // open -- so it has to reset the switch-network/add-token buttons back
+  // to hidden every time rather than only ever showing them, or a coin
+  // that becomes swappable after a switch would still show both as
+  // leftovers from the previous, unswappable state.
+  coinDetail.switchNetworkTarget = null;
+  coinDetail.prefillTokenAddress = null;
+  $("btn-coin-switch-network").classList.add("hidden");
+  $("btn-coin-add-token").classList.add("hidden");
+  $("btn-coin-add-token").textContent = TM_I18N.t("main.addTokenBtn");
   if (!currentNetwork || !currentStatus || !currentStatus.selectedAddress) {
     showNote(TM_I18N.t("coin.swapNeedsWallet"));
     return;
@@ -1406,6 +1460,15 @@ async function loadCoinSwapState(gen) {
       $("btn-coin-add-token").classList.remove("hidden");
       return;
     }
+    const knownToken = KNOWN_BTC_TOKENS_BY_CHAIN[currentNetwork.chainId];
+    if (want === "BTC" && knownToken) {
+      showNote(TM_I18N.t("coin.swapUnavailableAddKnownToken", { symbol: c.symbol, network: currentNetwork.name, tokenSymbol: knownToken.symbol }));
+      coinDetail.prefillTokenAddress = knownToken.address;
+      const addBtn = $("btn-coin-add-token");
+      addBtn.textContent = TM_I18N.t("coin.addKnownTokenBtn", { tokenSymbol: knownToken.symbol });
+      addBtn.classList.remove("hidden");
+      return;
+    }
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
     // Not a dead end -- this is almost always the reason a coin shows as
     // unswappable (see the note above), so put the fix one tap away instead
@@ -1434,7 +1497,7 @@ $("btn-coin-swap").addEventListener("click", () => {
 });
 
 $("btn-coin-add-token").addEventListener("click", () => {
-  resetAddTokenScreen();
+  resetAddTokenScreen(coinDetail.prefillTokenAddress || undefined);
   showScreen("screen-add-token");
 });
 

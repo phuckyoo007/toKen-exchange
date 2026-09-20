@@ -163,20 +163,29 @@ const FULL_PRICE_BOARD = PRICE_BOARD.concat(EXTRA_PRICE_BOARD);
 // keyless API can price directly (no separate FX-rate lookup needed) -- see
 // https://docs.coingecko.com/reference/simple-supported-vs-currencies.
 // Symbol is just for display; the code is what's actually sent to CoinGecko.
+// `stablecoin` is set only where a real, currently-circulating,
+// non-negligible stablecoin actually exists for that currency (checked
+// against issuer sites, exchange listings and news coverage, Sept 2026)
+// -- most currencies below have none, and none is invented for them.
+// Every one of these regional/non-USD stablecoins is far smaller and less
+// liquid than USDC -- collectively they're under 0.5% of total stablecoin
+// market share -- so this is shown as informational context on the
+// Currencies tab (see coin.stablecoinNote), never as a swap option this
+// wallet actually offers or a recommendation to hold one.
 const SUPPORTED_CURRENCIES = {
   // ---- Fiat (national currencies). Every code below is in CoinGecko's own
   // /simple/supported_vs_currencies list (checked Sept 2026). `decimals`
   // defaults to 2; currencies with no minor unit in everyday use show 0,
   // and the Gulf dinars that split into 1000ths show 3.
-  usd: { symbol: "$", label: "USD", name: "US Dollar", type: "fiat" },
-  eur: { symbol: "€", label: "EUR", name: "Euro", type: "fiat" },
-  gbp: { symbol: "£", label: "GBP", name: "British Pound", type: "fiat" },
-  jpy: { symbol: "¥", label: "JPY", name: "Japanese Yen", type: "fiat", decimals: 0 },
-  cad: { symbol: "CA$", label: "CAD", name: "Canadian Dollar", type: "fiat" },
-  aud: { symbol: "AU$", label: "AUD", name: "Australian Dollar", type: "fiat" },
+  usd: { symbol: "$", label: "USD", name: "US Dollar", type: "fiat", stablecoin: "USDC" },
+  eur: { symbol: "€", label: "EUR", name: "Euro", type: "fiat", stablecoin: "EURC" },
+  gbp: { symbol: "£", label: "GBP", name: "British Pound", type: "fiat", stablecoin: "tGBP" },
+  jpy: { symbol: "¥", label: "JPY", name: "Japanese Yen", type: "fiat", decimals: 0, stablecoin: "JPYC" },
+  cad: { symbol: "CA$", label: "CAD", name: "Canadian Dollar", type: "fiat", stablecoin: "QCAD" },
+  aud: { symbol: "AU$", label: "AUD", name: "Australian Dollar", type: "fiat", stablecoin: "AUDD" },
   inr: { symbol: "₹", label: "INR", name: "Indian Rupee", type: "fiat" },
-  brl: { symbol: "R$", label: "BRL", name: "Brazilian Real", type: "fiat" },
-  aed: { symbol: "AED", label: "AED", name: "UAE Dirham", type: "fiat" },
+  brl: { symbol: "R$", label: "BRL", name: "Brazilian Real", type: "fiat", stablecoin: "BRZ" },
+  aed: { symbol: "AED", label: "AED", name: "UAE Dirham", type: "fiat", stablecoin: "AE Coin" },
   ars: { symbol: "AR$", label: "ARS", name: "Argentine Peso", type: "fiat" },
   bdt: { symbol: "৳", label: "BDT", name: "Bangladeshi Taka", type: "fiat" },
   bhd: { symbol: "BHD", label: "BHD", name: "Bahraini Dinar", type: "fiat", decimals: 3 },
@@ -189,30 +198,33 @@ const SUPPORTED_CURRENCIES = {
   gel: { symbol: "₾", label: "GEL", name: "Georgian Lari", type: "fiat" },
   hkd: { symbol: "HK$", label: "HKD", name: "Hong Kong Dollar", type: "fiat" },
   huf: { symbol: "Ft", label: "HUF", name: "Hungarian Forint", type: "fiat", decimals: 0 },
-  idr: { symbol: "Rp", label: "IDR", name: "Indonesian Rupiah", type: "fiat", decimals: 0 },
+  idr: { symbol: "Rp", label: "IDR", name: "Indonesian Rupiah", type: "fiat", decimals: 0, stablecoin: "IDRX" },
   ils: { symbol: "₪", label: "ILS", name: "Israeli Shekel", type: "fiat" },
-  krw: { symbol: "₩", label: "KRW", name: "South Korean Won", type: "fiat", decimals: 0 },
+  krw: { symbol: "₩", label: "KRW", name: "South Korean Won", type: "fiat", decimals: 0, stablecoin: "KRWQ" },
   kwd: { symbol: "KWD", label: "KWD", name: "Kuwaiti Dinar", type: "fiat", decimals: 3 },
   lkr: { symbol: "Rs", label: "LKR", name: "Sri Lankan Rupee", type: "fiat" },
   mmk: { symbol: "K", label: "MMK", name: "Myanmar Kyat", type: "fiat", decimals: 0 },
-  mxn: { symbol: "MX$", label: "MXN", name: "Mexican Peso", type: "fiat" },
+  mxn: { symbol: "MX$", label: "MXN", name: "Mexican Peso", type: "fiat", stablecoin: "MXNe" },
   myr: { symbol: "RM", label: "MYR", name: "Malaysian Ringgit", type: "fiat" },
-  ngn: { symbol: "₦", label: "NGN", name: "Nigerian Naira", type: "fiat" },
+  ngn: { symbol: "₦", label: "NGN", name: "Nigerian Naira", type: "fiat", stablecoin: "cNGN" },
   nok: { symbol: "kr", label: "NOK", name: "Norwegian Krone", type: "fiat" },
-  nzd: { symbol: "NZ$", label: "NZD", name: "New Zealand Dollar", type: "fiat" },
-  php: { symbol: "₱", label: "PHP", name: "Philippine Peso", type: "fiat" },
+  nzd: { symbol: "NZ$", label: "NZD", name: "New Zealand Dollar", type: "fiat", stablecoin: "NZDS" },
+  php: { symbol: "₱", label: "PHP", name: "Philippine Peso", type: "fiat", stablecoin: "PHPC" },
   pkr: { symbol: "Rs", label: "PKR", name: "Pakistani Rupee", type: "fiat" },
   pln: { symbol: "zł", label: "PLN", name: "Polish Zloty", type: "fiat" },
+  // No stablecoin listed for the Russian ruble: the one that exists
+  // (A7A5) is tied to sanctions-evasion reporting, not something this
+  // wallet associates a currency with even informationally.
   rub: { symbol: "₽", label: "RUB", name: "Russian Ruble", type: "fiat" },
   sar: { symbol: "SAR", label: "SAR", name: "Saudi Riyal", type: "fiat" },
   sek: { symbol: "kr", label: "SEK", name: "Swedish Krona", type: "fiat" },
-  sgd: { symbol: "S$", label: "SGD", name: "Singapore Dollar", type: "fiat" },
+  sgd: { symbol: "S$", label: "SGD", name: "Singapore Dollar", type: "fiat", stablecoin: "XSGD" },
   thb: { symbol: "฿", label: "THB", name: "Thai Baht", type: "fiat" },
-  try: { symbol: "₺", label: "TRY", name: "Turkish Lira", type: "fiat" },
+  try: { symbol: "₺", label: "TRY", name: "Turkish Lira", type: "fiat", stablecoin: "TRYB" },
   twd: { symbol: "NT$", label: "TWD", name: "New Taiwan Dollar", type: "fiat" },
   uah: { symbol: "₴", label: "UAH", name: "Ukrainian Hryvnia", type: "fiat" },
   vnd: { symbol: "₫", label: "VND", name: "Vietnamese Dong", type: "fiat", decimals: 0 },
-  zar: { symbol: "R", label: "ZAR", name: "South African Rand", type: "fiat" },
+  zar: { symbol: "R", label: "ZAR", name: "South African Rand", type: "fiat", stablecoin: "ZARP" },
 
   // ---- Crypto (also valid CoinGecko vs_currencies, so balances and prices
   // can be shown in them directly). Shown with significant digits rather
@@ -486,7 +498,7 @@ async function getFiatRates(currency) {
     if (info.type !== "fiat" || code === display) return;
     const r = rates[code];
     if (!r || !r.value) return;
-    out.push({ code: info.label, name: info.name, rate: base.value / r.value });
+    out.push({ code: info.label, name: info.name, rate: base.value / r.value, stablecoin: info.stablecoin || null });
   });
   return out;
 }

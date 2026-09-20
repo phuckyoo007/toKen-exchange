@@ -993,6 +993,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .price-left .token-icon { width: 24px; height: 24px; font-size: 9px; }
 .price-row .price-name { font-weight: 600; color: var(--text); }
 .price-row .price-symbol { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
+.currency-stablecoin-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--gold); vertical-align: middle;
+}
 .price-row .price-usd { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold-bright); }
 .price-row .price-change { font-size: 11px; margin-left: 8px; font-variant-numeric: tabular-nums; }
 .price-change.up { color: var(--success); }
@@ -1141,6 +1147,26 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
 .lang-picker-trigger .lang-flag { width: 20px; height: 15px; flex-shrink: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
 .lang-picker-trigger .lang-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lang-picker-trigger .lang-caret { flex-shrink: 0; opacity: 0.6; font-size: 10px; }
+/* The splash screen's own language picker (#splash-continue-hint) lives
+   inside #splash-screen, whose "#splash-screen img" rule (further up this
+   file) is a broad, ID-specificity reset meant only for the big background
+   artwork -- but being an ID selector, it also beats these two-class flag-
+   icon rules above for any image nested anywhere inside #splash-screen,
+   including this one. Left alone, that stretches the tiny 20x15 flag icon
+   to position:absolute/inset:0/100%x100%/object-fit:cover, which crops it
+   into an unrecognizable, distorted strip covering the whole trigger
+   button. This selector matches that ID's specificity (and beats it on
+   class count) to opt the flag icons back out, the same way
+   "#splash-spinner img" already does for the spinner icon below. */
+#splash-continue-hint .lang-flag {
+  position: static;
+  inset: auto;
+  width: 20px;
+  height: 15px;
+  object-fit: cover;
+  object-position: center;
+  display: inline-block;
+}
 .lang-picker-list {
   position: absolute; z-index: 40; top: 100%; left: 0; right: 0; margin-top: 4px;
   max-height: 240px; overflow-y: auto; list-style: none; padding: 4px;
@@ -1173,7 +1199,8 @@ html[dir="rtl"] .tokens-header,
 html[dir="rtl"] .support-input-row { direction: rtl; }
 html[dir="rtl"] .token-balance-col { align-items: flex-start; }
 html[dir="rtl"] .price-row .price-symbol,
-html[dir="rtl"] .price-row .price-change { margin-left: 0; margin-right: 6px; }
+html[dir="rtl"] .price-row .price-change,
+html[dir="rtl"] .currency-stablecoin-tag { margin-left: 0; margin-right: 6px; }
 html[dir="rtl"] .support-msg.user { align-self: flex-start; border-bottom-right-radius: 10px; border-bottom-left-radius: 3px; }
 html[dir="rtl"] .support-msg.bot { align-self: flex-end; border-bottom-left-radius: 10px; border-bottom-right-radius: 3px; }
 html[dir="rtl"] .back-btn { align-self: flex-end; }
