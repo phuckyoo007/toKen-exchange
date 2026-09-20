@@ -74,6 +74,22 @@ function applyI18n(root) {
   document.documentElement.setAttribute("dir", dir);
   document.querySelectorAll(".language-select").forEach((sel) => {
     sel.value = tmI18nCurrentLang;
+    // Keep the custom flag dropdown (see populateLanguageSelects in
+    // app.js/popup.js) in sync whenever the language changes from
+    // somewhere other than that same dropdown -- e.g. auto-detected on
+    // first load, or changed via a different picker instance on the page.
+    const wrap = sel.closest(".lang-picker");
+    if (wrap) {
+      const lang = TM_I18N_LANGS.find((l) => l.code === tmI18nCurrentLang) || TM_I18N_LANGS[0];
+      const trigger = wrap.querySelector(".lang-picker-trigger");
+      if (trigger) {
+        const flagImg = trigger.querySelector(".lang-flag");
+        const nameSpan = trigger.querySelector(".lang-name");
+        if (flagImg) flagImg.src = `img/flag-${lang.code}.svg`;
+        if (nameSpan) nameSpan.textContent = lang.name;
+      }
+      wrap.querySelectorAll(".lang-picker-item").forEach((it) => it.classList.toggle("active", it.dataset.code === lang.code));
+    }
   });
 }
 
