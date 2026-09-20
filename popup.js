@@ -38,7 +38,7 @@ function currencySymbol() {
 }
 
 function formatCurrency(amount) {
-  return TM_PRICES.formatMoney(amount, currentCurrency);
+  return `${currencySymbol()}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---------------------------------------------------------------- NETWORK COLORS
@@ -112,90 +112,10 @@ function sendMsg(type, payload) {
   });
 }
 
-// ---------------------------------------------------------------- CUBE NAV
-// Home, Activity and Send are the app's three "peer" destinations -- the
-// same three the splash screen's own tab bar already treats as equal
-// starting points (see activateSplashHome() below; Assets is the fourth
-// icon there, but it's always just been screen-main scrolled to the
-// tokens list, not a separate screen, so it stays that way here too).
-// Once inside the app these three now live as three faces of a rotating
-// cube (see cube-nav.js) instead of plain sibling screens that just swap
-// with a hard cut: clicking Send from Home, or hitting Back from Send,
-// turns the cube instead. Every other screen -- Settings, Swap, Buy, Add
-// token, the dapp-approval dialogs, and so on -- still shows/hides exactly
-// like before, as a plain overlay on top of the cube (its own Back button
-// always returns to screen-main, landing back on the cube's Home face).
-const CUBE_FACE_ORDER = ["screen-main", "screen-activity", "screen-send"];
-let cubeNav = null;
-
-function mountCubeNav() {
-  if (cubeNav || !window.CubeNav) return;
-  const stageRoot = $("cube-stage");
-  if (!stageRoot) return;
-  const faces = CUBE_FACE_ORDER.map((id) => ({ id, el: $(id) }));
-  if (faces.some((f) => !f.el)) return;
-  cubeNav = window.CubeNav.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
-  // The cube keeps every face permanently in the DOM (just rotated out of
-  // view) so the 3D transform has something to show on every side -- so
-  // these three stop being ".hidden"-toggled like a normal screen the
-  // moment the cube takes them over. CubeNav's own aria-hidden/inert/dim
-  // handles "not the current face" instead.
-  CUBE_FACE_ORDER.forEach((id) => $(id).classList.remove("hidden"));
-  stageRoot.addEventListener("facechange", updateCubeTabbarActive);
-  updateCubeTabbarActive();
-}
-
-function updateCubeTabbarActive() {
-  const bar = $("cube-tabbar");
-  if (!bar || !cubeNav) return;
-  const activeId = CUBE_FACE_ORDER[cubeNav.index];
-  bar.querySelectorAll(".cube-tab").forEach((btn) => {
-    const goto = btn.dataset.cubeGoto;
-    btn.classList.toggle("active", goto !== "assets" && CUBE_FACE_ORDER[Number(goto)] === activeId);
-  });
-}
-
 function showScreen(id) {
-  document.querySelectorAll(".screen").forEach((el) => {
-    if (!CUBE_FACE_ORDER.includes(el.id)) el.classList.add("hidden");
-  });
-  const shell = $("cube-shell");
-  const faceIndex = CUBE_FACE_ORDER.indexOf(id);
-  if (faceIndex >= 0) {
-    mountCubeNav();
-    if (shell) shell.classList.remove("hidden");
-    if (cubeNav) cubeNav.go(faceIndex);
-    else $(id).classList.remove("hidden"); // CubeNav script missing/failed -- fall back to a plain screen
-  } else {
-    if (shell) shell.classList.add("hidden");
-    $(id).classList.remove("hidden");
-  }
+  document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
+  $(id).classList.remove("hidden");
 }
-
-// Persistent tab bar for the cube's three faces (plus the Assets shortcut),
-// visible only while a cube face is showing -- its own CSS follows
-// #cube-shell's hidden state, same as the cube itself.
-(function wireCubeTabbar() {
-  const bar = $("cube-tabbar");
-  if (!bar) return;
-  bar.querySelectorAll(".cube-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const goto = btn.dataset.cubeGoto;
-      if (goto === "assets") {
-        showScreen("screen-main");
-        const tokensHeader = document.querySelector("#screen-main .tokens-header");
-        if (tokensHeader) tokensHeader.scrollIntoView({ block: "start" });
-      } else if (goto === "1") {
-        renderActivity();
-        showScreen("screen-activity");
-      } else if (goto === "2") {
-        showScreen("screen-send");
-      } else {
-        showScreen("screen-main");
-      }
-    });
-  });
-})();
 
 function showError(id, message) {
   const el = $(id);
@@ -601,7 +521,7 @@ function renderPriceRow(c) {
   const priceText =
     c.price == null
       ? TM_I18N.t("prices.naText")
-      : TM_PRICES.formatMoney(c.price, currentCurrency, { price: true });
+      : `${currencySymbol()}${c.price.toLocaleString(undefined, { minimumFractionDigits: c.price < 1 ? 4 : 2, maximumFractionDigits: c.price < 1 ? 4 : 2 })}`;
   let changeHtml = "";
   if (typeof c.change24h === "number") {
     const cls = c.change24h >= 0 ? "up" : "down";
@@ -609,16 +529,10 @@ function renderPriceRow(c) {
     changeHtml = `<span class="price-change ${cls}">${sign}${c.change24h.toFixed(2)}%</span>`;
   }
   const starred = isWatchlisted(c.symbol);
-  // The whole row (logo, name, price) opens the in-app coin screen; the
-  // star is a separate button so pinning a coin doesn't navigate away.
-  const linkLabel = TM_I18N.t("prices.viewCoin", { name: c.name });
   row.innerHTML = `
-    <button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol)}<span class="price-id"><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>
-    <button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button>
+    <span class="price-left">${tokenIconHtml(c.symbol)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
+    <span class="price-right"><button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button><span class="price-usd">${priceText}</span>${changeHtml}</span>
   `;
-  row.querySelector(".price-link").addEventListener("click", () => {
-    openCoinDetail(c, $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices");
-  });
   row.querySelector(".star-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     toggleWatchlist(c.symbol);
@@ -627,389 +541,21 @@ function renderPriceRow(c) {
   return row;
 }
 
-// Prices screen state: two tabs (crypto coins / fiat currencies) sharing one
-// search box. Data is fetched once per refresh and filtered client-side as
-// the person types, so searching never triggers another CoinGecko request.
-let pricesTab = "crypto";
-let pricesBoardData = [];
-let pricesRatesData = [];
-
-function renderCurrencyRow(r) {
-  const row = document.createElement("div");
-  row.className = "price-row";
-  row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
-    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
-  `;
-  return row;
-}
-
-function renderPricesList() {
-  const list = $("prices-list");
-  const q = ($("prices-search").value || "").trim().toLowerCase();
-  list.innerHTML = "";
-  let count = 0;
-  if (pricesTab === "crypto") {
-    sortByWatchlist(pricesBoardData).forEach((c) => {
-      if (q && !(c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q))) return;
-      list.appendChild(renderPriceRow(c));
-      count++;
-    });
-  } else {
-    pricesRatesData.forEach((r) => {
-      if (q && !(r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))) return;
-      list.appendChild(renderCurrencyRow(r));
-      count++;
-    });
-  }
-  if (!count) {
-    const p = document.createElement("p");
-    p.className = "muted";
-    p.textContent = TM_I18N.t("prices.noResults");
-    list.appendChild(p);
-  }
-}
-
-function setPricesTab(tab) {
-  pricesTab = tab;
-  document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
-  $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
-  refreshPrices();
-}
-
-document.querySelectorAll(".prices-tab").forEach((b) => b.addEventListener("click", () => setPricesTab(b.dataset.pricesTab)));
-$("prices-search").addEventListener("input", renderPricesList);
-
 async function refreshPrices() {
   hideError("prices-error");
   $("prices-status").innerHTML = coinSpinnerHtml(TM_I18N.t("prices.loading"));
   $("prices-status").classList.remove("hidden");
   try {
-    if (pricesTab === "crypto") pricesBoardData = await TM_PRICES.getPriceBoard(currentCurrency);
-    else pricesRatesData = await TM_PRICES.getFiatRates(currentCurrency);
-    renderPricesList();
+    const board = sortByWatchlist(await TM_PRICES.getPriceBoard(currentCurrency));
+    const list = $("prices-list");
+    list.innerHTML = "";
+    board.forEach((c) => list.appendChild(renderPriceRow(c)));
     $("prices-status").classList.add("hidden");
   } catch (e) {
     $("prices-status").classList.add("hidden");
     showError("prices-error", e.message);
   }
 }
-
-// ---------------------------------------------------------------- COIN DETAIL
-// The screen a Live prices row opens (same idea as MetaMask's token page):
-// price + 24h change, a price chart with a few time ranges, market stats, a
-// short description, and a Swap button. Swap here means "swap INTO this
-// coin": it is only offered when the coin exists on the selected network as
-// the native coin or as a token the person has added (matched by symbol) --
-// this wallet never guesses a token contract address. The Swap screen then
-// lets them choose which of their own holdings to pay with.
-let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null };
-
-function normalizeCoinSymbol(s) {
-  const up = String(s || "").toUpperCase();
-  return up === "MATIC" ? "POL" : up; // Polygon's native coin was renamed
-}
-
-// Native coin + tracked tokens on the selected network, with balances.
-async function getHeldAssets() {
-  const assets = [];
-  if (!currentStatus || !currentStatus.selectedAddress || !currentNetwork) return assets;
-  try {
-    const bal = await sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress });
-    assets.push({
-      key: "native", address: "", symbol: bal.symbol || currentNetwork.nativeCurrency.symbol,
-      decimals: bal.decimals, balance: ethers.utils.formatUnits(bal.balanceWei, bal.decimals),
-    });
-  } catch (e) {
-    assets.push({ key: "native", address: "", symbol: currentNetwork.nativeCurrency.symbol, decimals: 18, balance: "0" });
-  }
-  try {
-    const res = await sendMsg("TM_GET_TRACKED_TOKEN_BALANCES");
-    (res.tokens || []).forEach((t) => {
-      if (t.error) return;
-      assets.push({
-        key: t.address, address: t.address, symbol: t.symbol, decimals: t.decimals,
-        balance: ethers.utils.formatUnits(t.balanceWei, t.decimals),
-      });
-    });
-  } catch (e) { /* best-effort: native coin only */ }
-  return assets;
-}
-
-function assetLabel(a) {
-  const n = Number(a.balance);
-  return `${a.symbol} (${isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 5 }) : a.balance})`;
-}
-
-// ---- Swap screen asset pickers (From = what you hold, To = any of your assets)
-let swapPopulateGen = 0;
-
-function syncSwapAsset(side) {
-  const sel = $(`swap-${side}-select`);
-  const input = $(`swap-${side}-custom`);
-  if (sel.value === "custom") {
-    input.classList.remove("hidden");
-    input.value = "";
-  } else {
-    input.classList.add("hidden");
-    input.value = sel.value === "native" ? "" : sel.value; // blank = native coin, as the quote code expects
-  }
-  $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
-}
-
-async function populateSwapSelects(pre) {
-  const myGen = ++swapPopulateGen;
-  const held = await getHeldAssets();
-  if (myGen !== swapPopulateGen) return;
-  const fromSel = $("swap-from-select");
-  const toSel = $("swap-to-select");
-  const toKey = pre && pre.toKey;
-  const fill = (sel, items) => {
-    sel.innerHTML = "";
-    items.forEach((a) => {
-      const o = document.createElement("option");
-      o.value = a.key;
-      o.textContent = assetLabel(a);
-      sel.appendChild(o);
-    });
-    const custom = document.createElement("option");
-    custom.value = "custom";
-    custom.textContent = TM_I18N.t("swap.customAddressOption");
-    sel.appendChild(custom);
-  };
-  // "From" only offers what the person actually holds (plus a paste-address
-  // escape hatch); the coin being bought is never offered as its own source.
-  let fromItems = held.filter((a) => Number(a.balance) > 0 && a.key !== toKey);
-  if (!fromItems.length) fromItems = held.filter((a) => a.key === "native" && a.key !== toKey);
-  fill(fromSel, fromItems);
-  fill(toSel, held);
-  if (toKey && held.some((a) => a.key === toKey)) toSel.value = toKey;
-  else toSel.value = (held.find((a) => a.key !== fromSel.value) || held[0] || { key: "custom" }).key;
-  syncSwapAsset("from");
-  syncSwapAsset("to");
-}
-
-["from", "to"].forEach((side) => {
-  $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
-});
-
-// ---- Coin screen
-function renderCoinPrice(price, change) {
-  $("coin-price").textContent = price == null ? TM_I18N.t("prices.naText") : TM_PRICES.formatMoney(price, currentCurrency, { price: true });
-  const el = $("coin-change");
-  if (typeof change === "number") {
-    el.className = `price-change ${change >= 0 ? "up" : "down"}`;
-    el.textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-  } else {
-    el.className = "price-change hidden";
-  }
-}
-
-function coinStat(label, value) {
-  const d = document.createElement("div");
-  d.className = "coin-stat";
-  const k = document.createElement("span");
-  k.className = "k";
-  k.textContent = label;
-  const v = document.createElement("span");
-  v.className = "v";
-  v.textContent = value;
-  d.appendChild(k);
-  d.appendChild(v);
-  return d;
-}
-
-async function openCoinDetail(c, fromScreen) {
-  const gen = ++coinDetail.gen;
-  coinDetail.coin = c;
-  coinDetail.swapTarget = null;
-  $("coin-back").dataset.back = fromScreen || "screen-prices";
-  hideError("coin-error");
-  $("coin-icon").innerHTML = tokenIconHtml(c.symbol);
-  $("coin-name").textContent = c.name;
-  $("coin-symbol").textContent = c.symbol;
-  $("coin-rank").classList.add("hidden");
-  renderCoinPrice(c.price, c.change24h);
-  $("coin-stats").innerHTML = "";
-  $("coin-about").textContent = TM_I18N.t("prices.loading");
-  $("coin-link-cg").href = c.url || "https://www.coingecko.com/";
-  const btn = $("btn-coin-swap");
-  btn.textContent = TM_I18N.t("coin.swapBtn", { symbol: c.symbol });
-  btn.disabled = true;
-  $("coin-holding").classList.add("hidden");
-  $("coin-swap-note").classList.add("hidden");
-  document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
-  showScreen("screen-coin");
-  loadCoinChart(gen);
-  loadCoinInfo(gen);
-  loadCoinSwapState(gen);
-}
-
-async function loadCoinInfo(gen) {
-  const c = coinDetail.coin;
-  try {
-    const d = await TM_PRICES.getCoinDetail(c.symbol, currentCurrency);
-    if (gen !== coinDetail.gen) return;
-    if (d.price != null) renderCoinPrice(d.price, d.change24h != null ? d.change24h : c.change24h);
-    if (d.rank != null) {
-      $("coin-rank").textContent = `#${d.rank}`;
-      $("coin-rank").classList.remove("hidden");
-    }
-    const stats = $("coin-stats");
-    stats.innerHTML = "";
-    const fm = (n) => TM_PRICES.formatMoney(n, currentCurrency, { price: true });
-    if (d.marketCap != null) stats.appendChild(coinStat(TM_I18N.t("coin.marketCap"), TM_PRICES.formatMoneyCompact(d.marketCap, currentCurrency)));
-    if (d.volume != null) stats.appendChild(coinStat(TM_I18N.t("coin.volume24h"), TM_PRICES.formatMoneyCompact(d.volume, currentCurrency)));
-    if (d.high24h != null) stats.appendChild(coinStat(TM_I18N.t("coin.high24h"), fm(d.high24h)));
-    if (d.low24h != null) stats.appendChild(coinStat(TM_I18N.t("coin.low24h"), fm(d.low24h)));
-    if (d.circulatingSupply != null) stats.appendChild(coinStat(TM_I18N.t("coin.supply"), d.circulatingSupply.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 })));
-    if (d.ath != null) {
-      const pct = d.athChange != null ? ` (${d.athChange.toFixed(1)}%)` : "";
-      stats.appendChild(coinStat(TM_I18N.t("coin.ath"), fm(d.ath) + pct));
-    }
-    $("coin-about").textContent = d.description || TM_I18N.t("coin.aboutUnavailable");
-  } catch (e) {
-    if (gen !== coinDetail.gen) return;
-    $("coin-about").textContent = TM_I18N.t("coin.aboutUnavailable");
-    showError("coin-error", TM_I18N.t("coin.loadError"));
-  }
-}
-
-async function loadCoinChart(gen) {
-  const c = coinDetail.coin;
-  const token = ++coinDetail.chartGen;
-  const box = $("coin-chart");
-  box.className = "coin-chart";
-  box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("prices.loading"))}</div>`;
-  $("coin-chart-readout").textContent = "";
-  try {
-    const pts = await TM_PRICES.getCoinChart(c.symbol, currentCurrency, coinDetail.days);
-    if (gen !== coinDetail.gen || token !== coinDetail.chartGen) return;
-    drawCoinChart(pts);
-  } catch (e) {
-    if (gen !== coinDetail.gen || token !== coinDetail.chartGen) return;
-    box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("coin.chartUnavailable"))}</div>`;
-  }
-}
-
-function coinRangeSummary() {
-  const pts = coinDetail.chartPoints;
-  if (pts.length < 2) return "";
-  const first = pts[0][1];
-  const last = pts[pts.length - 1][1];
-  const pct = first ? ((last - first) / first) * 100 : 0;
-  const label = { 1: "24H", 7: "7D", 30: "1M", 365: "1Y" }[coinDetail.days] || "";
-  return `${label}: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
-}
-
-function drawCoinChart(pts) {
-  const box = $("coin-chart");
-  coinDetail.chartPoints = pts;
-  if (!pts || pts.length < 2) {
-    box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("coin.chartUnavailable"))}</div>`;
-    return;
-  }
-  const W = 320, H = 130, PAD = 6;
-  const prices = pts.map((p) => p[1]);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const span = max - min || 1;
-  const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
-  const ys = prices.map((p) => H - PAD - ((p - min) / span) * (H - PAD * 2));
-  const line = xs.map((x, i) => `${i ? "L" : "M"}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(" ");
-  const area = `${line} L${W} ${H} L0 ${H} Z`;
-  box.className = `coin-chart ${prices[prices.length - 1] >= prices[0] ? "up" : "down"}`;
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(coinRangeSummary())}">
-    <path d="${area}" fill="currentColor" fill-opacity="0.12" stroke="none"></path>
-    <path d="${line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
-    <line id="coin-chart-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" opacity="0" stroke-dasharray="3 3"></line>
-  </svg>`;
-  $("coin-chart-readout").textContent = coinRangeSummary();
-}
-
-// Drag/hover over the chart to read the price at that moment.
-(function wireCoinChartScrub() {
-  const box = $("coin-chart");
-  const show = (e) => {
-    const pts = coinDetail.chartPoints;
-    if (!pts || pts.length < 2) return;
-    const rect = box.getBoundingClientRect();
-    if (!rect.width) return;
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const idx = Math.round(ratio * (pts.length - 1));
-    const [ts, price] = pts[idx];
-    const cursor = $("coin-chart-cursor");
-    if (cursor) {
-      const x = (idx / (pts.length - 1)) * 320;
-      cursor.setAttribute("x1", x);
-      cursor.setAttribute("x2", x);
-      cursor.setAttribute("opacity", "0.7");
-    }
-    const when = new Date(ts).toLocaleString(undefined, coinDetail.days === 1
-      ? { hour: "numeric", minute: "2-digit" }
-      : coinDetail.days <= 7 ? { month: "short", day: "numeric", hour: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
-    $("coin-chart-readout").textContent = `${TM_PRICES.formatMoney(price, currentCurrency, { price: true })} - ${when}`;
-  };
-  const reset = () => {
-    const cursor = $("coin-chart-cursor");
-    if (cursor) cursor.setAttribute("opacity", "0");
-    $("coin-chart-readout").textContent = coinRangeSummary();
-  };
-  box.addEventListener("pointermove", show);
-  box.addEventListener("pointerdown", show);
-  box.addEventListener("pointerleave", reset);
-  box.addEventListener("pointerup", reset);
-  box.addEventListener("pointercancel", reset);
-})();
-
-document.querySelectorAll(".coin-range").forEach((b) => {
-  b.addEventListener("click", () => {
-    coinDetail.days = Number(b.dataset.days);
-    document.querySelectorAll(".coin-range").forEach((x) => x.classList.toggle("active", x === b));
-    loadCoinChart(coinDetail.gen);
-  });
-});
-
-async function loadCoinSwapState(gen) {
-  const c = coinDetail.coin;
-  const btn = $("btn-coin-swap");
-  const note = $("coin-swap-note");
-  const showNote = (text) => { note.textContent = text; note.classList.remove("hidden"); };
-  if (!currentNetwork || !currentStatus || !currentStatus.selectedAddress) {
-    showNote(TM_I18N.t("coin.swapNeedsWallet"));
-    return;
-  }
-  if (!currentNetwork.swapRouter) {
-    showNote(TM_I18N.t("coin.swapNoRouter"));
-    return;
-  }
-  const held = await getHeldAssets();
-  if (gen !== coinDetail.gen) return;
-  const want = normalizeCoinSymbol(c.symbol);
-  const match = held.find((a) => normalizeCoinSymbol(a.symbol) === want);
-  if (!match) {
-    showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
-    return;
-  }
-  coinDetail.swapTarget = match;
-  if (Number(match.balance) > 0) {
-    const holding = $("coin-holding");
-    holding.textContent = TM_I18N.t("coin.holding", {
-      amount: Number(match.balance).toLocaleString(undefined, { maximumFractionDigits: 5 }),
-      symbol: match.symbol,
-    });
-    holding.classList.remove("hidden");
-  }
-  btn.disabled = false;
-  showNote(TM_I18N.t("coin.swapHint"));
-}
-
-$("btn-coin-swap").addEventListener("click", () => {
-  const m = coinDetail.swapTarget;
-  if (!m) return;
-  setupSwapScreen({ toKey: m.key });
-  showScreen("screen-swap");
-});
 
 // Compact live-prices card on the main screen -- just the first handful of
 // PRICE_BOARD's coins, at a glance, without navigating away. Best-effort
@@ -1100,53 +646,22 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
-// of opening a new tab -- see lib/buy-config.js's header comment for why
-// that's safe. Each time the screen is (re)opened, this resets back to the
-// "not loaded yet" state: description text, address row and Continue
-// button visible, iframe hidden -- ready for a fresh click.
 function setupBuyScreen() {
   hideError("buy-error");
   $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
-  $("buy-description-manual").classList.remove("hidden");
-  $("buy-description-autofill").classList.add("hidden");
-  $("buy-address-row").classList.remove("hidden");
-  $("btn-buy-open").classList.remove("hidden");
-  $("buy-frame-wrap").classList.add("hidden");
-  $("buy-frame").src = "about:blank";
 }
 
 $("btn-buy-copy-address").addEventListener("click", () => {
   navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
 });
 
-$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
-
-$("btn-buy-open").addEventListener("click", async () => {
+$("btn-buy-open").addEventListener("click", () => {
   hideError("buy-error");
-  const btn = $("btn-buy-open");
-  btn.disabled = true;
   try {
-    // Try for a signed URL with the address already filled in first (see
-    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
-    // manual "paste your address" flow) if that backend isn't configured
-    // or can't be reached. Either way this always embeds in the iframe
-    // below rather than opening a new tab.
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
-    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
-    $("buy-frame").src = url;
-    $("buy-frame-wrap").classList.remove("hidden");
-    btn.classList.add("hidden");
-    if (signedUrl) {
-      $("buy-description-manual").classList.add("hidden");
-      $("buy-description-autofill").classList.remove("hidden");
-      $("buy-address-row").classList.add("hidden");
-    }
+    const url = TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    chrome.tabs.create({ url });
   } catch (e) {
     showError("buy-error", e.message);
-  } finally {
-    btn.disabled = false;
   }
 });
 
@@ -1251,14 +766,13 @@ $("btn-send-submit").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- SWAP
-function setupSwapScreen(pre) {
+function setupSwapScreen() {
   hideError("swap-error");
   $("swap-status").classList.add("hidden");
   $("swap-quote-display").classList.add("hidden");
   const unsupported = !currentNetwork.swapRouter;
   $("swap-unsupported").classList.toggle("hidden", !unsupported);
   $("swap-form").classList.toggle("hidden", unsupported);
-  if (!unsupported) populateSwapSelects(pre || {}).catch(() => {});
 }
 
 $("btn-swap-quote").addEventListener("click", async () => {
@@ -1508,48 +1022,113 @@ $("support-input").addEventListener("keydown", (e) => {
 // not a claim that the language belongs to only that place (there's no
 // single flag for Arabic or English) -- this is the same convention almost
 // every app's language picker uses, just to make the list scannable.
-const TM_LANGUAGE_FLAGS = {
-  en: "\u{1F1FA}\u{1F1F8}", // English -> US
-  ar: "\u{1F1F8}\u{1F1E6}", // Arabic -> Saudi Arabia
-  zh: "\u{1F1E8}\u{1F1F3}", // Chinese (Simplified) -> China
-  es: "\u{1F1EA}\u{1F1F8}", // Spanish -> Spain
-  fr: "\u{1F1EB}\u{1F1F7}", // French -> France
-  hi: "\u{1F1EE}\u{1F1F3}", // Hindi -> India
-  pt: "\u{1F1F5}\u{1F1F9}", // Portuguese -> Portugal
-  ja: "\u{1F1EF}\u{1F1F5}", // Japanese -> Japan
-  ru: "\u{1F1F7}\u{1F1FA}", // Russian -> Russia
-};
-
+//
+// This used to be a plain <select> with a Unicode flag-emoji character
+// (Regional Indicator Symbol pairs) prepended to each option's text. That
+// works fine in the app's own rendered text, but a native <select>'s
+// dropdown popup is drawn by the OS/browser, not by us -- and a lot of
+// Android devices ship without the color-emoji flag glyphs installed, so
+// the popup falls back to showing the two raw letters ("US", "ES", ...)
+// instead of a flag picture, which is exactly the confusing thing a flag
+// was supposed to avoid. Real <img> flags fix that everywhere, but a
+// native <option> can't contain an <img> in any browser -- so each
+// ".language-select" element is progressively enhanced here into a small
+// custom dropdown (a button showing the current flag+name, and a listbox
+// of flag+name rows) while the original <select> stays in the DOM, hidden,
+// purely as the value-holder every other bit of code already reads/writes.
 function populateLanguageSelects() {
   document.querySelectorAll(".language-select").forEach((sel) => {
+    let wrap = sel.parentNode.classList && sel.parentNode.classList.contains("lang-picker") ? sel.parentNode : null;
+    let trigger, list;
+
+    if (!wrap) {
+      wrap = document.createElement("span");
+      wrap.className = "lang-picker";
+      sel.parentNode.insertBefore(wrap, sel);
+      wrap.appendChild(sel);
+
+      // Move the select's id (e.g. "language-select-header") onto the
+      // trigger so any CSS or labeling keyed off that id keeps applying to
+      // the thing that's actually visible now.
+      trigger = document.createElement("button");
+      trigger.type = "button";
+      if (sel.id) { trigger.id = sel.id; sel.removeAttribute("id"); }
+      if (sel.title) trigger.title = sel.title;
+      if (sel.getAttribute("aria-label")) trigger.setAttribute("aria-label", sel.getAttribute("aria-label"));
+      trigger.className = "lang-picker-trigger";
+      trigger.innerHTML = '<img class="lang-flag" alt="" /><span class="lang-name"></span><span class="lang-caret" aria-hidden="true">▾</span>';
+      wrap.appendChild(trigger);
+
+      sel.classList.add("lang-picker-native-hidden");
+      sel.setAttribute("tabindex", "-1");
+      sel.setAttribute("aria-hidden", "true");
+
+      list = document.createElement("ul");
+      list.className = "lang-picker-list hidden";
+      list.setAttribute("role", "listbox");
+      wrap.appendChild(list);
+
+      trigger.addEventListener("click", () => {
+        const willOpen = list.classList.contains("hidden");
+        document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
+        if (willOpen) list.classList.remove("hidden");
+      });
+      if (!document.body.dataset.langPickerOutsideClick) {
+        document.body.dataset.langPickerOutsideClick = "1";
+        document.addEventListener("click", (e) => {
+          if (!e.target.closest(".lang-picker")) {
+            document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
+          }
+        });
+      }
+    } else {
+      trigger = wrap.querySelector(".lang-picker-trigger");
+      list = wrap.querySelector(".lang-picker-list");
+    }
+
+    const updateTrigger = (code) => {
+      const lang = TM_I18N.LANGS.find((l) => l.code === code) || TM_I18N.LANGS[0];
+      trigger.querySelector(".lang-flag").src = `img/flag-${lang.code}.svg`;
+      trigger.querySelector(".lang-name").textContent = lang.name;
+      list.querySelectorAll(".lang-picker-item").forEach((it) => it.classList.toggle("active", it.dataset.code === lang.code));
+    };
+
     sel.innerHTML = "";
+    list.innerHTML = "";
     TM_I18N.LANGS.forEach((lang) => {
       const opt = document.createElement("option");
       opt.value = lang.code;
-      const flag = TM_LANGUAGE_FLAGS[lang.code];
-      opt.textContent = flag ? `${flag} ${lang.name}` : lang.name;
+      opt.textContent = lang.name;
       sel.appendChild(opt);
+
+      const item = document.createElement("li");
+      item.className = "lang-picker-item";
+      item.setAttribute("role", "option");
+      item.dataset.code = lang.code;
+      item.innerHTML = `<img class="lang-flag" src="img/flag-${lang.code}.svg" alt="" /><span>${lang.name}</span>`;
+      item.addEventListener("click", () => {
+        sel.value = lang.code;
+        TM_I18N.setLanguage(lang.code);
+        updateTrigger(lang.code);
+        list.classList.add("hidden");
+      });
+      list.appendChild(item);
     });
+
     sel.value = TM_I18N.getLanguage();
-    sel.addEventListener("change", (e) => TM_I18N.setLanguage(e.target.value));
+    updateTrigger(sel.value);
   });
 }
 
 function populateCurrencySelect() {
   const sel = $("currency-select-settings");
   sel.innerHTML = "";
-  const groups = { fiat: document.createElement("optgroup"), crypto: document.createElement("optgroup") };
-  groups.fiat.label = "Currencies";
-  groups.crypto.label = "Crypto";
   Object.keys(TM_PRICES.SUPPORTED_CURRENCIES).forEach((code) => {
-    const info = TM_PRICES.SUPPORTED_CURRENCIES[code];
     const opt = document.createElement("option");
     opt.value = code;
-    opt.textContent = `${info.label} - ${info.name} (${info.symbol})`;
-    (groups[info.type] || groups.fiat).appendChild(opt);
+    opt.textContent = `${TM_PRICES.SUPPORTED_CURRENCIES[code].symbol} ${TM_PRICES.SUPPORTED_CURRENCIES[code].label}`;
+    sel.appendChild(opt);
   });
-  sel.appendChild(groups.fiat);
-  sel.appendChild(groups.crypto);
   sel.value = currentCurrency;
   sel.addEventListener("change", async (e) => {
     currentCurrency = e.target.value;
@@ -1639,28 +1218,6 @@ function activateSplashHome() {
     hideSplash();
     showScreen("screen-send");
   });
-}
-
-// Onboarding/unlock: no wallet exists yet (or it's locked), so the splash
-// shouldn't auto-fade on a timer -- the user needs a deliberate moment to
-// land on before moving forward. Distinct from activateSplashHome(): the
-// Home/Assets/Activity/Send bar doesn't apply here (nothing to navigate to
-// yet), so instead this shows a language picker (populateLanguageSelects(),
-// called once during init(), already wires up any .language-select it
-// finds -- including this one, since it's in the static DOM from the
-// start) plus an explicit Continue button. Deliberately NOT a whole-screen
-// tap target anymore: that would swallow clicks meant for the language
-// <select> sitting on top of it.
-let splashLandingActivated = false;
-function activateSplashLanding() {
-  if (splashHomeActivated || splashLandingActivated) return;
-  splashLandingActivated = true;
-  clearSplashAutoTimers();
-  const el = $("splash-screen");
-  if (!el) return;
-  el.classList.add("splash-landing");
-  const continueBtn = $("splash-continue-btn");
-  if (continueBtn) continueBtn.addEventListener("click", () => hideSplash());
 }
 
 // ---------------------------------------------------------------- ACTIVITY
@@ -1934,10 +1491,10 @@ function renderActivity() {
   const status = await sendMsg("TM_GET_STATUS");
   if (!status.hasVault) {
     showScreen("screen-onboarding");
-    activateSplashLanding();
+    splashAutoTimers.push(setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStartedAt))));
   } else if (!status.unlocked) {
     showScreen("screen-unlock");
-    activateSplashLanding();
+    splashAutoTimers.push(setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStartedAt))));
   } else {
     await refreshMain();
     showScreen("screen-main");
