@@ -165,8 +165,18 @@ const FULL_PRICE_BOARD = PRICE_BOARD.concat(EXTRA_PRICE_BOARD);
 // Symbol is just for display; the code is what's actually sent to CoinGecko.
 // `stablecoin` is set only where a real, currently-circulating,
 // non-negligible stablecoin actually exists for that currency (checked
-// against issuer sites, exchange listings and news coverage, Sept 2026)
-// -- most currencies below have none, and none is invented for them.
+// against issuer sites, exchange listings and news coverage, Sept 2026,
+// re-checked 2026-09-20 specifically to look for anything new since the
+// first pass) -- most currencies below have none, and none is invented
+// for them. A currency stays unmapped when the only options found are
+// still in a regulatory sandbox/pilot rather than open circulation (CHF's
+// CHFD, Malaysia's RMJDT), haven't actually launched despite announcements
+// (India's ARC, Taiwan/Thailand's planned tokens), or come from an
+// issuer whose legitimacy couldn't be verified (Chile's CLPX, dormant
+// since a 2021 announcement) -- an unverifiable or pre-launch pick is
+// worse than none. HKDAP (HKD) is real and live but currently
+// institutional-only (retail access is planned, not yet open) -- still
+// listed since it's genuinely circulating, not merely announced.
 // Every one of these regional/non-USD stablecoins is far smaller and less
 // liquid than USDC -- collectively they're under 0.5% of total stablecoin
 // market share -- so this is shown as informational context on the
@@ -186,7 +196,7 @@ const SUPPORTED_CURRENCIES = {
   inr: { symbol: "₹", label: "INR", name: "Indian Rupee", type: "fiat" },
   brl: { symbol: "R$", label: "BRL", name: "Brazilian Real", type: "fiat", stablecoin: "BRZ" },
   aed: { symbol: "AED", label: "AED", name: "UAE Dirham", type: "fiat", stablecoin: "AE Coin" },
-  ars: { symbol: "AR$", label: "ARS", name: "Argentine Peso", type: "fiat" },
+  ars: { symbol: "AR$", label: "ARS", name: "Argentine Peso", type: "fiat", stablecoin: "wARS" },
   bdt: { symbol: "৳", label: "BDT", name: "Bangladeshi Taka", type: "fiat" },
   bhd: { symbol: "BHD", label: "BHD", name: "Bahraini Dinar", type: "fiat", decimals: 3 },
   bmd: { symbol: "BD$", label: "BMD", name: "Bermudian Dollar", type: "fiat" },
@@ -196,10 +206,10 @@ const SUPPORTED_CURRENCIES = {
   czk: { symbol: "Kč", label: "CZK", name: "Czech Koruna", type: "fiat" },
   dkk: { symbol: "kr", label: "DKK", name: "Danish Krone", type: "fiat" },
   gel: { symbol: "₾", label: "GEL", name: "Georgian Lari", type: "fiat" },
-  hkd: { symbol: "HK$", label: "HKD", name: "Hong Kong Dollar", type: "fiat" },
+  hkd: { symbol: "HK$", label: "HKD", name: "Hong Kong Dollar", type: "fiat", stablecoin: "HKDAP" },
   huf: { symbol: "Ft", label: "HUF", name: "Hungarian Forint", type: "fiat", decimals: 0 },
   idr: { symbol: "Rp", label: "IDR", name: "Indonesian Rupiah", type: "fiat", decimals: 0, stablecoin: "IDRX" },
-  ils: { symbol: "₪", label: "ILS", name: "Israeli Shekel", type: "fiat" },
+  ils: { symbol: "₪", label: "ILS", name: "Israeli Shekel", type: "fiat", stablecoin: "BILS" },
   krw: { symbol: "₩", label: "KRW", name: "South Korean Won", type: "fiat", decimals: 0, stablecoin: "KRWQ" },
   kwd: { symbol: "KWD", label: "KWD", name: "Kuwaiti Dinar", type: "fiat", decimals: 3 },
   lkr: { symbol: "Rs", label: "LKR", name: "Sri Lankan Rupee", type: "fiat" },
