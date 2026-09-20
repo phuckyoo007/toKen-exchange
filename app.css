@@ -1,0 +1,1379 @@
+/* ============================================================
+   Token Exchange — "Vault" theme
+   A warm brass/gold identity carried through from the header
+   logo into every screen: espresso surfaces, brass accents,
+   ledger-style monospace for anything numeric or on-chain,
+   a rounded, friendly display/body face (Fredoka, self-hosted --
+   extensions can't reach Google Fonts' CDN at runtime) for
+   headings and everyday text alike.
+   ============================================================ */
+
+@font-face {
+  font-family: 'Fredoka';
+  src: url('fonts/fredoka-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fredoka';
+  src: url('fonts/fredoka-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fredoka';
+  src: url('fonts/fredoka-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fredoka';
+  src: url('fonts/fredoka-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #12100c;
+  --bg-raised: #1d1810;
+  --bg-inset: #0b0a07;
+  --bg-hover: #241e14;
+  --line: #362d1c;
+  --line-strong: #4d4025;
+  --text: #f2ead9;
+  --text-muted: #a3987d;
+  --text-faint: #766c56;
+  --gold: #ddac4d;
+  --gold-bright: #f3d488;
+  --gold-deep: #9c701f;
+  --gold-ink: #241a06;
+  --danger: #e2685a;
+  --danger-bg: #2c1712;
+  --danger-line: #5c2c22;
+  --success: #7fc99a;
+  --font-display: 'Fredoka', Georgia, 'Times New Roman', serif;
+  --font-body: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  width: 360px;
+  min-height: 480px;
+  max-height: 600px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) var(--bg-inset);
+}
+
+::selection { background: var(--gold-deep); color: var(--gold-ink); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-inset); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
+
+/* ---------------- full-bleed arcade-cabinet scene ----------------
+   A fixed backdrop -- the user's own AI-generated "jackpot" reference
+   art -- sitting behind the whole popup on every screen. A dark scrim
+   gradient is baked into the same layer: strong enough near the top to
+   reveal the art's own slot-machine assembly (blending into the header
+   logo above it), then quickly opaque enough that real screen content
+   (headings, inputs, buttons) stays fully readable over it lower down.
+   #app itself is transparent so this shows through; individual
+   cards/inputs keep their own solid dark fills for contrast. */
+#bg-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(to bottom,
+      rgba(4, 6, 12, 0.02) 0%,
+      rgba(4, 6, 12, 0.06) 18%,
+      rgba(5, 7, 13, 0.6) 33%,
+      rgba(6, 8, 14, 0.95) 41%,
+      rgba(6, 8, 14, 0.985) 50%,
+      rgba(6, 8, 14, 0.99) 100%),
+    url(img/bg-scene.jpg) center top / cover no-repeat;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+  /* Fully opaque -- no part of the app card lets the #bg-scene backdrop
+     show through anymore. The backdrop art is still visible around the
+     outside of this card on wide/desktop viewports (see the framed
+     look below), but nothing inside it -- header included -- is
+     see-through in any way. A faint copy of the splash artwork sits on
+     the card's own face instead -- see #app::before below -- which is
+     a separate, self-contained watermark baked onto this opaque card,
+     not a window onto the fixed backdrop behind it. */
+  background: var(--bg);
+}
+/* A very faint copy of the splash art's coin/globe centerpiece,
+   printed directly onto the card's own face so the card reads as more
+   than flat black and still visually differs from the plain #bg-scene
+   backdrop around it -- but this is a static image living on #app
+   itself, at z-index -1 (behind every real child of #app, including
+   #app-header), never a see-through hole onto the fixed backdrop.
+   Uses cropped card-watermark(-light).jpg rather than the splash art
+   directly -- the splash images have the "TOKEN EXCHANGE" title and
+   (on the dark variant) a fake bottom nav bar baked into the artwork
+   itself, and those need to stay out of a watermark that sits behind
+   real screen content everywhere in the app. Fully non-interactive. */
+#app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url(img/card-watermark.jpg) center / cover no-repeat;
+  opacity: 0.14;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: light) {
+  #app::before { background-image: url(img/card-watermark-light.jpg); }
+}
+
+/* ---------------- splash screen ----------------
+   Shown for a brief moment every time the popup opens, before the
+   onboarding/unlock/main screen underneath -- the MetaMask-fox-style
+   "brand moment" the user asked for. Sits above #app and comes down
+   once the real starting screen is ready.
+   Deliberately NOT animated (no opacity transition): a fade would pass
+   through a half-see-through frame first, which is exactly the
+   "translucent, does nothing" glitch reported when tapping a tab
+   before a wallet exists. A hard cut avoids that state entirely. */
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  width: 360px;
+  height: 600px;
+  z-index: 999;
+  overflow: hidden;
+  background: #050810;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#splash-screen img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+#splash-brand {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 5px 22px;
+  border-radius: 999px;
+  background: rgba(5, 8, 16, 0.55);
+  backdrop-filter: blur(2px);
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgba(243, 212, 136, 0.55);
+  border: 1px solid rgba(243, 212, 136, 0.35);
+}
+#splash-screen.splash-hide {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Only relevant to the framed web-wallet layout (see below) -- hidden
+   by default so it has no effect in the extension popup context. */
+#splash-tagline { display: none; }
+#splash-spinner {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+}
+#splash-spinner img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+  animation: spinCoin 1.6s linear infinite;
+}
+@keyframes spinCoin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* When a wallet already exists and is unlocked, the splash stops being a
+   timed brand flash and becomes the real landing screen: it stays up
+   (#splash-screen.splash-home skips the auto-fade entirely) and these four
+   tabs are the way forward, matching the reference artwork's own bottom
+   nav bar -- Home/Assets/Activity/Send become real navigation instead of
+   painted-on decoration. The spinner (a "loading" cue) has no role once
+   the screen is meant to be lingered on, so the two are mutually exclusive. */
+#splash-screen.splash-home #splash-spinner { display: none; }
+/* The splash artwork itself has a faint painted-on "Home / Assets /
+   Activity / Send" bar baked into the image around 45-95px up from the
+   bottom edge (that's the exact bar this real tabbar replaces). The
+   splash <img> has no scrim of its own, so without a tall, solidly
+   opaque backing here, that painted bar shows through as a ghost
+   directly above the real one. Cover well past its top edge before
+   fading out, so only the real, functional bar is ever visible. */
+#splash-tabbar {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  min-height: 132px;
+  align-items: flex-end;
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top,
+    rgba(9, 11, 17, 0.99) 0%,
+    rgba(9, 11, 17, 0.99) 68%,
+    rgba(9, 11, 17, 0.9) 82%,
+    rgba(9, 11, 17, 0.4) 94%,
+    transparent 100%);
+}
+#splash-screen.splash-home #splash-tabbar { display: flex; }
+
+/* Before any wallet exists yet (screen-onboarding) or while one exists but
+   is locked (screen-unlock), the splash still lingers instead of
+   auto-fading -- see activateSplashLanding() -- but showing the
+   Home/Assets/Activity/Send bar here makes no sense: those are existing-
+   wallet features and there's nothing to tap that actually starts
+   onboarding or unlocking. This swaps that bar for one plain "tap to
+   continue" hint, and the whole splash becomes a single big tap target
+   (see activateSplashLanding()), so a first-time visitor isn't left
+   guessing which nav icon dismisses a screen that never explained itself. */
+#splash-screen.splash-landing #splash-spinner { display: none; }
+#splash-screen.splash-landing #splash-tabbar { display: none; }
+/* Language picker + Continue button live inside this footer now (see
+   below) -- no longer a whole-screen tap target, since that would swallow
+   clicks meant for the <select> sitting on top of it. */
+#splash-continue-hint {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  /* Same 132px min-height and gradient shape as #splash-tabbar above --
+     this still has to fully cover the artwork's own baked-in tab-bar
+     ghost (~45-95px up from the bottom) even though no real buttons
+     render here in landing mode. Grows taller than 132px to fit the
+     language row + Continue button, which only helps that coverage. */
+  min-height: 132px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top,
+    rgba(9, 11, 17, 0.99) 0%,
+    rgba(9, 11, 17, 0.99) 68%,
+    rgba(9, 11, 17, 0.9) 82%,
+    rgba(9, 11, 17, 0.4) 94%,
+    transparent 100%);
+}
+#splash-screen.splash-landing #splash-continue-hint { display: flex; }
+#splash-continue-hint .language-picker { margin: 0; }
+#splash-continue-hint .language-picker label {
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#splash-continue-btn { width: 100%; }
+.splash-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 4px 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.splash-tab:hover, .splash-tab:focus-visible { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.splash-tab-icon { font-size: 17px; line-height: 1; }
+.splash-tab-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em; }
+#splash-tab-home { color: var(--gold-bright); }
+
+/* ---------------- activity screen ---------------- */
+#activity-list { display: flex; flex-direction: column; gap: 8px; }
+.activity-entry {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--bg-raised); border: 1px solid var(--line);
+}
+/* Entries with a real block-explorer link (see buildExplorerTxUrl in
+   app.js) render as an <a>, not a div -- reset its default link styling
+   back to looking like the rest of the list, then add just enough of a
+   hover/focus cue plus a small external-link glyph to signal it's
+   clickable, the same way MetaMask/Coinbase Wallet's activity rows do. */
+a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
+.activity-entry-linked:hover, .activity-entry-linked:focus-visible {
+  border-color: var(--gold-deep); background: var(--bg-hover);
+}
+.activity-entry-linked::after {
+  content: "↗"; flex-shrink: 0; align-self: flex-start;
+  font-size: 12px; color: var(--text-faint); margin-left: 2px;
+}
+/* Outgoing sends: a small circular badge with an up-right arrow, the same
+   visual shorthand MetaMask's own activity feed uses to mark a send at a
+   glance. Incoming (best-effort, balance-delta-detected -- see
+   checkForIncomingBalance in app.js) gets the mirror-image treatment: a
+   down-left arrow in the app's success-green rather than gold, so the two
+   directions are distinguishable at a glance without reading the text. */
+.activity-icon {
+  flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(243, 212, 136, 0.12);
+  border: 1px solid var(--line-strong);
+  color: var(--gold);
+}
+.activity-icon-in {
+  background: rgba(84, 196, 130, 0.15);
+  border-color: rgba(84, 196, 130, 0.35);
+  color: #6fd39a;
+}
+.activity-icon svg { width: 16px; height: 16px; }
+.activity-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.activity-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.activity-entry .activity-main { font-weight: 700; color: var(--text); font-size: 13.5px; }
+.activity-entry .activity-sub { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-entry .activity-time { font-size: 10.5px; color: var(--text-faint); }
+/* The small "detected from a balance change, not a real transaction record"
+   caveat shown under incoming entries -- see the long comment on
+   checkForIncomingBalance in app.js for the full reasoning. Deliberately
+   understated (same treatment as .activity-sub, just italic) rather than a
+   loud warning -- it's a normal, expected limitation of this feature, not
+   an error. Declared AFTER .activity-entry .activity-sub above so its
+   equal-specificity override of the ellipsis/nowrap rule actually wins --
+   CSS ties break on source order, not just specificity. */
+.activity-entry .activity-approx-note {
+  font-style: italic;
+  white-space: normal; overflow: visible; text-overflow: clip;
+}
+/* Confirmed-status pill -- every entry here already succeeded on-chain
+   before it's recorded, so it always reads "Sent" in a positive/success
+   color, matching a completed transaction's state in other wallets. */
+/* Reused for the WalletConnect "Connected dapps" list -- same row layout
+   as an Activity entry, but with a compact action button on the end
+   instead of a status pill. */
+.activity-entry .secondary.small { padding: 6px 12px; flex-shrink: 0; }
+
+.activity-status {
+  flex-shrink: 0;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 2px 9px; border-radius: 20px;
+  background: rgba(84, 196, 130, 0.15); color: #6fd39a;
+  border: 1px solid rgba(84, 196, 130, 0.35);
+}
+
+/* screen-loading also gets the spinning coin -- covers the (rare) longer
+   waits, e.g. a slow status check or the approval-mode popup. */
+.loading-screen {
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+#loading-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  animation: spinCoin 1.6s linear infinite;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}
+
+/* ---------------- header ----------------
+   #app is now fully opaque (see #app above) -- nothing behind it shows
+   through anymore, including here. This no longer reserves space for
+   the backdrop's baked-in title, so it's sized to just its own content
+   (the network pill); the circular badge logo lives down in the
+   footer instead (see below). */
+#app-header {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
+  padding: 12px 12px 10px;
+  flex-shrink: 0;
+}
+#network-badge {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px; letter-spacing: 0.01em;
+  padding: 4px 12px; border-radius: 20px;
+  background: var(--bg-raised); color: var(--text);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  display: flex; align-items: center; gap: 6px;
+}
+/* A network's own brand color as a small dot -- Ethereum's periwinkle,
+   Base's blue, Polygon's purple, etc. -- next to its name wherever it's
+   shown, so the current chain reads at a glance instead of only by text. */
+.network-dot {
+  display: inline-block; flex-shrink: 0;
+  width: 8px; height: 8px; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+}
+
+/* ---------------- layout ---------------- */
+.screen {
+  padding: 18px 16px; flex: 1; display: flex; flex-direction: column; gap: 11px;
+  /* Deliberately NOT opacity-animated: a fade briefly shows every card at
+     partial opacity, letting the backdrop bleed through underneath -- the
+     same "goes translucent" problem fixed on the splash screen, but on
+     every single screen change/button click instead. Cards render at full
+     opacity immediately, matching the solid look they have once settled.
+     A screen still gets a small transform-only entrance below, which
+     never touches opacity so it can't reintroduce that bug -- it just
+     keeps navigation from feeling like an instant, jarring cut. */
+}
+/* Runs once each time a screen goes from .hidden (display:none, so no
+   animation applies) to shown -- CSS starts a fresh animation whenever an
+   element newly matches a rule with an animation-name, which is exactly
+   the show/hide toggle showScreen() already does, so no JS changes were
+   needed to trigger this. Transform + a hair of scale only, same as a
+   native app's push/pop transition -- opacity is never touched. */
+@keyframes screenEnter {
+  from { transform: translateY(6px) scale(0.985); }
+  to { transform: translateY(0) scale(1); }
+}
+.screen:not(.hidden) {
+  animation: screenEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen:not(.hidden) { animation: none; }
+}
+.hidden { display: none !important; }
+
+/* ---------------- cube nav (Home / Activity / Send) ----------------
+   These three screens live inside a rotating 3D cube (cube-nav.js) instead
+   of swapping with a hard cut -- clicking Send from Home, or hitting Back
+   from Send, turns the cube. #cube-shell takes over the same flex:1 slot
+   .screen normally holds; #cube-stage is where CubeNav.mount() builds its
+   own .cn-stage/.cn-cube/.cn-face structure, sized via --cn-stage-h since
+   the cube needs a real, bounded viewport rather than the auto-height
+   "grows to content, page scrolls" model every other screen uses -- each
+   face scrolls internally instead (see .cn-face in cube-nav.js). */
+#cube-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#cube-stage {
+  --cn-stage-h: min(60vh, 460px);
+}
+#cube-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+.cube-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 7px 4px 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.cube-tab:hover, .cube-tab:focus-visible { background: var(--bg-hover); color: var(--text); }
+.cube-tab.active { color: var(--gold-bright); }
+.cube-tab-icon { font-size: 17px; line-height: 1; }
+.cube-tab-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em; }
+
+/* ---------------- footer ----------------
+   The circular "TOKEN EXCHANGE" badge (the same image used as the app
+   icon) now sits down here at the bottom of every screen instead of up
+   in the header, where it fought with the backdrop's own baked-in
+   title. Small and out of the way of the actual "non-custodial"
+   messaging it sits above. */
+#app-footer {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 16px 12px; border-top: 1px solid var(--line);
+  background: linear-gradient(0deg, #17130c 0%, transparent 100%);
+  color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+#app-footer #brand-logo {
+  display: block; width: 56px; height: 56px;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(221, 172, 77, 0.25);
+}
+#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
+#app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
+#app-footer .footer-copyright { font-size: 9.5px; color: var(--text-faint); opacity: 0.8; letter-spacing: 0.03em; }
+
+h2 {
+  margin: 0 0 6px 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.01em;
+  color: var(--gold-bright);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(243, 212, 136, 0.18);
+}
+.muted { color: var(--text-muted); font-size: 12px; margin: 0; line-height: 1.5; }
+
+/* ---------------- form controls ---------------- */
+input, select, textarea {
+  width: 100%; padding: 10px 11px; border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--bg-inset); color: var(--text);
+  font-size: 13px; font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(221, 172, 77, 0.15);
+}
+textarea { resize: vertical; }
+label {
+  font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); margin-top: 2px; display: block;
+}
+
+/* ---------------- buttons ----------------
+   Chunky "jackpot pill" shape carried down from the header's slot-machine
+   buttons/lever -- fully rounded ends, a strong top-highlight bevel, and a
+   drop shadow so every button reads as a raised, pressable coin/token. */
+button {
+  cursor: pointer; border: none; border-radius: 999px;
+  padding: 12px 16px; font-size: 13.5px; font-weight: 700;
+  font-family: var(--font-body); letter-spacing: 0.01em;
+  transition: filter 0.12s ease, transform 0.05s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+button:active { transform: translateY(1px); }
+button:focus-visible, .link:focus-visible, a:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 2px;
+}
+
+.primary {
+  background: linear-gradient(180deg, #fff6df 0%, var(--gold-bright) 32%, var(--gold) 68%, var(--gold-deep) 100%);
+  color: var(--gold-ink);
+  border: 1.5px solid #8a6a10;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.4);
+}
+.primary:hover { filter: brightness(1.06); }
+.primary:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+
+.secondary {
+  background: linear-gradient(180deg, #3a3018 0%, #241d10 60%, #1a150b 100%);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 4px rgba(0,0,0,0.3);
+}
+.secondary:hover { border-color: var(--gold-deep); filter: brightness(1.12); }
+
+.danger {
+  background: linear-gradient(180deg, #3a1c15 0%, var(--danger-bg) 100%);
+  color: var(--danger); border: 1px solid var(--danger-line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.3);
+}
+.danger:hover { background: #35190f; }
+
+.link {
+  background: transparent; color: var(--gold);
+  text-decoration: underline; text-underline-offset: 2px;
+  padding: 4px 0; font-weight: 500; font-size: 13px;
+}
+.link:hover { color: var(--gold-bright); }
+
+.icon-btn {
+  background: linear-gradient(180deg, #3a3018 0%, #241d10 100%);
+  border: 1px solid var(--line-strong);
+  color: var(--text); border-radius: 999px; padding: 7px 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 1px 3px rgba(0,0,0,0.3);
+}
+.icon-btn:hover { border-color: var(--gold-deep); }
+
+/* ---------------- status / feedback ---------------- */
+.error {
+  color: #f0a99d; font-size: 12px; line-height: 1.5;
+  background: var(--danger-bg); border: 1px solid var(--danger-line);
+  border-left: 3px solid var(--danger);
+  padding: 9px 11px; border-radius: 7px;
+}
+.warn {
+  color: #e8c37a; font-size: 12px; line-height: 1.5;
+  background: #2a2110; border: 1px solid #4a3a17;
+  border-left: 3px solid var(--gold-deep);
+  padding: 9px 11px; border-radius: 7px;
+}
+/* Same slot-machine top-strip treatment as the card panels above (see
+   .prices-card / .tokens-section), applied to just this one .warn box --
+   not .warn generally, so the smaller warning callouts elsewhere (create
+   password, send confirmation, etc.) stay their plain solid selves. */
+.onboarding-intro-card {
+  position: relative;
+  /* A single, deliberately-cropped strip of card-banner.jpg (the "GLOBAL
+     TOKEN EXCHANGE" scene) -- not the old bg-scene.jpg treatment this
+     replaced in round 3, which "cover"-scaled a much larger image against
+     each card's own (very different) rendered height, landing on a
+     different, often illegible crop each time. This source image was
+     pre-cropped specifically as a wide, short banner, so "cover" at a
+     typical card width lands close to the same framing everywhere. */
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 64px, #2a2110 100%),
+    url(img/card-banner.jpg) center top / 100% auto no-repeat;
+  padding-top: 64px;
+}
+.hint {
+  color: var(--success); font-size: 12px; line-height: 1.5;
+  background: #142822; border: 1px solid #234a3d;
+  border-left: 3px solid var(--success);
+  padding: 9px 11px; border-radius: 7px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ---------------- send speed (gas) selector ----------------
+   Three-way slow/standard/fast toggle shown under the amount field once
+   a fee estimate is available. */
+.send-speed-row {
+  display: flex; gap: 6px; margin: 2px 0 0;
+}
+.send-speed-btn {
+  flex: 1; text-align: center; cursor: pointer;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  color: var(--text-muted); border-radius: 8px;
+  padding: 8px 6px; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em; transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.send-speed-btn:hover { border-color: var(--line-strong); color: var(--text); }
+.send-speed-btn.active {
+  background: linear-gradient(180deg, #3a3018 0%, #241d10 100%);
+  border-color: var(--gold-deep); color: var(--gold);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.send-speed-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* ---------------- send confirm / cancel-window card ----------------
+   Shown after "Send" is tapped and before the transaction actually goes
+   out, while the (configurable, cancellable) delay counts down. Sits
+   right where the Send button was, so nothing about the layout jumps. */
+.send-confirm-card {
+  margin-top: 10px; padding: 12px; border-radius: 10px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.send-confirm-card .warn,
+.send-confirm-card .error { margin: 0; }
+/* Escalated beyond the generic "first time sending here" notice: this one
+   means a lookalike of an address already trusted on this device, which is
+   the specific pattern address-poisoning scams rely on. */
+.poison-warning {
+  border-width: 2px; border-color: var(--danger); font-weight: 600;
+}
+.send-confirm-summary {
+  margin: 0; font-size: 13px; color: var(--text);
+  font-family: var(--font-mono); word-break: break-all;
+}
+
+/* The one shared "you're waiting on something" cue (see coinSpinnerHtml()
+   in popup.js) -- small enough to sit inline next to a loading label
+   wherever one is needed, reusing the same image and spin as the startup
+   splash, screen-loading, and the balance's own loading state. */
+.inline-coin-spinner {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border-radius: 50%;
+  animation: spinCoin 1.2s linear infinite;
+}
+.price-row.skeleton, .market-row.skeleton { gap: 8px; }
+.mono { font-family: var(--font-mono); word-break: break-all; }
+.small { font-size: 11px; }
+
+/* ---------------- vault-specific components ---------------- */
+.mnemonic-box {
+  background: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px; padding: 14px;
+  font-family: var(--font-mono); font-size: 13px;
+  line-height: 2; word-spacing: 6px; color: var(--gold-bright);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.checkbox-row {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-body); font-size: 12.5px; letter-spacing: normal;
+  text-transform: none; color: var(--text-muted);
+}
+.checkbox-row input { width: auto; accent-color: var(--gold); }
+
+.account-row { display: flex; gap: 8px; }
+.account-picker { flex: 1; display: flex; align-items: center; gap: 8px; }
+.account-picker select { flex: 1; }
+
+/* Deterministic, per-address identicon (see lib/identicon.js) -- the same
+   "this account/address always looks like this" visual anchor MetaMask's
+   own account avatar provides, generated locally with no image request. */
+.account-identicon {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+.account-identicon svg { display: block; width: 100%; height: 100%; }
+.send-to-label-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.send-to-label-row label { margin: 0; }
+.send-to-row { display: flex; align-items: center; gap: 8px; }
+.send-to-row input { flex: 1; }
+#send-to-identicon { width: 24px; height: 24px; }
+
+.network-picker { margin-top: auto; padding-top: 2px; }
+.network-picker label { margin-top: 0; margin-bottom: 3px; }
+.network-select-row { display: flex; align-items: center; gap: 8px; }
+.network-select-row select { flex: 1; }
+
+.balance-box {
+  text-align: center; padding: 20px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  position: relative;
+}
+.balance-box::before {
+  content: ""; position: absolute; inset: 5px;
+  border: 1px solid var(--line); border-radius: 6px;
+  pointer-events: none; opacity: 0.6;
+}
+/* USD leads (the number most people actually scan for -- the same
+   hierarchy MetaMask/Coinbase Wallet/Rainbow all settled on), with the
+   native amount + symbol as a smaller line underneath. When there's no
+   USD estimate to show (CoinGecko unreachable/rate-limited), the native
+   row itself takes over the lead styling via .balance-lead-fallback
+   below, so the balance box never reads as empty. */
+/* Small caption above the hero number, clarifying that it's now a combined
+   total across the native balance + all tracked tokens, not just one
+   coin's value -- hidden whenever the fallback (.balance-lead-fallback)
+   takes over, since "Total balance" reads oddly labeling a lone native
+   amount. */
+.balance-usd-label {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+#balance-usd {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 30px; letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-bright);
+  min-height: 36px;
+  display: flex; align-items: center; justify-content: center;
+}
+/* The balance's own loading state reuses the same spinning-coin image as
+   the splash screen and screen-loading, instead of a plain pulsing "..."
+   -- one consistent "you're waiting" cue everywhere in the wallet. */
+.balance-coin-spinner {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+  animation: spinCoin 1.2s linear infinite;
+}
+.balance-native-row {
+  display: flex; align-items: baseline; justify-content: center; gap: 6px;
+  margin-top: 4px;
+}
+#balance-amount { font-size: 14px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+#balance-symbol { letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; }
+.balance-native-row.balance-lead-fallback { margin-top: 0; }
+.balance-native-row.balance-lead-fallback #balance-amount {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 30px; color: var(--gold-bright);
+}
+.balance-native-row.balance-lead-fallback #balance-symbol { font-size: 13px; }
+
+.address-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+/* Buy/Sell screens: MoonPay's widget embedded right here instead of
+   opening a new tab (see lib/buy-config.js). Fixed height since the
+   iframe's own content can't influence its parent's size across origins. */
+.widget-frame-wrap {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+}
+.widget-frame { display: block; width: 100%; height: 520px; border: none; }
+/* Buy screen: points at Swap as the fully non-custodial, no-signup
+   alternative to MoonPay for anyone who already holds some crypto. */
+.no-third-party-callout {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold-deep);
+  padding: 10px 12px; border-radius: 7px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
+/* QR codes need real light/dark contrast to stay scannable, so this stays
+   a plain white card regardless of the app's own dark theme -- the same
+   compromise every dark-themed wallet's QR view makes. */
+.qr-box {
+  margin: 4px auto 0; padding: 12px; width: 148px;
+  background: #fff; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.qr-box svg { width: 100%; height: 100%; display: block; }
+.actions-row { display: flex; gap: 8px; }
+.actions-row button { flex: 1; }
+.swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+/* #swap-form/#swap-quote-display are plain divs, not direct flex children
+   of .screen, so their buttons (Get quote / Approve token first / Swap)
+   were falling back to the browser's shrink-to-fit button sizing instead
+   of the full-width "chunky pill" every other screen's buttons get from
+   .screen's own flex column. Mirroring that same flex layout here fixes
+   it -- and stacking Approve/Swap top-to-bottom (rather than a Reject/
+   Confirm-style side-by-side split) matches how they're actually used:
+   sequential steps, not a pick-one choice, since both stay visible at
+   once when a token needs approval before it can swap. */
+#swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 11px; }
+
+/* A soft gold glow across the top of a card, fading into the card's own
+   solid fill by 44px down -- a small decorative accent, without making
+   any part of the card itself see-through. This used to be a cropped
+   strip of the slot-machine backdrop art, but that crop always caught
+   part of the "TOKEN EXCHANGE" wordmark baked into the artwork, so it
+   repeated illegibly above every single card on the main screen. A plain
+   gradient keeps the warm accent without the repeated, unreadable text.
+   Real content starts below the reserved padding either way. */
+.tokens-section {
+  margin-top: 4px;
+  position: relative;
+  /* See .onboarding-intro-card above for why this is a pre-cropped banner
+     image rather than the old cover-scaled full backdrop. */
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 64px, var(--bg-inset) 100%),
+    url(img/card-banner.jpg) center top / 100% auto no-repeat;
+  border: 1px solid var(--line);
+  border-radius: 10px; padding: 64px 10px 10px;
+}
+.tokens-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.tokens-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.tokens-list { display: flex; flex-direction: column; gap: 6px; }
+.tokens-list:not(:empty) { margin-bottom: 2px; }
+#tokens-empty { margin: 2px 0 0; }
+/* Friendlier empty states for the Tokens/NFTs sections -- a small icon
+   above the existing muted hint text, instead of just a bare line, so an
+   empty section reads as "nothing added yet" rather than "something's
+   missing/broken". Purely decorative (aria-hidden) since the text below
+   already says the same thing to a screen reader. */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 4px;
+  padding: 10px 6px 4px;
+}
+.empty-state-icon {
+  font-size: 26px; line-height: 1;
+  opacity: 0.75;
+  filter: grayscale(0.15);
+}
+.empty-state p { margin: 0; }
+.token-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px;
+}
+.token-icon {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  font-size: 10px; font-weight: 800; letter-spacing: -0.02em;
+  color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+/* A real logo, when one loads, sits on top of the colored initials rather
+   than replacing them in the DOM -- see tokenIconHtml() in app.js. Sized to
+   fill whatever size .token-icon is at each call site (28px here, smaller
+   in .price-left/.prices-card-list below) rather than a fixed size. */
+.token-icon-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  border-radius: 50%; object-fit: cover;
+}
+.token-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.token-symbol { font-weight: 600; color: var(--text); }
+.token-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.token-balance-col { display: flex; flex-direction: column; align-items: flex-end; }
+.token-balance { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold-bright); }
+.token-remove-btn {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 16px; line-height: 1; padding: 2px 4px; cursor: pointer;
+}
+.token-remove-btn:hover { color: var(--danger); }
+
+/* NFTs are shown as image thumbnails rather than balance rows -- a small
+   grid instead of .tokens-list's stacked rows -- but the outer
+   .tokens-section/.tokens-header/.tokens-title classes are reused as-is so
+   this section matches the Tokens card above it exactly (same backdrop
+   strip, same header style). */
+.nft-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.nft-grid:not(:empty) { margin-bottom: 2px; }
+.nft-card {
+  position: relative;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px; text-align: center;
+}
+.nft-thumb {
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+  border-radius: 6px; background: var(--bg-inset);
+  display: block; margin-bottom: 4px;
+}
+.nft-thumb-fallback {
+  width: 100%; aspect-ratio: 1 / 1; border-radius: 6px;
+  background: var(--bg-inset); display: flex; align-items: center; justify-content: center;
+  color: var(--text-faint); font-size: 10px; margin-bottom: 4px;
+}
+.nft-name {
+  display: block; font-size: 11px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nft-id { display: block; font-size: 9.5px; color: var(--text-faint); font-family: var(--font-mono); }
+.nft-remove-btn {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(9, 11, 17, 0.75); border: 1px solid var(--line);
+  color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.nft-remove-btn:hover { color: var(--danger); }
+
+.prices-list {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px;
+}
+.price-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; font-size: 13px;
+}
+.price-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.price-left .token-icon { width: 24px; height: 24px; font-size: 9px; }
+.price-row .price-name { font-weight: 600; color: var(--text); }
+.price-row .price-symbol { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
+.price-row .price-usd { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold-bright); }
+.price-row .price-change { font-size: 11px; margin-left: 8px; font-variant-numeric: tabular-nums; }
+.price-change.up { color: var(--success); }
+.price-change.down { color: var(--danger); }
+.price-right { display: flex; align-items: center; }
+/* Watchlist star -- same convention Binance/most exchange apps use to pin
+   a token for quick reference. Purely local (chrome.storage.local); no
+   token symbol choice is ever sent anywhere by starring it. */
+.star-btn {
+  background: none; border: none; padding: 0 6px 0 0; margin: 0;
+  font-size: 15px; line-height: 1; cursor: pointer;
+  color: var(--text-faint);
+  box-shadow: none; border-radius: 0;
+}
+.star-btn:active { transform: none; }
+.star-btn.starred { color: var(--gold-bright); }
+.prices-card-list .star-btn { font-size: 13px; }
+
+/* Compact live-prices card on the main screen -- a handful of top coins
+   at a glance, with "See all" going to the full Prices screen. Rows
+   reuse .price-row/.price-name/etc. above so the two views stay visually
+   consistent. */
+.prices-card {
+  position: relative;
+  /* Same card-banner.jpg treatment as .tokens-section above. */
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0) 0%, var(--bg-inset) 64px, var(--bg-inset) 100%),
+    url(img/card-banner.jpg) center top / 100% auto no-repeat;
+  border: 1px solid var(--line);
+  border-radius: 10px; padding: 64px 10px 10px; margin-bottom: 10px;
+}
+.prices-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.prices-card-title { font-weight: 700; color: var(--text); font-size: 12.5px; letter-spacing: 0.02em; }
+.prices-card-list { display: flex; flex-direction: column; gap: 6px; }
+.prices-card-list .price-row { padding: 7px 10px; font-size: 12.5px; }
+.prices-card-list .price-left .token-icon { width: 20px; height: 20px; font-size: 8px; }
+.prices-card-list .price-row.skeleton { color: var(--text-faint); justify-content: center; }
+
+/* Trending prediction-market rows (Polymarket, read-only) -- same card
+   language as the price rows above, but the left side is a wrapping
+   question instead of a fixed-width coin name. */
+.market-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; font-size: 13px;
+}
+.market-row .market-question { flex: 1; min-width: 0; color: var(--text); line-height: 1.3; }
+.market-row .market-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.market-row .market-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+.market-row .market-pct.up { color: var(--success); }
+.market-row .market-pct.down { color: var(--danger); }
+.market-row .market-volume { font-size: 10.5px; color: var(--text-faint); font-family: var(--font-mono); }
+.prices-card-list .market-row { padding: 7px 10px; font-size: 12.5px; }
+.market-row.skeleton { justify-content: center; color: var(--text-faint); }
+
+.tx-details {
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px;
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 13px;
+}
+
+/* Plain-language decode of a transaction's raw call data, shown above the
+   raw To/Value/Data box on the transaction-approval screen -- the same
+   "here's what this actually does" summary MetaMask/Coinbase show before
+   raw hex, built entirely from a small bundled dictionary of common ERC-20
+   function signatures (never a network call to a third-party simulation
+   service). Left un-styled beyond the shared .tx-details look except for
+   the one case worth visually raising: an unlimited-amount approval. */
+#approvals-list { display: flex; flex-direction: column; gap: 10px; }
+.approval-row .btn-revoke-approval { margin-top: 2px; }
+
+.decoded-tx { border-color: var(--gold-deep); }
+.decoded-tx .decoded-line { font-size: 13.5px; }
+.decoded-tx .decoded-unlimited { color: var(--danger); font-weight: 700; }
+.decoded-tx .decoded-arg { display: flex; gap: 6px; }
+.decoded-tx .decoded-arg .muted { flex-shrink: 0; }
+
+.back-btn { align-self: flex-start; }
+pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(--font-mono); }
+
+/* ---------------- support chat ---------------- */
+.support-log {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px;
+  max-height: 220px; overflow-y: auto;
+}
+.support-msg {
+  max-width: 85%; padding: 8px 11px; border-radius: 10px;
+  font-size: 12.5px; line-height: 1.5; word-break: break-word;
+}
+.support-msg.bot {
+  align-self: flex-start;
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  color: var(--text); border-bottom-left-radius: 3px;
+}
+.support-msg.user {
+  align-self: flex-end;
+  background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 100%);
+  color: var(--gold-ink); font-weight: 500;
+  border-bottom-right-radius: 3px;
+}
+.support-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.support-chip {
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  color: var(--gold); border-radius: 20px;
+  padding: 6px 12px; font-size: 11.5px; font-weight: 500;
+  cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.support-chip:hover { background: var(--bg-hover); border-color: var(--gold-deep); }
+.support-input-row { display: flex; gap: 8px; }
+.support-input-row input { flex: 1; }
+.support-input-row button { flex-shrink: 0; }
+
+/* ---------------- language picker ---------------- */
+.language-picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
+.language-picker label { margin: 0; flex-shrink: 0; }
+.language-picker > p.muted { flex: 1 0 100%; margin: 2px 0 0; font-size: 11px; line-height: 1.4; }
+.language-picker .lang-picker { flex: 1; max-width: 62%; }
+#screen-onboarding .language-picker { margin-bottom: 10px; }
+
+/* Custom flag dropdown -- see the big comment on populateLanguageSelects()
+   in app.js for why this replaces a plain <select>. The real <select> is
+   still in the DOM (see .lang-picker-native-hidden below); this is just
+   the visible stand-in for it, built at runtime. */
+.lang-picker { position: relative; display: inline-block; width: auto; min-width: 0; }
+.lang-picker-native-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+.lang-picker-trigger {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  border-radius: 999px; padding: 9px 16px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+  color: var(--text); font: inherit; cursor: pointer; text-align: left;
+}
+.lang-picker-trigger:focus-visible {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 3px rgba(221, 172, 77, 0.15);
+}
+.lang-picker-trigger .lang-flag { width: 20px; height: 15px; flex-shrink: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
+.lang-picker-trigger .lang-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lang-picker-trigger .lang-caret { flex-shrink: 0; opacity: 0.6; font-size: 10px; }
+.lang-picker-list {
+  position: absolute; z-index: 40; top: 100%; left: 0; right: 0; margin-top: 4px;
+  max-height: 240px; overflow-y: auto; list-style: none; padding: 4px;
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.lang-picker-list.hidden { display: none; }
+.lang-picker-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text);
+}
+.lang-picker-item:hover, .lang-picker-item.active { background: var(--bg-inset); }
+.lang-picker-item .lang-flag { width: 20px; height: 15px; flex-shrink: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
+
+/* ---------------- RTL (Arabic) ----------------
+   Applied via dir="rtl" on <html>, set by lib/i18n.js whenever Arabic is
+   the active language. Flexbox rows and text alignment need to mirror;
+   most of the layout (stacked forms, centered headings) needs no change
+   at all, so this stays a short, targeted list rather than a blanket flip. */
+html[dir="rtl"] body { direction: rtl; }
+html[dir="rtl"] .checkbox-row,
+html[dir="rtl"] .address-row,
+html[dir="rtl"] .account-row,
+html[dir="rtl"] .account-picker,
+html[dir="rtl"] .language-picker,
+html[dir="rtl"] .network-picker label,
+html[dir="rtl"] .network-select-row,
+html[dir="rtl"] .send-to-row,
+html[dir="rtl"] .tokens-header,
+html[dir="rtl"] .support-input-row { direction: rtl; }
+html[dir="rtl"] .token-balance-col { align-items: flex-start; }
+html[dir="rtl"] .price-row .price-symbol,
+html[dir="rtl"] .price-row .price-change { margin-left: 0; margin-right: 6px; }
+html[dir="rtl"] .support-msg.user { align-self: flex-start; border-bottom-right-radius: 10px; border-bottom-left-radius: 3px; }
+html[dir="rtl"] .support-msg.bot { align-self: flex-end; border-bottom-left-radius: 10px; border-bottom-right-radius: 3px; }
+html[dir="rtl"] .back-btn { align-self: flex-end; }
+html[dir="rtl"] #app-footer { direction: rtl; }
+html[dir="rtl"] .footer-lock { margin-right: 0; margin-left: 6px; }
+html[dir="rtl"] input[type="text"],
+html[dir="rtl"] input[type="password"],
+html[dir="rtl"] textarea { text-align: right; }
+html[dir="rtl"] .mono { direction: ltr; unicode-bidi: embed; text-align: right; } /* addresses/hex stay LTR internally */
+
+/* ============================================================
+   Web-wallet-only layout overrides
+   Everything above this point is unchanged from the extension's own
+   popup.css. The extension's <body> is sized to exactly fill a fixed
+   Chrome popup window (360x480, capped at 600 tall with internal
+   scrolling). This standalone page runs in a normal, resizable browser
+   tab instead, so the same app is presented as a centered fixed-width
+   card floating over the full-bleed background art, rather than
+   stretched edge-to-edge or capped at popup height. Scoped to
+   body.tm-web-wallet so it only ever applies here.
+   ============================================================ */
+html { background: #08070a; }
+body.tm-web-wallet {
+  position: relative;
+  width: auto;
+  max-height: none;
+  min-height: 100vh;
+  overflow-y: visible;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 12px;
+}
+body.tm-web-wallet #app {
+  width: 390px;
+  max-width: 100%;
+  min-height: 640px;
+  border-radius: 20px;
+  overflow: hidden;
+  /* Same gold-deep frame the splash screen already uses (see
+     body.tm-web-wallet #splash-screen below) -- previously #app dropped
+     back to a plain dark hairline the moment the splash handed off,
+     which broke the "gold-bordered phone floating on a dark desk" look
+     right when the real app appeared. Carrying the same border through
+     keeps that frame consistent for the whole session, not just the
+     first second. */
+  border: 2px solid var(--gold-deep);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
+}
+/* Back to the framed-card look on a wide window: the splash sits right
+   on top of where the #app card will be (same 390x640 rounded
+   rectangle, gold-bordered like a phone screenshot floating on a dark
+   desk) instead of stretching edge-to-edge, with the "non-custodial"
+   tagline floating just below it on the page background. On an actual
+   phone-width screen (the media query below) it goes back to filling
+   the whole viewport, same as #app does there -- there's no "desk"
+   around it to show on a real phone screen anyway. */
+body.tm-web-wallet #splash-screen {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: 390px;
+  height: 640px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100vh - 24px);
+  border-radius: 20px;
+  border: 2px solid var(--gold-deep);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
+}
+body.tm-web-wallet #splash-tagline {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  position: fixed; z-index: 999;
+  left: 50%; top: calc(50% + 320px + 18px);
+  transform: translateX(-50%);
+  color: var(--text-faint); font-size: 12px; letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+body.tm-web-wallet #splash-tagline .footer-lock { color: var(--gold-deep); font-size: 12px; }
+@media (max-width: 460px) {
+  body.tm-web-wallet #splash-screen {
+    top: 0; left: 0; transform: none;
+    width: 100%; height: 100%;
+    max-width: 100%; max-height: 100%;
+    border-radius: 0; border: none;
+  }
+  body.tm-web-wallet #splash-tagline { display: none; }
+}
+@media (max-width: 460px) {
+  body.tm-web-wallet { padding: 0; }
+  body.tm-web-wallet #app { border-radius: 0; min-height: 100vh; border: none; }
+}
+
+/* Prices screen: Crypto / Currencies tabs + search */
+.prices-tabs {
+  display: flex; gap: 6px; margin: 10px 0 8px;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 10px; padding: 4px;
+}
+.prices-tab {
+  flex: 1; background: transparent; border: 0; border-radius: 7px;
+  color: var(--text-muted); font: inherit; font-weight: 600; font-size: 13px;
+  padding: 7px 10px; cursor: pointer;
+}
+.prices-tab:hover { color: var(--text); }
+.prices-tab.active { background: var(--gold); color: var(--gold-ink); }
+.prices-tab:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
+.prices-search {
+  width: 100%; box-sizing: border-box; margin: 0 0 8px;
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font: inherit; font-size: 13px; padding: 9px 12px;
+}
+.prices-search:focus { outline: none; border-color: var(--gold); }
+#prices-tab-note { margin: 0 0 8px; font-size: 12px; }
+
+/* Prices screen polish: symbol stacked under the name, price with a 24h
+   change pill stacked on the right, star in its own fixed column so every
+   row lines up regardless of how long the price text is. */
+.price-left { flex: 1; min-width: 0; }
+.price-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.price-id .price-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-row .price-id .price-symbol,
+html[dir="rtl"] .price-row .price-id .price-symbol { margin: 0; font-size: 11px; letter-spacing: 0.02em; }
+.price-right { flex-shrink: 0; gap: 6px; }
+.price-quote { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.price-quote .price-change,
+html[dir="rtl"] .price-quote .price-change {
+  margin: 0; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; line-height: 1.5;
+}
+.price-quote .price-change.up { background: rgba(127, 201, 154, 0.14); }
+.price-quote .price-change.down { background: rgba(226, 104, 90, 0.14); }
+.price-right .star-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 32px; padding: 0; font-size: 16px;
+}
+.prices-search {
+  padding-inline-start: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23766c56' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 11px center; background-size: 15px;
+}
+html[dir="rtl"] .prices-search { background-position: right 11px center; }
+.prices-tab.active { box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+/* Keep numbers and +/- signs reading correctly inside right-to-left layouts. */
+.price-quote .price-change, .price-quote .price-usd { direction: ltr; unicode-bidi: isolate; }
+
+/* Coin rows are links to the coin's CoinGecko page (star stays a button). */
+.price-link {
+  display: flex; align-items: center; justify-content: space-between;
+  flex: 1; min-width: 0; gap: 10px; color: inherit; text-decoration: none;
+  cursor: pointer;
+}
+.price-link:hover .price-name { text-decoration: underline; text-underline-offset: 2px; }
+.price-link:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; border-radius: 8px; }
+.price-link { margin-inline-end: 6px; }
+
+/* ---- Coin detail screen ---- */
+.coin-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.coin-head .coin-icon .token-icon, .coin-head .coin-icon img { width: 40px; height: 40px; }
+.coin-title { flex: 1; min-width: 0; }
+.coin-title h2 { margin: 0; line-height: 1.15; }
+.coin-rank {
+  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-inset); border: 1px solid var(--line); color: var(--text-muted);
+}
+.coin-price-block { display: flex; align-items: center; gap: 10px; margin: 6px 0 4px; }
+.coin-price { font-size: 28px; font-weight: 700; color: var(--gold-bright); direction: ltr; unicode-bidi: isolate; }
+.coin-price-block .price-change { font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.coin-price-block .price-change.up { background: rgba(127, 201, 154, 0.14); }
+.coin-price-block .price-change.down { background: rgba(226, 104, 90, 0.14); }
+.coin-chart { height: 130px; margin: 6px 0 2px; color: var(--text-muted); touch-action: pan-y; cursor: crosshair; }
+.coin-chart.up { color: #7fc99a; }
+.coin-chart.down { color: #e2685a; }
+.coin-chart svg { width: 100%; height: 100%; display: block; }
+.coin-chart-msg { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 12px; color: var(--text-muted); }
+.coin-chart-readout { min-height: 18px; margin: 2px 0 8px; direction: ltr; unicode-bidi: isolate; }
+.coin-ranges {
+  display: flex; gap: 6px; margin: 0 0 14px;
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+}
+.coin-range {
+  flex: 1; background: transparent; border: 0; border-radius: 7px; color: var(--text-muted);
+  font: inherit; font-weight: 600; font-size: 12px; padding: 6px 4px; cursor: pointer;
+}
+.coin-range.active { background: var(--gold); color: var(--gold-ink); }
+.coin-swap-card {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; margin: 0 0 16px;
+}
+.coin-swap-card p { margin: 0 0 8px; }
+.coin-swap-card button { width: 100%; }
+.coin-swap-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+.coin-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.coin-stat {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; min-width: 0;
+}
+.coin-stat .k { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+.coin-stat .v { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; unicode-bidi: isolate; text-align: start; }
+/* Price rows now open the coin screen, so they are buttons, not anchors. */
+button.price-link { background: none; border: 0; padding: 0; font: inherit; text-align: start; width: auto; }
