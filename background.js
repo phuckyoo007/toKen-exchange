@@ -784,14 +784,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const provider = await getProviderFor(network);
           const meta = await getSelectedAccountMeta();
           const totalWei = ethers.BigNumber.from(msg.amountInWei);
-          const { feeWei, netWei } = TM_FEE.computeFee(totalWei);
+
+          // 0x bakes its own ~0.15% protocol fee into the quote it
+          // returns (already netted out of the buyAmount -- not
+          // something we separately collect), so an aggregator-routed
+          // swap is skimmed at the higher AGGREGATOR_* rate (see
+          // lib/fee-config.js) to keep this wallet's own take the same
+          // either way. We have to compute that rate's netWei BEFORE
+          // asking 0x for a quote, since the quote is for an exact sell
+          // amount -- if 0x can't help, we fall back to the base rate
+          // below and quote the plain router instead.
+          const { feeWei: aggFeeWei, netWei: aggNetWei } = TM_FEE.computeFee(totalWei, { viaAggregator: true });
 
           const aggQuote = meta
             ? await TM_SWAP.tryAggregatorQuote({
                 network,
                 tokenIn: msg.tokenIn,
                 tokenOut: msg.tokenOut,
-                amountInWei: netWei,
+                amountInWei: aggNetWei,
                 taker: meta.address,
                 slippageBps: msg.slippageBps || 100,
               })
@@ -803,7 +813,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               chainId: network.chainId,
               tokenIn: (msg.tokenIn || "native").toLowerCase(),
               tokenOut: (msg.tokenOut || "native").toLowerCase(),
-              netAmountInWei: netWei.toString(),
+              netAmountInWei: aggNetWei.toString(),
               kind: "aggregator",
               spender: aggQuote.allowanceTarget || network.swapRouter,
               transaction: aggQuote.transaction,
@@ -814,14 +824,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               ok: true,
               amountOutWei: aggQuote.amountOutWei.toString(),
               path: null,
-              feeWei: feeWei.toString(),
-              netAmountInWei: netWei.toString(),
-              feePercentLabel: TM_FEE.feePercentLabel(),
+              feeWei: aggFeeWei.toString(),
+              netAmountInWei: aggNetWei.toString(),
+              feePercentLabel: TM_FEE.feePercentLabel({ viaAggregator: true }),
               route: "aggregator",
             });
             break;
           }
 
+          const { feeWei, netWei } = TM_FEE.computeFee(totalWei, { viaAggregator: false });
           lastSwapRoute = { key: swapRouteKey(network, msg.tokenIn), chainId: network.chainId, kind: "router" };
           const { amountOutWei, path } = await TM_SWAP.getQuote({
             network,
@@ -836,7 +847,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             path,
             feeWei: feeWei.toString(),
             netAmountInWei: netWei.toString(),
-            feePercentLabel: TM_FEE.feePercentLabel(),
+            feePercentLabel: TM_FEE.feePercentLabel({ viaAggregator: false }),
             route: "router",
           });
           break;
@@ -885,7 +896,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
 
           const totalWei = ethers.BigNumber.from(msg.amountInWei);
-          const { feeWei, netWei } = TM_FEE.computeFee(totalWei);
+
+          // Figure out which rate applies the same way TM_SWAP_QUOTE did,
+          // without a second call to 0x: if the remembered route is
+          // still an exact match for this pair/amount at the AGGREGATOR
+          // rate, this swap goes through 0x and is skimmed at that
+          // higher rate; otherwise it's a plain router swap at the base
+          // rate. aggregatorRouteMatches() is just comparing against
+          // what TM_SWAP_QUOTE already fetched and saved.
+          const { feeWei: aggFeeWei, netWei: aggNetWei } = TM_FEE.computeFee(totalWei, { viaAggregator: true });
+          const useAggregator = aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, aggNetWei);
+          const { feeWei, netWei } = useAggregator
+            ? { feeWei: aggFeeWei, netWei: aggNetWei }
+            : TM_FEE.computeFee(totalWei, { viaAggregator: false });
 
           let feeTxHash = null;
           if (feeWei.gt(0)) {
@@ -905,7 +928,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
           }
 
-          if (aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, netWei)) {
+          if (useAggregator) {
             try {
               const aggTx = await TM_SWAP.executeAggregatorSwap({ signer: wallet, transaction: lastSwapRoute.transaction });
               sendResponse({
