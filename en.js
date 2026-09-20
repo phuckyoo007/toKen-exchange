@@ -252,7 +252,7 @@
     "feedback.titleRequired": "Give it a short title first.",
     "feedback.upvoteBtn": "Upvote",
     "feedback.upvotedBtn": "Upvoted",
-    "feedback.contactLine": "Prefer email? Reach us at msandersod@gmail.com",
+    "feedback.contactLine": "Prefer email? Reach us at amunra325@gmail.com",
 
     "importKey.title": "Import private key",
     "importKey.description": "This adds a separate account to this wallet from a raw private key, not from your recovery phrase -- back it up on its own, since your recovery phrase won't restore it. Never share a private key with anyone; anyone who has it can spend everything in that account.",
