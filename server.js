@@ -27,6 +27,8 @@ const IMG_FILES = [
 "bg-scene.jpg", "spinner-coin.png", "splash.jpg", "splash-light.jpg",
 "apple-touch-icon.png", "icon-192.png", "icon-512.png", "favicon-32.png",
 "card-banner.jpg", "card-watermark.jpg", "card-watermark-light.jpg",
+"flag-en.svg", "flag-ar.svg", "flag-zh.svg", "flag-es.svg", "flag-fr.svg",
+"flag-hi.svg", "flag-pt.svg", "flag-ja.svg", "flag-ru.svg",
 ];
 
 function copyIfExists(srcName, destDir) {

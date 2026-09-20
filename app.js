@@ -2507,30 +2507,101 @@ $("support-input").addEventListener("keydown", (e) => {
 // not a claim that the language belongs to only that place (there's no
 // single flag for Arabic or English) -- this is the same convention almost
 // every app's language picker uses, just to make the list scannable.
-const TM_LANGUAGE_FLAGS = {
-  en: "\u{1F1FA}\u{1F1F8}", // English -> US
-  ar: "\u{1F1F8}\u{1F1E6}", // Arabic -> Saudi Arabia
-  zh: "\u{1F1E8}\u{1F1F3}", // Chinese (Simplified) -> China
-  es: "\u{1F1EA}\u{1F1F8}", // Spanish -> Spain
-  fr: "\u{1F1EB}\u{1F1F7}", // French -> France
-  hi: "\u{1F1EE}\u{1F1F3}", // Hindi -> India
-  pt: "\u{1F1F5}\u{1F1F9}", // Portuguese -> Portugal
-  ja: "\u{1F1EF}\u{1F1F5}", // Japanese -> Japan
-  ru: "\u{1F1F7}\u{1F1FA}", // Russian -> Russia
-};
-
+//
+// This used to be a plain <select> with a Unicode flag-emoji character
+// (Regional Indicator Symbol pairs) prepended to each option's text. That
+// works fine in the app's own rendered text, but a native <select>'s
+// dropdown popup is drawn by the OS/browser, not by us -- and a lot of
+// Android devices ship without the color-emoji flag glyphs installed, so
+// the popup falls back to showing the two raw letters ("US", "ES", ...)
+// instead of a flag picture, which is exactly the confusing thing a flag
+// was supposed to avoid. Real <img> flags fix that everywhere, but a
+// native <option> can't contain an <img> in any browser -- so each
+// ".language-select" element is progressively enhanced here into a small
+// custom dropdown (a button showing the current flag+name, and a listbox
+// of flag+name rows) while the original <select> stays in the DOM, hidden,
+// purely as the value-holder every other bit of code already reads/writes.
 function populateLanguageSelects() {
   document.querySelectorAll(".language-select").forEach((sel) => {
+    let wrap = sel.parentNode.classList && sel.parentNode.classList.contains("lang-picker") ? sel.parentNode : null;
+    let trigger, list;
+
+    if (!wrap) {
+      wrap = document.createElement("span");
+      wrap.className = "lang-picker";
+      sel.parentNode.insertBefore(wrap, sel);
+      wrap.appendChild(sel);
+
+      // Move the select's id (e.g. "language-select-header") onto the
+      // trigger so any CSS or labeling keyed off that id keeps applying to
+      // the thing that's actually visible now.
+      trigger = document.createElement("button");
+      trigger.type = "button";
+      if (sel.id) { trigger.id = sel.id; sel.removeAttribute("id"); }
+      if (sel.title) trigger.title = sel.title;
+      if (sel.getAttribute("aria-label")) trigger.setAttribute("aria-label", sel.getAttribute("aria-label"));
+      trigger.className = "lang-picker-trigger";
+      trigger.innerHTML = '<img class="lang-flag" alt="" /><span class="lang-name"></span><span class="lang-caret" aria-hidden="true">▾</span>';
+      wrap.appendChild(trigger);
+
+      sel.classList.add("lang-picker-native-hidden");
+      sel.setAttribute("tabindex", "-1");
+      sel.setAttribute("aria-hidden", "true");
+
+      list = document.createElement("ul");
+      list.className = "lang-picker-list hidden";
+      list.setAttribute("role", "listbox");
+      wrap.appendChild(list);
+
+      trigger.addEventListener("click", () => {
+        const willOpen = list.classList.contains("hidden");
+        document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
+        if (willOpen) list.classList.remove("hidden");
+      });
+      if (!document.body.dataset.langPickerOutsideClick) {
+        document.body.dataset.langPickerOutsideClick = "1";
+        document.addEventListener("click", (e) => {
+          if (!e.target.closest(".lang-picker")) {
+            document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
+          }
+        });
+      }
+    } else {
+      trigger = wrap.querySelector(".lang-picker-trigger");
+      list = wrap.querySelector(".lang-picker-list");
+    }
+
+    const updateTrigger = (code) => {
+      const lang = TM_I18N.LANGS.find((l) => l.code === code) || TM_I18N.LANGS[0];
+      trigger.querySelector(".lang-flag").src = `img/flag-${lang.code}.svg`;
+      trigger.querySelector(".lang-name").textContent = lang.name;
+      list.querySelectorAll(".lang-picker-item").forEach((it) => it.classList.toggle("active", it.dataset.code === lang.code));
+    };
+
     sel.innerHTML = "";
+    list.innerHTML = "";
     TM_I18N.LANGS.forEach((lang) => {
       const opt = document.createElement("option");
       opt.value = lang.code;
-      const flag = TM_LANGUAGE_FLAGS[lang.code];
-      opt.textContent = flag ? `${flag} ${lang.name}` : lang.name;
+      opt.textContent = lang.name;
       sel.appendChild(opt);
+
+      const item = document.createElement("li");
+      item.className = "lang-picker-item";
+      item.setAttribute("role", "option");
+      item.dataset.code = lang.code;
+      item.innerHTML = `<img class="lang-flag" src="img/flag-${lang.code}.svg" alt="" /><span>${lang.name}</span>`;
+      item.addEventListener("click", () => {
+        sel.value = lang.code;
+        TM_I18N.setLanguage(lang.code);
+        updateTrigger(lang.code);
+        list.classList.add("hidden");
+      });
+      list.appendChild(item);
     });
+
     sel.value = TM_I18N.getLanguage();
-    sel.addEventListener("change", (e) => TM_I18N.setLanguage(e.target.value));
+    updateTrigger(sel.value);
   });
 }
 
