@@ -110,6 +110,8 @@
     "coin.swapNeedsWallet": "Unlock your wallet to swap.",
     "coin.swapNoRouter": "Swapping isn't enabled on this network yet.",
     "coin.swapUnavailableNetwork": "{symbol} can't be swapped on {network} yet. It has to be the network's own coin, or a token you've added with Add token.",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} is {network}'s own coin, so it can't be swapped here. Switch to {network} to swap it directly, or use Add token below if you meant a different, bridged version.",
+    "coin.switchNetworkBtn": "Switch to {network} to swap",
     "coin.holding": "You hold {amount} {symbol}",
     "coin.statsTitle": "Market stats",
     "coin.aboutTitle": "About",

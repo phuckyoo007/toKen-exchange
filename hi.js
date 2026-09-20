@@ -85,6 +85,8 @@
     "coin.swapNeedsWallet": "स्वैप करने के लिए अपना वॉलेट अनलॉक करें।",
     "coin.swapNoRouter": "इस नेटवर्क पर स्वैप अभी चालू नहीं है।",
     "coin.swapUnavailableNetwork": "{network} पर {symbol} अभी स्वैप नहीं हो सकता। यह नेटवर्क का अपना कॉइन या \"टोकन जोड़ें\" से जोड़ा गया टोकन होना चाहिए।",
+    "coin.swapUnavailableSwitchNetwork": "{symbol}, {network} का अपना कॉइन है, इसलिए इसे यहां स्वैप नहीं किया जा सकता। इसे सीधे स्वैप करने के लिए {network} पर स्विच करें, या यदि आपका मतलब किसी अलग, ब्रिज किए गए वर्शन से था तो \"टोकन जोड़ें\" का उपयोग करें।",
+    "coin.switchNetworkBtn": "स्वैप करने के लिए {network} पर स्विच करें",
     "coin.holding": "आपके पास {amount} {symbol} है",
     "coin.statsTitle": "मार्केट आँकड़े",
     "coin.aboutTitle": "परिचय",

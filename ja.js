@@ -84,6 +84,8 @@
     "coin.swapNeedsWallet": "スワップするにはウォレットのロックを解除してください。",
     "coin.swapNoRouter": "このネットワークではまだスワップを利用できません。",
     "coin.swapUnavailableNetwork": "{network} では {symbol} をまだスワップできません。ネットワークのネイティブコイン、または「トークンを追加」で追加したトークンである必要があります。",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} は {network} のネイティブコインのため、ここではスワップできません。直接スワップするには {network} に切り替えるか、ブリッジされた別バージョンをお考えの場合は「トークンを追加」をご利用ください。",
+    "coin.switchNetworkBtn": "スワップするには {network} に切り替え",
     "coin.holding": "{amount} {symbol} を保有しています",
     "coin.statsTitle": "マーケット情報",
     "coin.aboutTitle": "概要",

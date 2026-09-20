@@ -84,6 +84,8 @@
     "coin.swapNeedsWallet": "Разблокируйте кошелёк, чтобы обменять.",
     "coin.swapNoRouter": "Обмен в этой сети пока недоступен.",
     "coin.swapUnavailableNetwork": "Обменять {symbol} в сети {network} пока нельзя. Это должна быть основная монета сети или токен, добавленный через «Добавить токен».",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} — основная монета сети {network}, поэтому обменять её здесь нельзя. Переключитесь на {network}, чтобы обменять напрямую, либо используйте «Добавить токен», если вы имели в виду другую, перенесённую через мост версию.",
+    "coin.switchNetworkBtn": "Переключиться на {network} для обмена",
     "coin.holding": "У вас {amount} {symbol}",
     "coin.statsTitle": "Рыночные данные",
     "coin.aboutTitle": "О монете",

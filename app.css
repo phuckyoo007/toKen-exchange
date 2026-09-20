@@ -1367,6 +1367,7 @@ html[dir="rtl"] .prices-search { background-position: right 11px center; }
 }
 .coin-swap-card p { margin: 0 0 8px; }
 .coin-swap-card button { width: 100%; }
+.coin-swap-card button + button { margin-top: 8px; }
 .coin-swap-card button:disabled { opacity: 0.5; cursor: not-allowed; }
 .coin-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
 .coin-stat {

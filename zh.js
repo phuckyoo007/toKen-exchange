@@ -85,6 +85,8 @@
     "coin.swapNeedsWallet": "请解锁钱包后再兑换。",
     "coin.swapNoRouter": "此网络暂未启用兑换功能。",
     "coin.swapUnavailableNetwork": "暂时无法在 {network} 上兑换 {symbol}。它必须是该网络的原生币，或您已通过“添加代币”添加的代币。",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} 是 {network} 的原生币，因此无法在此处兑换。请切换到 {network} 直接兑换，或者如果您指的是跨链桥接版本，请使用“添加代币”。",
+    "coin.switchNetworkBtn": "切换到 {network} 进行兑换",
     "coin.holding": "您持有 {amount} {symbol}",
     "coin.statsTitle": "市场数据",
     "coin.aboutTitle": "简介",

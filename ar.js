@@ -84,6 +84,8 @@
     "coin.swapNeedsWallet": "افتح محفظتك للمبادلة.",
     "coin.swapNoRouter": "المبادلة غير مفعّلة على هذه الشبكة بعد.",
     "coin.swapUnavailableNetwork": "لا يمكن مبادلة {symbol} على {network} بعد. يجب أن تكون العملة الأصلية للشبكة أو رمزًا أضفته عبر إضافة رمز.",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} هي العملة الأصلية لشبكة {network}، لذا لا يمكن مبادلتها هنا. بدّل إلى {network} لمبادلتها مباشرة، أو استخدم إضافة رمز إذا كنت تقصد نسخة مختلفة تم ربطها عبر جسر.",
+    "coin.switchNetworkBtn": "التبديل إلى {network} للمبادلة",
     "coin.holding": "لديك {amount} {symbol}",
     "coin.statsTitle": "إحصاءات السوق",
     "coin.aboutTitle": "نبذة",

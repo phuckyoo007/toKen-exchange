@@ -83,6 +83,8 @@
     "coin.swapNeedsWallet": "Desbloqueie sua carteira para trocar.",
     "coin.swapNoRouter": "A troca ainda não está ativada nesta rede.",
     "coin.swapUnavailableNetwork": "Ainda não é possível trocar {symbol} na rede {network}. Ele precisa ser a moeda nativa da rede ou um token adicionado em Adicionar token.",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} é a moeda nativa da rede {network}, então não pode ser trocada aqui. Mude para {network} para trocá-la diretamente, ou use Adicionar token se você quis dizer uma versão diferente, via bridge.",
+    "coin.switchNetworkBtn": "Mudar para {network} para trocar",
     "coin.holding": "Você tem {amount} {symbol}",
     "coin.statsTitle": "Dados de mercado",
     "coin.aboutTitle": "Sobre",

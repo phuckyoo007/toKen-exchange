@@ -85,6 +85,8 @@
     "coin.swapNeedsWallet": "Déverrouillez votre portefeuille pour échanger.",
     "coin.swapNoRouter": "L'échange n'est pas encore activé sur ce réseau.",
     "coin.swapUnavailableNetwork": "{symbol} ne peut pas encore être échangé sur {network}. Il doit s'agir de la monnaie native du réseau ou d'un jeton ajouté via Ajouter un jeton.",
+    "coin.swapUnavailableSwitchNetwork": "{symbol} est la monnaie native de {network}, il ne peut donc pas être échangé ici. Passez sur {network} pour l'échanger directement, ou utilisez Ajouter un jeton si vous pensiez à une version différente, pontée.",
+    "coin.switchNetworkBtn": "Passer sur {network} pour échanger",
     "coin.holding": "Vous détenez {amount} {symbol}",
     "coin.statsTitle": "Données de marché",
     "coin.aboutTitle": "À propos",
