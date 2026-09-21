@@ -81,6 +81,8 @@
     "prices.stablecoinNote": "如果某种货币存在真实且成熟的稳定币，会在其旁边显示对应代码。这些稳定币通常比 USDC 小得多、流动性也低得多，不一定能在本钱包中兑换，也并非推荐——只是我们能核实到的最接近的加密等价物。",
     "prices.stablecoinTagTitle": "{stablecoin} 是 {currency} 最广为人知的加密等价物",
     "prices.noStablecoinYet": "{currency} 目前还没有公认的加密等价物——这只是法币汇率，并非代币。",
+    "prices.currencySwapNote": "兑换为 {stablecoin}——{currency} 最接近的可追踪加密等价物。你将持有真实的链上代币，而非 {currency} 本身。",
+    "prices.currencySwapSwitchNetwork": "{stablecoin} 在 {network} 网络上追踪 {currency}。请切换网络以在那里进行兑换。",
     "prices.noResults": "没有结果。",
     "prices.viewCoin": "查看 {name}",
     "coin.swapBtn": "兑换为 {symbol}",

@@ -79,6 +79,8 @@
     "prices.stablecoinNote": "Quando existe uma stablecoin real e estabelecida para uma moeda, seu ticker é mostrado ao lado dela. Elas costumam ser muito menores e menos líquidas que a USDC, não estão necessariamente disponíveis para troca nesta carteira, e não são uma recomendação -- apenas o equivalente cripto mais próximo que conseguimos verificar.",
     "prices.stablecoinTagTitle": "{stablecoin} é o equivalente cripto mais reconhecido do {currency}",
     "prices.noStablecoinYet": "Ainda não existe um equivalente cripto estabelecido para {currency} -- isto é apenas uma taxa de câmbio fiduciária, não um token.",
+    "prices.currencySwapNote": "Troque por {stablecoin}, o equivalente cripto mais próximo do {currency} -- você terá um token real on-chain, não o {currency} em si.",
+    "prices.currencySwapSwitchNetwork": "{stablecoin} acompanha o {currency} na rede {network}. Mude de rede para trocar por ele lá.",
     "prices.noResults": "Nenhum resultado.",
     "prices.viewCoin": "Ver {name}",
     "coin.swapBtn": "Trocar por {symbol}",

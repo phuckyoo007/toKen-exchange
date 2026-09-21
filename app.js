@@ -1122,7 +1122,13 @@ async function refreshPrices() {
 // the native coin or as a token the person has added (matched by symbol) --
 // this wallet never guesses a token contract address. The Swap screen then
 // lets them choose which of their own holdings to pay with.
-let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null, prefillTokenAddress: null };
+let coinDetail = {
+  coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null, prefillTokenAddress: null,
+  // Currency-detail-only state (see openCurrencyDetail): the fiat row
+  // currently open, and -- when a verified, liquid stablecoin exists for it
+  // on the current or some other network -- the address to swap into.
+  currency: null, currencySwapAddress: null,
+};
 
 function normalizeCoinSymbol(s) {
   const up = String(s || "").toUpperCase();
@@ -1206,6 +1212,17 @@ async function populateSwapSelects(pre) {
   else toSel.value = (held.find((a) => a.key !== fromSel.value) || held[0] || { key: "custom" }).key;
   syncSwapAsset("from");
   syncSwapAsset("to");
+  // A verified contract address to swap into that ISN'T necessarily one of
+  // the person's held assets yet (e.g. a currency's paired stablecoin, see
+  // openCurrencyDetail/applyCurrencySwapState) -- bypasses the held-asset
+  // dropdown entirely and goes straight into the "to" custom-address field,
+  // which is what swap execution actually reads regardless of how it got
+  // filled in.
+  if (pre && pre.toCustomAddress) {
+    toSel.value = "custom";
+    syncSwapAsset("to");
+    $("swap-to-custom").value = pre.toCustomAddress;
+  }
 }
 
 ["from", "to"].forEach((side) => {
@@ -1239,21 +1256,26 @@ function coinStat(label, value) {
 }
 
 // Sections of the (shared) coin-detail screen that only make sense for a
-// real, chartable/swappable crypto asset -- hidden entirely for a plain
-// fiat currency row (see openCurrencyDetail below) and always restored
-// here so a real coin opened afterwards looks exactly as it always has.
+// real, chartable crypto asset -- hidden entirely for a plain fiat currency
+// row (see openCurrencyDetail below) and always restored here so a real
+// coin opened afterwards looks exactly as it always has. coin-swap-card is
+// handled separately (openCurrencyDetail can still show it, just with only
+// the swap button, when a verified stablecoin exists for that currency).
 function setCoinDetailCryptoSectionsVisible(visible) {
-  ["coin-chart", "coin-chart-readout", "coin-ranges", "coin-swap-card", "coin-stats-title", "coin-stats", "coin-about-title", "coin-cg-row"]
+  ["coin-chart", "coin-chart-readout", "coin-ranges", "coin-stats-title", "coin-stats", "coin-about-title", "coin-cg-row"]
     .forEach((id) => $(id).classList.toggle("hidden", !visible));
 }
 
 async function openCoinDetail(c, fromScreen) {
   const gen = ++coinDetail.gen;
   coinDetail.coin = c;
+  coinDetail.currency = null;
+  coinDetail.currencySwapAddress = null;
   coinDetail.swapTarget = null;
   coinDetail.switchNetworkTarget = null;
   coinDetail.prefillTokenAddress = null;
   setCoinDetailCryptoSectionsVisible(true);
+  $("coin-swap-card").classList.remove("hidden");
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
   $("coin-icon").innerHTML = tokenIconHtml(c.symbol, c.image);
@@ -1278,16 +1300,100 @@ async function openCoinDetail(c, fromScreen) {
   loadCoinSwapState(gen);
 }
 
+// A currency's "closest crypto equivalent" tag (shown on the Prices list
+// row) is purely informational -- most of those tickers turned out, on
+// direct verification, to have no real deployment this wallet's users could
+// actually trade into (wrong/legacy contract, unverified, or technically a
+// real token with ~$0 trading volume, i.e. abandoned). This table is the
+// much narrower subset actually offered as a SWAP target: a real,
+// source-verified contract on one of this wallet's supported chains, with
+// confirmed non-trivial trading activity at the time it was checked
+// (2026-09-21, cross-referenced against the issuer's own site, that chain's
+// block explorer, and CoinGecko/DexScreener/PancakeSwap for live volume --
+// same bar as KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN below). Deliberately leaves
+// out tGBP (real contract, ~$745 total pool, $0 24h volume), QCAD (no
+// verified+liquid deployment on any supported chain), AE Coin (no on-chain
+// token found at all -- a bank/app-based instrument, not a swappable
+// asset), and wARS (verified contracts on Ethereum/Base, but $0 24h volume
+// on both at check time) -- pointing someone at any of those would be
+// offering a swap that can't actually fill.
+const KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN = {
+  EUR: {
+    1: { address: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", symbol: "EURC" }, // Ethereum (Circle)
+    8453: { address: "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42", symbol: "EURC" }, // Base (Circle)
+  },
+  JPY: {
+    1: { address: "0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29", symbol: "JPYC" }, // Ethereum -- the current, bank-backed relaunch; NOT the older, thinly-traded "JPYC Prepaid" contract
+  },
+  AUD: {
+    1: { address: "0x4cce605ed955295432958d8951d0b176c10720d5", symbol: "AUDD" }, // Ethereum (Novatti)
+    8453: { address: "0x449B3317a6d1efb1Bc3ba0700C9EaA4FFFf4Ae65", symbol: "AUDD" }, // Base (Novatti)
+  },
+  BRL: {
+    137: { address: "0x4eD141110F6EEeAba9A1df36d8C26f684D2475Dc", symbol: "BRZ" }, // Polygon (Transfero) -- BRZ's real liquidity venue; its Ethereum contract is verified but effectively untraded ($0/24h)
+  },
+};
+
+// Re-applies the coin-swap-card's contents for whichever currency is
+// currently open (see openCurrencyDetail) -- pulled out on its own so the
+// "Switch to X to swap" button (shared with loadCoinSwapState above) can
+// re-run this after actually switching networks, the same way it re-runs
+// loadCoinSwapState for a real coin.
+function applyCurrencySwapState() {
+  const r = coinDetail.currency;
+  if (!r) return;
+  coinDetail.currencySwapAddress = null;
+  coinDetail.switchNetworkTarget = null;
+  $("coin-holding").classList.add("hidden");
+  $("btn-coin-add-token").classList.add("hidden");
+  $("btn-coin-switch-network").classList.add("hidden");
+  const knownByChain = KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN[r.code] || {};
+  const known = currentNetwork ? knownByChain[currentNetwork.chainId] : null;
+  if (known) {
+    coinDetail.currencySwapAddress = known.address;
+    $("coin-swap-card").classList.remove("hidden");
+    const btn = $("btn-coin-swap");
+    btn.textContent = TM_I18N.t("coin.swapBtn", { symbol: known.symbol });
+    btn.disabled = false;
+    btn.classList.remove("hidden");
+    $("coin-swap-note").textContent = TM_I18N.t("prices.currencySwapNote", { stablecoin: known.symbol, currency: r.name });
+    $("coin-swap-note").classList.remove("hidden");
+    return;
+  }
+  // Not on the current network -- but if it's verified+liquid on some OTHER
+  // network this wallet already supports, offer switching there instead of
+  // just giving up, the same courtesy loadCoinSwapState gives a coin that's
+  // really some other network's native currency.
+  const elsewhereChainId = Object.keys(knownByChain).map(Number).find((cid) => (currentNetworks || []).some((n) => n.chainId === cid));
+  const elsewhereNet = elsewhereChainId ? currentNetworks.find((n) => n.chainId === elsewhereChainId) : null;
+  if (elsewhereNet) {
+    $("coin-swap-card").classList.remove("hidden");
+    $("btn-coin-swap").classList.add("hidden");
+    coinDetail.switchNetworkTarget = elsewhereNet;
+    $("coin-swap-note").textContent = TM_I18N.t("prices.currencySwapSwitchNetwork", {
+      stablecoin: knownByChain[elsewhereNet.chainId].symbol, currency: r.name, network: elsewhereNet.name,
+    });
+    $("coin-swap-note").classList.remove("hidden");
+    const switchBtn = $("btn-coin-switch-network");
+    switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: elsewhereNet.name });
+    switchBtn.classList.remove("hidden");
+    return;
+  }
+  $("coin-swap-card").classList.add("hidden");
+}
+
 // A fiat currency (the "Currencies" tab) isn't a network asset -- there's
-// no chart history, market stats, holding, or swap route for it, so this
-// reuses just the header + price part of the coin-detail screen (opened
-// the exact same way a crypto row opens it) and hides the rest. Where a
-// verified stablecoin ticker exists for the currency, its "about" text
-// mirrors the note already shown on the Prices list row; otherwise it
-// says plainly that no crypto equivalent is tracked yet.
+// no chart history, market stats, or holding for it, so this reuses just
+// the header + price part of the coin-detail screen (opened the exact same
+// way a crypto row opens it) and hides those. Its "about" text mirrors the
+// closest-crypto-equivalent note already shown on the Prices list row (or
+// says plainly that none is tracked yet); the swap card below it, when
+// applyCurrencySwapState finds a real one to offer, is what actually lets
+// someone exchange into it rather than just reading about it.
 function openCurrencyDetail(r, fromScreen) {
   coinDetail.gen++; // invalidate any in-flight real-coin chart/info/swap loads
   coinDetail.coin = null;
+  coinDetail.currency = r;
   setCoinDetailCryptoSectionsVisible(false);
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
@@ -1300,6 +1406,7 @@ function openCurrencyDetail(r, fromScreen) {
   $("coin-about").textContent = r.stablecoin
     ? `${TM_I18N.t("prices.stablecoinTagTitle", { stablecoin: r.stablecoin, currency: r.name })}. ${TM_I18N.t("prices.stablecoinNote")}`
     : TM_I18N.t("prices.noStablecoinYet", { currency: r.name });
+  applyCurrencySwapState();
   showScreen("screen-coin");
 }
 
@@ -1551,6 +1658,11 @@ async function loadCoinSwapState(gen) {
 }
 
 $("btn-coin-swap").addEventListener("click", () => {
+  if (coinDetail.currencySwapAddress) {
+    setupSwapScreen({ toCustomAddress: coinDetail.currencySwapAddress });
+    showScreen("screen-swap");
+    return;
+  }
   const m = coinDetail.swapTarget;
   if (!m) return;
   setupSwapScreen({ toKey: m.key });
@@ -1570,10 +1682,12 @@ $("btn-coin-switch-network").addEventListener("click", async () => {
   try {
     await sendMsg("TM_SELECT_NETWORK", { chainId: net.chainId });
     await refreshMain(); // same call the main screen's own network picker uses
-    // Re-run the swap-availability check now that currentNetwork has
-    // changed -- the coin the person was looking at is very likely this
-    // network's native coin now, so this normally just enables Swap.
-    loadCoinSwapState(coinDetail.gen);
+    // Re-run whichever availability check applies -- a real coin's swap
+    // state, or a currency's swap-into-its-stablecoin state -- now that
+    // currentNetwork has changed. Exactly one of these is ever active,
+    // since openCoinDetail/openCurrencyDetail each clear the other's state.
+    if (coinDetail.coin) loadCoinSwapState(coinDetail.gen);
+    else if (coinDetail.currency) applyCurrencySwapState();
   } finally {
     btn.disabled = false;
   }

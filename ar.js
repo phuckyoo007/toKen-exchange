@@ -80,6 +80,8 @@
     "prices.stablecoinNote": "عندما تتوفر عملة مستقرة حقيقية وراسخة لعملة ما، يظهر رمزها بجانبها. عادةً ما تكون هذه العملات أصغر بكثير وأقل سيولة من USDC، وليست بالضرورة متاحة للمبادلة في هذه المحفظة، وهي ليست توصية -- بل فقط أقرب مكافئ رقمي تمكّنا من التحقق منه.",
     "prices.stablecoinTagTitle": "{stablecoin} هو المكافئ الرقمي الأكثر شهرة لعملة {currency}",
     "prices.noStablecoinYet": "لا يوجد حتى الآن مكافئ رقمي معروف لعملة {currency} -- هذا مجرد سعر صرف نقدي تقليدي، وليس عملة رقمية (توكن).",
+    "prices.currencySwapNote": "بادل إلى {stablecoin}، أقرب مكافئ رقمي يتم تتبعه لعملة {currency} -- ستمتلك عملة رقمية حقيقية على السلسلة، وليس عملة {currency} نفسها.",
+    "prices.currencySwapSwitchNetwork": "{stablecoin} يتتبع عملة {currency} على شبكة {network}. بدّل الشبكة للمبادلة هناك.",
     "prices.noResults": "لا توجد نتائج.",
     "prices.viewCoin": "عرض {name}",
     "coin.swapBtn": "مبادلة إلى {symbol}",
