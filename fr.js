@@ -80,6 +80,7 @@
     "prices.currenciesNote": "Ce que vaut 1 unité de chaque devise dans votre devise d'affichage.",
     "prices.stablecoinNote": "Quand une stablecoin réelle et établie existe pour une devise, son symbole est affiché à côté. Elles sont généralement bien plus petites et moins liquides que l'USDC, pas forcément disponibles à l'échange dans ce portefeuille, et ne constituent pas une recommandation : juste l'équivalent crypto le plus proche que nous avons pu vérifier.",
     "prices.stablecoinTagTitle": "{stablecoin} est l'équivalent crypto le plus reconnu de {currency}",
+    "prices.noStablecoinYet": "Il n'existe pas encore d'équivalent crypto établi pour {currency} -- il s'agit simplement d'un taux de change fiat, pas d'un jeton.",
     "prices.noResults": "Aucun résultat.",
     "prices.viewCoin": "Voir {name}",
     "coin.swapBtn": "Échanger contre {symbol}",

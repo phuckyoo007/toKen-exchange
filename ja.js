@@ -79,6 +79,7 @@
     "prices.currenciesNote": "各通貨 1 単位が、表示通貨でいくらになるかを示します。",
     "prices.stablecoinNote": "ある通貨に実在する定着したステーブルコインがある場合、その通貨の横にティッカーが表示されます。これらは通常 USDC よりもはるかに小規模で流動性が低く、このウォレットで必ずしもスワップできるとは限らず、推奨でもありません。あくまで確認できた最も近い暗号資産の対応物です。",
     "prices.stablecoinTagTitle": "{stablecoin} は {currency} に最も近い、広く認知された暗号資産です",
+    "prices.noStablecoinYet": "{currency} にはまだ広く認知された暗号資産の等価物がありません -- これは単なる法定通貨の為替レートであり、トークンではありません。",
     "prices.noResults": "結果がありません。",
     "prices.viewCoin": "{name} を見る",
     "coin.swapBtn": "{symbol} にスワップ",

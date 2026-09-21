@@ -105,6 +105,7 @@
     "prices.currenciesNote": "What 1 unit of each currency is worth in your display currency.",
     "prices.stablecoinNote": "Where a real, established stablecoin exists for a currency, its ticker is shown next to it. These are usually far smaller and less liquid than USDC, aren't necessarily available to swap in this wallet, and aren't a recommendation -- just the closest crypto equivalent we could verify.",
     "prices.stablecoinTagTitle": "{stablecoin} is the closest widely-recognized crypto equivalent of the {currency}",
+    "prices.noStablecoinYet": "No established crypto equivalent exists yet for the {currency} -- this is a plain fiat exchange rate, not a token.",
     "prices.noResults": "No results.",
     "prices.viewCoin": "View {name}",
     "coin.swapBtn": "Swap for {symbol}",

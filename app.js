@@ -1050,10 +1050,15 @@ function renderCurrencyRow(r) {
   const stablecoinTag = r.stablecoin
     ? `<span class="currency-stablecoin-tag" title="${escapeHtml(TM_I18N.t("prices.stablecoinTagTitle", { stablecoin: r.stablecoin, currency: r.name }))}">${escapeHtml(r.stablecoin)}</span>`
     : "";
+  // Whole row opens a lightweight currency-detail view, the same way a
+  // crypto row opens the coin screen -- see openCurrencyDetail().
+  const linkLabel = TM_I18N.t("prices.viewCoin", { name: r.name });
   row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}${stablecoinTag}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
-    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
+    <button type="button" class="price-link" aria-label="${escapeHtml(linkLabel)}" title="${escapeHtml(linkLabel)}"><span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}${stablecoinTag}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></button>
   `;
+  row.querySelector(".price-link").addEventListener("click", () => {
+    openCurrencyDetail(r, $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices");
+  });
   return row;
 }
 
@@ -1233,12 +1238,22 @@ function coinStat(label, value) {
   return d;
 }
 
+// Sections of the (shared) coin-detail screen that only make sense for a
+// real, chartable/swappable crypto asset -- hidden entirely for a plain
+// fiat currency row (see openCurrencyDetail below) and always restored
+// here so a real coin opened afterwards looks exactly as it always has.
+function setCoinDetailCryptoSectionsVisible(visible) {
+  ["coin-chart", "coin-chart-readout", "coin-ranges", "coin-swap-card", "coin-stats-title", "coin-stats", "coin-about-title", "coin-cg-row"]
+    .forEach((id) => $(id).classList.toggle("hidden", !visible));
+}
+
 async function openCoinDetail(c, fromScreen) {
   const gen = ++coinDetail.gen;
   coinDetail.coin = c;
   coinDetail.swapTarget = null;
   coinDetail.switchNetworkTarget = null;
   coinDetail.prefillTokenAddress = null;
+  setCoinDetailCryptoSectionsVisible(true);
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
   $("coin-icon").innerHTML = tokenIconHtml(c.symbol, c.image);
@@ -1261,6 +1276,31 @@ async function openCoinDetail(c, fromScreen) {
   loadCoinChart(gen);
   loadCoinInfo(gen);
   loadCoinSwapState(gen);
+}
+
+// A fiat currency (the "Currencies" tab) isn't a network asset -- there's
+// no chart history, market stats, holding, or swap route for it, so this
+// reuses just the header + price part of the coin-detail screen (opened
+// the exact same way a crypto row opens it) and hides the rest. Where a
+// verified stablecoin ticker exists for the currency, its "about" text
+// mirrors the note already shown on the Prices list row; otherwise it
+// says plainly that no crypto equivalent is tracked yet.
+function openCurrencyDetail(r, fromScreen) {
+  coinDetail.gen++; // invalidate any in-flight real-coin chart/info/swap loads
+  coinDetail.coin = null;
+  setCoinDetailCryptoSectionsVisible(false);
+  $("coin-back").dataset.back = fromScreen || "screen-prices";
+  hideError("coin-error");
+  $("coin-icon").innerHTML = tokenIconHtml(r.code);
+  $("coin-name").textContent = r.name;
+  $("coin-symbol").textContent = r.code;
+  $("coin-rank").classList.add("hidden");
+  $("coin-price").textContent = TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true });
+  $("coin-change").classList.add("hidden");
+  $("coin-about").textContent = r.stablecoin
+    ? `${TM_I18N.t("prices.stablecoinTagTitle", { stablecoin: r.stablecoin, currency: r.name })}. ${TM_I18N.t("prices.stablecoinNote")}`
+    : TM_I18N.t("prices.noStablecoinYet", { currency: r.name });
+  showScreen("screen-coin");
 }
 
 async function loadCoinInfo(gen) {

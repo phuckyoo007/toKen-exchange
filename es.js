@@ -79,6 +79,7 @@
     "prices.currenciesNote": "Lo que vale 1 unidad de cada divisa en tu moneda de visualización.",
     "prices.stablecoinNote": "Cuando existe una stablecoin real y establecida para una moneda, su símbolo se muestra junto a ella. Suelen ser mucho más pequeñas y menos líquidas que USDC, no necesariamente están disponibles para intercambiar en esta billetera, y no son una recomendación, solo el equivalente cripto más cercano que pudimos verificar.",
     "prices.stablecoinTagTitle": "{stablecoin} es el equivalente cripto más reconocido de {currency}",
+    "prices.noStablecoinYet": "Todavía no existe un equivalente cripto establecido para {currency} -- esto es solo un tipo de cambio fiat, no un token.",
     "prices.noResults": "Sin resultados.",
     "prices.viewCoin": "Ver {name}",
     "coin.swapBtn": "Cambiar a {symbol}",

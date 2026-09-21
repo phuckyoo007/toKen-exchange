@@ -372,24 +372,24 @@
     </div>
     <div id="coin-chart" class="coin-chart"></div>
     <p id="coin-chart-readout" class="muted small coin-chart-readout"></p>
-    <div class="coin-ranges" role="tablist">
+    <div id="coin-ranges" class="coin-ranges" role="tablist">
       <button type="button" class="coin-range" data-days="1">24H</button>
       <button type="button" class="coin-range active" data-days="7">7D</button>
       <button type="button" class="coin-range" data-days="30">1M</button>
       <button type="button" class="coin-range" data-days="365">1Y</button>
     </div>
-    <div class="coin-swap-card">
+    <div id="coin-swap-card" class="coin-swap-card">
       <p id="coin-holding" class="muted small hidden"></p>
       <button type="button" id="btn-coin-swap" class="primary"></button>
       <p id="coin-swap-note" class="hint hidden"></p>
       <button type="button" id="btn-coin-switch-network" class="secondary hidden"></button>
       <button type="button" id="btn-coin-add-token" class="link hidden" data-i18n="main.addTokenBtn">+ Add token</button>
     </div>
-    <h3 data-i18n="coin.statsTitle">Market stats</h3>
+    <h3 id="coin-stats-title" data-i18n="coin.statsTitle">Market stats</h3>
     <div id="coin-stats" class="coin-stats"></div>
-    <h3 data-i18n="coin.aboutTitle">About</h3>
+    <h3 id="coin-about-title" data-i18n="coin.aboutTitle">About</h3>
     <p id="coin-about" class="muted"></p>
-    <p><a id="coin-link-cg" class="link" target="_blank" rel="noopener noreferrer" data-i18n="coin.viewCoingecko">View on CoinGecko</a></p>
+    <p id="coin-cg-row"><a id="coin-link-cg" class="link" target="_blank" rel="noopener noreferrer" data-i18n="coin.viewCoingecko">View on CoinGecko</a></p>
     <p id="coin-error" class="error hidden"></p>
     <button id="coin-back" class="link back-btn" data-back="screen-prices" data-i18n="common.back">Back</button>
   </section>

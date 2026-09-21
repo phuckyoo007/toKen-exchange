@@ -80,6 +80,7 @@
     "prices.currenciesNote": "每种货币 1 单位按您所选显示货币折算的价值。",
     "prices.stablecoinNote": "如果某种货币存在真实且成熟的稳定币，会在其旁边显示对应代码。这些稳定币通常比 USDC 小得多、流动性也低得多，不一定能在本钱包中兑换，也并非推荐——只是我们能核实到的最接近的加密等价物。",
     "prices.stablecoinTagTitle": "{stablecoin} 是 {currency} 最广为人知的加密等价物",
+    "prices.noStablecoinYet": "{currency} 目前还没有公认的加密等价物——这只是法币汇率，并非代币。",
     "prices.noResults": "没有结果。",
     "prices.viewCoin": "查看 {name}",
     "coin.swapBtn": "兑换为 {symbol}",
