@@ -39,37 +39,6 @@ let unlockedSecret = null; // { mnemonic, importedKeys }
 let unlockedPassword = null; // kept only in memory, needed to re-encrypt on add-account/import
 let selectedAddress = null;
 
-// Set by TM_SWAP_QUOTE, read by TM_SWAP_ALLOWANCE/TM_SWAP_APPROVE/
-// TM_SWAP_EXECUTE so those steps use whichever spender/transaction the
-// quote actually used (the 0x aggregator, or this network's own router)
-// without popup.js's swap-screen code needing to know or care which.
-// Same "cleared on lock / SW restart" lifetime as unlockedSecret above --
-// if the service worker gets killed between quote and execute, the popup
-// already has to re-unlock, and a fresh quote is fetched at the same time.
-let lastSwapRoute = null;
-
-// Loose key (chain + input token only) -- safe for picking WHICH SPENDER
-// to approve, since approving the real 0x allowance-holder contract for a
-// token is harmless even if the trade that prompted it never happens.
-function swapRouteKey(network, tokenIn) {
-  return `${network.chainId}:${(tokenIn || "native").toLowerCase()}`;
-}
-
-// Strict match -- required before ever broadcasting the aggregator's
-// saved transaction, since that calldata encodes an exact
-// tokenIn/tokenOut/amount. Anything less exact and we fall back to the
-// direct router path instead of risking a swap into the wrong asset.
-function aggregatorRouteMatches(route, network, tokenIn, tokenOut, netAmountInWei) {
-  return !!(
-    route &&
-    route.kind === "aggregator" &&
-    route.chainId === network.chainId &&
-    route.tokenIn === (tokenIn || "native").toLowerCase() &&
-    route.tokenOut === (tokenOut || "native").toLowerCase() &&
-    route.netAmountInWei === netAmountInWei.toString()
-  );
-}
-
 const APPROVED_ORIGINS_KEY = "tm_approved_origins"; // { [origin]: string[] addresses }
 const pendingRequests = new Map(); // requestId -> { resolve, reject, type, payload, origin }
 
@@ -777,63 +746,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case "TM_SWAP_QUOTE": {
           // msg.amountInWei is the TOTAL amount the user is putting in. The
           // app fee comes off the top first (see lib/fee-config.js); only
-          // the remainder ever touches the router (or the aggregator), and
-          // the quote shown to the user is for that remainder so it
-          // matches what they'll actually receive.
+          // the remainder ever touches the router, and the quote shown to
+          // the user is for that remainder so it matches what they'll
+          // actually receive.
           const network = await getActiveNetwork();
           const provider = await getProviderFor(network);
-          const meta = await getSelectedAccountMeta();
           const totalWei = ethers.BigNumber.from(msg.amountInWei);
-
-          // 0x bakes its own ~0.15% protocol fee into the quote it
-          // returns (already netted out of the buyAmount -- not
-          // something we separately collect), so an aggregator-routed
-          // swap is skimmed at the higher AGGREGATOR_* rate (see
-          // lib/fee-config.js) to keep this wallet's own take the same
-          // either way. We have to compute that rate's netWei BEFORE
-          // asking 0x for a quote, since the quote is for an exact sell
-          // amount -- if 0x can't help, we fall back to the base rate
-          // below and quote the plain router instead.
-          const { feeWei: aggFeeWei, netWei: aggNetWei } = TM_FEE.computeFee(totalWei, { viaAggregator: true });
-
-          const aggQuote = meta
-            ? await TM_SWAP.tryAggregatorQuote({
-                network,
-                tokenIn: msg.tokenIn,
-                tokenOut: msg.tokenOut,
-                amountInWei: aggNetWei,
-                taker: meta.address,
-                slippageBps: msg.slippageBps || 100,
-              })
-            : null;
-
-          if (aggQuote) {
-            lastSwapRoute = {
-              key: swapRouteKey(network, msg.tokenIn),
-              chainId: network.chainId,
-              tokenIn: (msg.tokenIn || "native").toLowerCase(),
-              tokenOut: (msg.tokenOut || "native").toLowerCase(),
-              netAmountInWei: aggNetWei.toString(),
-              kind: "aggregator",
-              spender: aggQuote.allowanceTarget || network.swapRouter,
-              transaction: aggQuote.transaction,
-              amountOutWei: aggQuote.amountOutWei.toString(),
-              minAmountOutWei: aggQuote.minAmountOutWei.toString(),
-            };
-            sendResponse({
-              ok: true,
-              amountOutWei: aggQuote.amountOutWei.toString(),
-              path: null,
-              feeWei: aggFeeWei.toString(),
-              netAmountInWei: aggNetWei.toString(),
-              feePercentLabel: TM_FEE.feePercentLabel({ viaAggregator: true }),
-              route: "aggregator",
-            });
-            break;
-          }
-
-          const { feeWei, netWei } = TM_FEE.computeFee(totalWei, { viaAggregator: false });
-          lastSwapRoute = { key: swapRouteKey(network, msg.tokenIn), chainId: network.chainId, kind: "router" };
+          const { feeWei, netWei } = TM_FEE.computeFee(totalWei);
           const { amountOutWei, path } = await TM_SWAP.getQuote({
             network,
             provider,
@@ -847,8 +766,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             path,
             feeWei: feeWei.toString(),
             netAmountInWei: netWei.toString(),
-            feePercentLabel: TM_FEE.feePercentLabel({ viaAggregator: false }),
-            route: "router",
+            feePercentLabel: TM_FEE.feePercentLabel(),
           });
           break;
         }
@@ -857,13 +775,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const network = await getActiveNetwork();
           const provider = await getProviderFor(network);
           const meta = await getSelectedAccountMeta();
-          const routeKey = swapRouteKey(network, msg.tokenAddress);
-          const spender =
-            lastSwapRoute && lastSwapRoute.key === routeKey && lastSwapRoute.kind === "aggregator" && lastSwapRoute.spender
-              ? lastSwapRoute.spender
-              : network.swapRouter;
-          const allowance = await TM_SWAP.getAllowance({ provider, tokenAddress: msg.tokenAddress, owner: meta.address, spender });
-          sendResponse({ ok: true, allowanceWei: allowance.toString(), spender });
+          const allowance = await TM_SWAP.getAllowance({ provider, tokenAddress: msg.tokenAddress, owner: meta.address, spender: network.swapRouter });
+          sendResponse({ ok: true, allowanceWei: allowance.toString() });
           break;
         }
 
@@ -873,12 +786,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const meta = await getSelectedAccountMeta();
           assertNotSanctioned(meta.address, "account");
           const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
-          const routeKey = swapRouteKey(network, msg.tokenAddress);
-          const spender =
-            lastSwapRoute && lastSwapRoute.key === routeKey && lastSwapRoute.kind === "aggregator" && lastSwapRoute.spender
-              ? lastSwapRoute.spender
-              : network.swapRouter;
-          const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender, amountWei: ethers.BigNumber.from(msg.amountWei) });
+          const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender: network.swapRouter, amountWei: ethers.BigNumber.from(msg.amountWei) });
           sendResponse({ ok: true, txHash: tx.hash });
           break;
         }
@@ -896,19 +804,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
 
           const totalWei = ethers.BigNumber.from(msg.amountInWei);
-
-          // Figure out which rate applies the same way TM_SWAP_QUOTE did,
-          // without a second call to 0x: if the remembered route is
-          // still an exact match for this pair/amount at the AGGREGATOR
-          // rate, this swap goes through 0x and is skimmed at that
-          // higher rate; otherwise it's a plain router swap at the base
-          // rate. aggregatorRouteMatches() is just comparing against
-          // what TM_SWAP_QUOTE already fetched and saved.
-          const { feeWei: aggFeeWei, netWei: aggNetWei } = TM_FEE.computeFee(totalWei, { viaAggregator: true });
-          const useAggregator = aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, aggNetWei);
-          const { feeWei, netWei } = useAggregator
-            ? { feeWei: aggFeeWei, netWei: aggNetWei }
-            : TM_FEE.computeFee(totalWei, { viaAggregator: false });
+          const { feeWei, netWei } = TM_FEE.computeFee(totalWei);
 
           let feeTxHash = null;
           if (feeWei.gt(0)) {
@@ -928,29 +824,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
           }
 
-          if (useAggregator) {
-            try {
-              const aggTx = await TM_SWAP.executeAggregatorSwap({ signer: wallet, transaction: lastSwapRoute.transaction });
-              sendResponse({
-                ok: true,
-                feeTxHash,
-                feeWei: feeWei.toString(),
-                txHash: aggTx.hash,
-                quotedAmountOutWei: lastSwapRoute.amountOutWei,
-                minAmountOutWei: lastSwapRoute.minAmountOutWei,
-                route: "aggregator",
-              });
-              break;
-            } catch (e) {
-              // The aggregator's saved transaction failed to broadcast
-              // (stale quote, a gas re-estimate mismatch, etc). The fee is
-              // already paid at this point either way, so fall through to
-              // the direct router path below rather than leaving the user
-              // stuck having paid the fee with nothing to show for it --
-              // same slippage tolerance either way.
-            }
-          }
-
           const { tx, quotedAmountOutWei, minAmountOutWei } = await TM_SWAP.executeSwap({
             network,
             signer: wallet,
@@ -967,7 +840,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             txHash: tx.hash,
             quotedAmountOutWei: quotedAmountOutWei.toString(),
             minAmountOutWei: minAmountOutWei.toString(),
-            route: "router",
           });
           break;
         }
