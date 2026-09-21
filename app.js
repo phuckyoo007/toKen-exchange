@@ -1134,6 +1134,16 @@ function setPricesTab(tab) {
   document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
   $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
   $("prices-stablecoin-note").classList.toggle("hidden", tab !== "currencies");
+  // Re-render immediately with whatever's already in memory for this tab
+  // (pricesBoardData for crypto, pricesRatesData for currencies) BEFORE the
+  // fresh fetch below resolves. Without this, switching tabs left the OLD
+  // tab's rows sitting in #prices-list until the new fetch finished -- and
+  // if that fetch failed (e.g. the "Couldn't reach CoinGecko for currency
+  // rates" error), it never finished at all, so tapping "Currencies" could
+  // permanently strand the previous tab's crypto rows on screen under the
+  // Currencies tab. Calling this here means a tab switch always shows the
+  // right TYPE of row (even if stale/empty) and never the other tab's data.
+  renderPricesList();
   refreshPrices();
 }
 
