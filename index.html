@@ -424,6 +424,8 @@
       <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
     </div>
     <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
+    <button type="button" id="btn-buy-coinbase" class="secondary hidden" data-i18n="buy.coinbaseBtn">Buy with Coinbase instead</button>
+    <p class="muted small hidden" id="buy-coinbase-note" data-i18n="buy.coinbaseNote">Opens Coinbase in a new tab, with this address already filled in. A separate service from MoonPay, run by Coinbase.</p>
     <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
       <iframe id="buy-frame" class="widget-frame" title="MoonPay Buy" allow="payment"></iframe>
     </div>
@@ -782,6 +784,7 @@
 <script src="lib/prices.js"></script>
 <script src="lib/polymarket.js"></script>
 <script src="lib/buy-config.js"></script>
+<script src="lib/coinbase-onramp-config.js"></script>
 <script src="lib/sell-config.js"></script>
 <script src="lib/i18n/en.js"></script>
 <script src="lib/i18n/ar.js"></script>

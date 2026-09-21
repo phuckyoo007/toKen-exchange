@@ -142,6 +142,8 @@
     "buy.noThirdPartySwapBtn": "بادل بدلاً من ذلك",
     "buy.description2Html": "سيُفتح MoonPay هنا مباشرةً بالأسفل. وبما أن هذه المحفظة لا تستطيع توقيع الطلبات بأمان باستخدام مفتاح سرّي (إذ يجب ألا يوجد هذا المفتاح داخل إضافة متصفح أبدًا -- راجع <code>lib/buy-config.js</code>)، فعليك <strong>لصق عنوان استلامك بنفسك</strong> بعد اكتمال التحميل:",
     "buy.continueBtn": "المتابعة إلى MoonPay",
+    "buy.coinbaseBtn": "الشراء عبر Coinbase بدلاً من ذلك",
+    "buy.coinbaseNote": "يفتح Coinbase في علامة تبويب جديدة، مع تعبئة هذا العنوان مسبقاً. خدمة منفصلة عن MoonPay، تديرها Coinbase.",
 
     "sell.title": "البيع مقابل نقد",
     "sell.description1": "خدمة البيع مقدَّمة عبر MoonPay، وهي نفس الخدمة الخارجية التي تستخدمها خدمة الشراء -- لا تطّلع Token Exchange مطلقًا على بيانات استلام أموالك.",

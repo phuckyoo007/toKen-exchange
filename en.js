@@ -163,6 +163,8 @@
     "buy.description2Html": "MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:",
     "buy.description2AutoFill": "MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.",
     "buy.continueBtn": "Continue to MoonPay",
+    "buy.coinbaseBtn": "Buy with Coinbase instead",
+    "buy.coinbaseNote": "Opens Coinbase in a new tab, with this address already filled in. A separate service from MoonPay, run by Coinbase.",
 
     "sell.title": "Sell for cash",
     "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",

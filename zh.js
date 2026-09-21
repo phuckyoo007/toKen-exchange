@@ -143,6 +143,8 @@
     "buy.noThirdPartySwapBtn": "改为兑换",
     "buy.description2Html": "MoonPay 将在下方直接打开。由于本钱包无法使用密钥安全地对请求进行签名（密钥绝不能存放在浏览器扩展中——详见 <code>lib/buy-config.js</code>），请在加载完成后<strong>自行粘贴您的收款地址</strong>：",
     "buy.continueBtn": "前往 MoonPay",
+    "buy.coinbaseBtn": "改用 Coinbase 购买",
+    "buy.coinbaseNote": "在新标签页中打开 Coinbase，并已自动填入该地址。这是独立于 MoonPay 的服务，由 Coinbase 运营。",
 
     "sell.title": "出售换取现金",
     "sell.description1": "出售功能由 MoonPay 提供支持，与购买功能使用的是同一个第三方服务 -- Token Exchange 绝不会接触您的收款信息。",

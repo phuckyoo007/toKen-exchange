@@ -2001,10 +2001,35 @@ function setupBuyScreen(fiatCode) {
   $("btn-buy-open").classList.remove("hidden");
   $("buy-frame-wrap").classList.add("hidden");
   $("buy-frame").src = "about:blank";
+  // Coinbase Onramp is a second, independent Buy option -- see
+  // lib/coinbase-onramp-config.js's header comment for why it exists
+  // (MoonPay's own account approval is still pending) and why it opens in
+  // a new tab instead of embedding like the MoonPay iframe above. Only
+  // shown for networks Coinbase is confirmed to support; hidden entirely
+  // otherwise rather than showing a button that would just error.
+  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
+  $("btn-buy-coinbase").classList.toggle("hidden", !coinbaseSupported);
+  $("buy-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
+  $("btn-buy-coinbase").disabled = false;
 }
 
 $("btn-buy-copy-address").addEventListener("click", () => {
   navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
+});
+
+$("btn-buy-coinbase").addEventListener("click", async () => {
+  hideError("buy-error");
+  const btn = $("btn-buy-coinbase");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOnrampUrl(currentNetwork.key, address);
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch (e) {
+    showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 $("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });

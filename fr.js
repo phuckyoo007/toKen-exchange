@@ -143,6 +143,8 @@
     "buy.noThirdPartySwapBtn": "Échanger à la place",
     "buy.description2Html": "MoonPay s'ouvre ici même, ci-dessous. Comme ce portefeuille ne peut pas signer les requêtes en toute sécurité avec une clé secrète (celle-ci ne doit jamais se trouver dans une extension de navigateur -- voir <code>lib/buy-config.js</code>), <strong>collez vous-même votre adresse de réception</strong> une fois le chargement terminé :",
     "buy.continueBtn": "Continuer vers MoonPay",
+    "buy.coinbaseBtn": "Acheter avec Coinbase à la place",
+    "buy.coinbaseNote": "Ouvre Coinbase dans un nouvel onglet, avec cette adresse déjà renseignée. Un service distinct de MoonPay, géré par Coinbase.",
 
     "sell.title": "Vendre contre de l'argent",
     "sell.description1": "Vendre fonctionne avec MoonPay, le même service tiers qu'Acheter -- Token Exchange n'a jamais accès à vos informations de paiement.",
