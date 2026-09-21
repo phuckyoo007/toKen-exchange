@@ -2001,6 +2001,13 @@ function setupBuyScreen(fiatCode) {
   $("btn-buy-open").classList.remove("hidden");
   $("buy-frame-wrap").classList.add("hidden");
   $("buy-frame").src = "about:blank";
+  // MoonPay is muted (hidden entirely, not just left to error) until
+  // lib/buy-config.js's MOONPAY_PUBLISHABLE_API_KEY is swapped for a real
+  // pk_live_ key -- see isBuyLive()'s comment there. Until then Coinbase
+  // (below) is the only Buy path shown, on networks it supports.
+  const moonpayLive = TM_BUY_CONFIG.isBuyLive();
+  $("buy-moonpay-section").classList.toggle("hidden", !moonpayLive);
+  $("buy-moonpay-muted-note").classList.toggle("hidden", moonpayLive);
   // Coinbase Onramp is a second, independent Buy option -- see
   // lib/coinbase-onramp-config.js's header comment for why it exists
   // (MoonPay's own account approval is still pending) and why it opens in
@@ -2078,6 +2085,10 @@ function setupSellScreen(fiatCode) {
   $("sell-send-helper").classList.add("hidden");
   $("sell-deposit-address").value = "";
   $("sell-deposit-amount").value = "";
+  // Same MoonPay-muting as Buy -- see setupBuyScreen()'s comment above.
+  const moonpayLive = TM_SELL_CONFIG.isSellLive();
+  $("sell-moonpay-section").classList.toggle("hidden", !moonpayLive);
+  $("sell-moonpay-muted-note").classList.toggle("hidden", moonpayLive);
   // Coinbase Offramp -- see lib/coinbase-onramp-config.js's header comment
   // for the two-step flow (open Coinbase in a tab, then come back and
   // fetch the deposit details). Same network-support gating as Buy.

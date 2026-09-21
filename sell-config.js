@@ -46,6 +46,14 @@ function isSellConfigured() {
   return !!moonpaySellApiKey();
 }
 
+// Mirrors lib/buy-config.js's isBuyLive() -- see that comment for why this
+// is stricter than isSellConfigured() above (true only for a real pk_live_
+// key, not the pk_test_ sandbox placeholder). Sell reuses Buy's key, so
+// this stays in sync automatically.
+function isSellLive() {
+  return moonpaySellApiKey().startsWith("pk_live_");
+}
+
 function sellWidgetBaseUrl(apiKey) {
   return apiKey.startsWith("pk_live_")
     ? MOONPAY_SELL_WIDGET_BASE_URL_LIVE
@@ -82,6 +90,7 @@ function buildSellUrl(networkKey, quoteCurrency) {
 if (typeof self !== "undefined") {
   self.TM_SELL_CONFIG = {
     isSellConfigured,
+    isSellLive,
     buildSellUrl,
   };
 }

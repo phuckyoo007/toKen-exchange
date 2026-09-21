@@ -88,6 +88,19 @@ function isBuyConfigured() {
   return !!MOONPAY_PUBLISHABLE_API_KEY;
 }
 
+// Stricter than isBuyConfigured() above: that one only checks "is some key
+// present" (true even for the pk_test_ sandbox placeholder, so the widget
+// still opens for local testing). This checks whether it's a REAL,
+// account-approved key -- what the UI uses to decide whether to show
+// MoonPay to real users at all, so nobody lands on a sandbox-only widget
+// thinking it's a working Buy/Sell path. Flip automatically the moment
+// MOONPAY_PUBLISHABLE_API_KEY above is swapped for a pk_live_ key --
+// nothing else needs to change, on either the Buy or Sell screen (Sell
+// reuses this same key, see lib/sell-config.js).
+function isBuyLive() {
+  return MOONPAY_PUBLISHABLE_API_KEY.startsWith("pk_live_");
+}
+
 // Builds the URL to embed for the given network key (see lib/networks.js).
 // Throws if no publishable key has been configured yet.
 // Fiat codes passed to MoonPay's Buy widget as baseCurrencyCode. Same eight
@@ -156,6 +169,7 @@ async function buildSignedBuyUrl(networkKey, address, fiatCode) {
 if (typeof self !== "undefined") {
   self.TM_BUY_CONFIG = {
     isBuyConfigured,
+    isBuyLive,
     buildBuyUrl,
     buildSignedBuyUrl,
     NETWORK_MOONPAY_CURRENCY_CODE,
