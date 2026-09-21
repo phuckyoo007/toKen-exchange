@@ -1,0 +1,357 @@
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/README.md work/toKen-exchange-main/README.md
+--- orig/toKen-exchange-main/README.md	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/README.md	2026-09-21 04:34:31.981495010 +0000
+@@ -194,6 +194,29 @@
+   `lib/buy-config.js` for the full trail, and add a code there yourself once
+   you can confirm one from your own MoonPay dashboard.
+ 
++## Swap, buy, and sell from any currency or coin
++
++Every row on the Live prices screen opens a detail screen with actions:
++
++- **Currencies tab** -- every currency is listed, including your own display
++  currency (USD used to drop out of the list when it was the display currency).
++  Tapping a currency offers **Swap for <stablecoin>** when a verified, liquid
++  token for it exists on your network (USD -> USDC on all six built-in
++  networks; EUR -> EURC, JPY -> JPYC, AUD -> AUDD, BRL -> BRZ where verified).
++  If a currency has no such token, or none on any supported network, the swap
++  falls back to USDC (a US-dollar stablecoin) with a note saying so -- it never
++  invents a token for a currency.
++- **Buy with <currency>** opens MoonPay's Buy widget in that currency.
++- **Sell to my bank (<currency>)** opens MoonPay's Sell widget paying out in that
++  currency. Cashing out is two steps because MoonPay hands you a deposit
++  address: paste it (and the quoted amount) into "Step 2" on the Sell screen and
++  the wallet opens Send with both filled in for you to review and confirm.
++  Nothing is sent automatically.
++- Currencies outside MoonPay's eight known codes (USD, EUR, GBP, JPY, CAD, AUD,
++  INR, BRL) open MoonPay with its own currency picker.
++- Not yet applied to the browser-extension popup (`extension-updated-icons/`),
++  which doesn't have the Currencies tab.
++
+ ## Help & support chat
+ 
+ A "Need help?" link on the onboarding and unlock screens, and a "Help &
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/app.css work/toKen-exchange-main/app.css
+--- orig/toKen-exchange-main/app.css	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/app.css	2026-09-21 04:33:55.557199043 +0000
+@@ -1462,3 +1462,10 @@
+ .coin-stat .v { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; unicode-bidi: isolate; text-align: start; }
+ /* Price rows now open the coin screen, so they are buttons, not anchors. */
+ button.price-link { background: none; border: 0; padding: 0; font: inherit; text-align: start; width: auto; }
++
++/* Buy / Sell actions under the swap card, and Sell step 2 */
++.coin-cash-actions { display: flex; gap: 8px; margin: 10px 0 4px; }
++.coin-cash-actions button { flex: 1; }
++.coin-cash-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
++.sell-send-helper { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
++.sell-send-helper h3, .sell-send-helper p { margin: 0; }
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/app.js work/toKen-exchange-main/app.js
+--- orig/toKen-exchange-main/app.js	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/app.js	2026-09-21 04:33:55.556667169 +0000
+@@ -1275,6 +1275,7 @@
+   coinDetail.switchNetworkTarget = null;
+   coinDetail.prefillTokenAddress = null;
+   setCoinDetailCryptoSectionsVisible(true);
++  showCoinCashActions(currentCurrency);
+   $("coin-swap-card").classList.remove("hidden");
+   $("coin-back").dataset.back = fromScreen || "screen-prices";
+   hideError("coin-error");
+@@ -1334,6 +1335,34 @@
+   },
+ };
+ 
++// USD's stablecoin is USDC. Its contracts are the same verified, native Circle
++// deployments already listed in KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN, so USD reuses
++// that table instead of repeating the addresses here. Every other currency
++// uses KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN above.
++function knownStablecoinsFor(code) {
++  if (code === "USD") return KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN.USDC || {};
++  return KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN[code] || {};
++}
++
++function fiatLabel(code) {
++  const info = TM_PRICES.SUPPORTED_CURRENCIES[String(code).toLowerCase()];
++  return info ? info.label : String(code).toUpperCase();
++}
++
++// Buy / Sell buttons shown under the swap card on every coin screen and every
++// currency screen. `fiatCode` is the currency the person is looking at (or,
++// for a coin, their display currency); it is carried into the MoonPay Buy and
++// Sell screens so the bank leg is in the right currency.
++function showCoinCashActions(fiatCode) {
++  coinDetail.fiat = fiatCode;
++  const label = fiatLabel(fiatCode);
++  $("btn-coin-buy").textContent = TM_I18N.t("coin.buyBtn", { currency: label });
++  $("btn-coin-sell").textContent = TM_I18N.t("coin.sellBtn", { currency: label });
++  const meta = ((currentStatus && currentStatus.accounts) || []).find((a) => a.address === currentStatus.selectedAddress);
++  $("btn-coin-sell").disabled = !!meta && meta.type === "watch"; // same gating as the main Sell button
++  $("coin-cash-actions").classList.remove("hidden");
++}
++
+ // Re-applies the coin-swap-card's contents for whichever currency is
+ // currently open (see openCurrencyDetail) -- pulled out on its own so the
+ // "Switch to X to swap" button (shared with loadCoinSwapState above) can
+@@ -1342,12 +1371,13 @@
+ function applyCurrencySwapState() {
+   const r = coinDetail.currency;
+   if (!r) return;
++  showCoinCashActions(String(r.code).toLowerCase());
+   coinDetail.currencySwapAddress = null;
+   coinDetail.switchNetworkTarget = null;
+   $("coin-holding").classList.add("hidden");
+   $("btn-coin-add-token").classList.add("hidden");
+   $("btn-coin-switch-network").classList.add("hidden");
+-  const knownByChain = KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN[r.code] || {};
++  const knownByChain = knownStablecoinsFor(r.code);
+   const known = currentNetwork ? knownByChain[currentNetwork.chainId] : null;
+   if (known) {
+     coinDetail.currencySwapAddress = known.address;
+@@ -1379,6 +1409,23 @@
+     switchBtn.classList.remove("hidden");
+     return;
+   }
++  // No verified, liquid token for this currency on any network this wallet
++  // supports. Rather than leave the currency with nothing to do, offer the
++  // closest thing that IS real and liquid: USDC, a US-dollar stablecoin, on
++  // the current network. The note says plainly that it's dollars, not the
++  // local currency; the Sell button below is the way out to a bank account.
++  const usdcHere = currentNetwork ? (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN.USDC || {})[currentNetwork.chainId] : null;
++  if (usdcHere && r.code !== "USD") {
++    coinDetail.currencySwapAddress = usdcHere.address;
++    $("coin-swap-card").classList.remove("hidden");
++    const fbBtn = $("btn-coin-swap");
++    fbBtn.textContent = TM_I18N.t("coin.swapBtn", { symbol: usdcHere.symbol });
++    fbBtn.disabled = false;
++    fbBtn.classList.remove("hidden");
++    $("coin-swap-note").textContent = TM_I18N.t("prices.currencyFallbackNote", { currency: r.name, code: r.code });
++    $("coin-swap-note").classList.remove("hidden");
++    return;
++  }
+   $("coin-swap-card").classList.add("hidden");
+ }
+ 
+@@ -1769,6 +1816,16 @@
+   showScreen("screen-swap");
+ });
+ 
++$("btn-coin-buy").addEventListener("click", () => {
++  setupBuyScreen(coinDetail.fiat);
++  showScreen("screen-buy");
++});
++
++$("btn-coin-sell").addEventListener("click", () => {
++  setupSellScreen(coinDetail.fiat);
++  showScreen("screen-sell");
++});
++
+ $("btn-coin-add-token").addEventListener("click", () => {
+   resetAddTokenScreen(coinDetail.prefillTokenAddress || undefined);
+   showScreen("screen-add-token");
+@@ -1899,7 +1956,11 @@
+ // that's safe. Each time the screen is (re)opened, this resets back to the
+ // "not loaded yet" state: description text, address row and Continue
+ // button visible, iframe hidden -- ready for a fresh click.
+-function setupBuyScreen() {
++// The fiat currency the MoonPay Buy widget should open in: whatever the person
++// was looking at (a currency or coin screen), else their display currency.
++let buyFiat = null;
++function setupBuyScreen(fiatCode) {
++  buyFiat = fiatCode || currentCurrency;
+   hideError("buy-error");
+   $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+   $("buy-description-manual").classList.remove("hidden");
+@@ -1927,8 +1988,8 @@
+     // or can't be reached. Either way this always embeds in the iframe
+     // below rather than opening a new tab.
+     const address = (currentStatus && currentStatus.selectedAddress) || "";
+-    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
+-    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
++    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address, buyFiat);
++    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key, buyFiat);
+     $("buy-frame").src = url;
+     $("buy-frame-wrap").classList.remove("hidden");
+     btn.classList.add("hidden");
+@@ -1947,25 +2008,60 @@
+ // ---------------------------------------------------------------- SELL
+ // Same embedding change as Buy -- see lib/sell-config.js's header comment
+ // for why there's no address to auto-fill here.
+-function setupSellScreen() {
++// The fiat currency MoonPay's Sell widget should pay out in: whatever the
++// person was looking at (a currency or coin screen), else their display currency.
++let sellFiat = null;
++function setupSellScreen(fiatCode) {
++  sellFiat = fiatCode || currentCurrency;
+   hideError("sell-error");
++  hideError("sell-deposit-error");
+   $("btn-sell-open").classList.remove("hidden");
+   $("sell-frame-wrap").classList.add("hidden");
+   $("sell-frame").src = "about:blank";
++  $("sell-send-helper").classList.add("hidden");
++  $("sell-deposit-address").value = "";
++  $("sell-deposit-amount").value = "";
+ }
+ 
+ $("btn-sell-open").addEventListener("click", () => {
+   hideError("sell-error");
+   try {
+-    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
++    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, sellFiat || currentCurrency);
+     $("sell-frame").src = url;
+     $("sell-frame-wrap").classList.remove("hidden");
+     $("btn-sell-open").classList.add("hidden");
++    // Step 2: once MoonPay shows a deposit address, the person pastes it
++    // here and we open Send with it filled in (they still review + confirm).
++    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
++    $("sell-send-helper").classList.remove("hidden");
+   } catch (e) {
+     showError("sell-error", e.message);
+   }
+ });
+ 
++$("btn-sell-to-send").addEventListener("click", () => {
++  hideError("sell-deposit-error");
++  const addr = $("sell-deposit-address").value.trim();
++  const amt = $("sell-deposit-amount").value.trim();
++  if (!ethers.utils.isAddress(addr)) {
++    showError("sell-deposit-error", TM_I18N.t("sell.invalidAddress"));
++    return;
++  }
++  if (amt && !(Number(amt) > 0)) {
++    showError("sell-deposit-error", TM_I18N.t("sell.invalidAmount"));
++    return;
++  }
++  // Prefill only. The Send screen's own review/confirm step (and the
++  // sanctions check) still run, so nothing leaves the wallet unreviewed.
++  $("send-to").value = addr;
++  $("send-to").dispatchEvent(new Event("input"));
++  $("send-amount").value = amt;
++  $("send-amount").dispatchEvent(new Event("input"));
++  setSendSpeed("standard");
++  showScreen("screen-send");
++  refreshSendFeePreview();
++});
++
+ // ---------------------------------------------------------------- SETTINGS
+ $("btn-add-account").addEventListener("click", async () => {
+   try {
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/buy-config.js work/toKen-exchange-main/buy-config.js
+--- orig/toKen-exchange-main/buy-config.js	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/buy-config.js	2026-09-21 04:33:55.553981806 +0000
+@@ -90,7 +90,17 @@
+ 
+ // Builds the URL to embed for the given network key (see lib/networks.js).
+ // Throws if no publishable key has been configured yet.
+-function buildBuyUrl(networkKey) {
++// Fiat codes passed to MoonPay's Buy widget as baseCurrencyCode. Same eight
++// as the Sell side (see lib/sell-config.js) -- anything else opens the
++// widget's own currency picker rather than risk an unsupported code.
++const MOONPAY_BUY_FIAT_CODES = new Set(["usd", "eur", "gbp", "jpy", "cad", "aud", "inr", "brl"]);
++
++function buyFiatParam(fiatCode) {
++  const c = fiatCode ? String(fiatCode).toLowerCase() : "";
++  return MOONPAY_BUY_FIAT_CODES.has(c) ? c : "";
++}
++
++function buildBuyUrl(networkKey, fiatCode) {
+   if (!isBuyConfigured()) {
+     throw new Error(
+       "Buy isn't set up yet -- add your MoonPay publishable API key to lib/buy-config.js first (see the comment at the top of that file)."
+@@ -100,6 +110,8 @@
+   params.set("apiKey", MOONPAY_PUBLISHABLE_API_KEY);
+   const currencyCode = NETWORK_MOONPAY_CURRENCY_CODE[networkKey];
+   if (currencyCode) params.set("currencyCode", currencyCode);
++  const fiat = buyFiatParam(fiatCode);
++  if (fiat) params.set("baseCurrencyCode", fiat);
+   return `${MOONPAY_WIDGET_BASE_URL}?${params.toString()}`;
+ }
+ 
+@@ -128,12 +140,14 @@
+ // isn't set up yet or the signing backend can't be reached -- callers
+ // should fall back to buildBuyUrl()'s plain unsigned URL (today's
+ // manual-paste flow) in that case. Never throws.
+-async function buildSignedBuyUrl(networkKey, address) {
++async function buildSignedBuyUrl(networkKey, address, fiatCode) {
+   if (!isBuyConfigured() || !address) return null;
+   const params = new URLSearchParams();
+   params.set("apiKey", MOONPAY_PUBLISHABLE_API_KEY);
+   const currencyCode = NETWORK_MOONPAY_CURRENCY_CODE[networkKey];
+   if (currencyCode) params.set("currencyCode", currencyCode);
++  const fiat = buyFiatParam(fiatCode);
++  if (fiat) params.set("baseCurrencyCode", fiat);
+   params.set("walletAddress", address);
+   const unsignedUrl = `${MOONPAY_WIDGET_BASE_URL}?${params.toString()}`;
+   return trySignUrl(unsignedUrl);
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/en.js work/toKen-exchange-main/en.js
+--- orig/toKen-exchange-main/en.js	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/en.js	2026-09-21 04:33:55.557380080 +0000
+@@ -112,6 +112,17 @@
+     "prices.viewCoin": "View {name}",
+     "coin.swapBtn": "Swap for {symbol}",
+     "coin.swapHint": "You'll choose which of your holdings to pay with on the next screen.",
++    "coin.buyBtn": "Buy with {currency}",
++    "coin.sellBtn": "Sell to my bank ({currency})",
++    "prices.currencyFallbackNote": "There's no liquid {currency} token yet, so this swaps into USDC, a US-dollar stablecoin, instead. Use Sell to cash out to your bank in {code}.",
++    "sell.step2Title": "Step 2: send your crypto to MoonPay",
++    "sell.step2Desc": "When MoonPay shows you a deposit address and amount, paste them here. This opens Send with them filled in, and you review and confirm the send yourself.",
++    "sell.networkHint": "MoonPay tells you which network to send on. You're on {network}. If MoonPay asks for a different one, switch networks first.",
++    "sell.depositPlaceholder": "MoonPay deposit address (0x...)",
++    "sell.amountPlaceholder": "Amount MoonPay quoted",
++    "sell.reviewInSendBtn": "Review in Send",
++    "sell.invalidAddress": "That doesn't look like a valid address. Copy it exactly as MoonPay shows it.",
++    "sell.invalidAmount": "Enter the amount as a number, or leave it blank.",
+     "coin.swapNeedsWallet": "Unlock your wallet to swap.",
+     "coin.swapNoRouter": "Swapping isn't enabled on this network yet.",
+     "coin.swapUnavailableNetwork": "{symbol} can't be swapped on {network} yet. It has to be the network's own coin, or a token you've added with Add token.",
+@@ -155,7 +166,7 @@
+     "sell.title": "Sell for cash",
+     "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
+     "sell.description2": "MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
+-    "sell.description3Html": "Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.",
++    "sell.description3Html": "When MoonPay shows you a deposit address, paste it into <strong>Step 2</strong> below and this wallet opens Send with it filled in. You still review and confirm the send yourself -- this wallet never sends funds anywhere on its own.",
+     "sell.continueBtn": "Continue to MoonPay",
+ 
+     "support.title": "Help & support",
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/index.html work/toKen-exchange-main/index.html
+--- orig/toKen-exchange-main/index.html	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/index.html	2026-09-21 04:33:55.556997650 +0000
+@@ -385,6 +385,10 @@
+       <button type="button" id="btn-coin-switch-network" class="secondary hidden"></button>
+       <button type="button" id="btn-coin-add-token" class="link hidden" data-i18n="main.addTokenBtn">+ Add token</button>
+     </div>
++    <div id="coin-cash-actions" class="coin-cash-actions hidden">
++      <button type="button" id="btn-coin-buy" class="secondary"></button>
++      <button type="button" id="btn-coin-sell" class="secondary"></button>
++    </div>
+     <h3 id="coin-stats-title" data-i18n="coin.statsTitle">Market stats</h3>
+     <div id="coin-stats" class="coin-stats"></div>
+     <h3 id="coin-about-title" data-i18n="coin.aboutTitle">About</h3>
+@@ -437,6 +441,15 @@
+     <div id="sell-frame-wrap" class="widget-frame-wrap hidden">
+       <iframe id="sell-frame" class="widget-frame" title="MoonPay Sell" allow="payment"></iframe>
+     </div>
++    <div id="sell-send-helper" class="sell-send-helper hidden">
++      <h3 data-i18n="sell.step2Title">Step 2: send your crypto to MoonPay</h3>
++      <p class="muted" data-i18n="sell.step2Desc">When MoonPay shows you a deposit address and amount, paste them here. This opens Send with them filled in, and you review and confirm the send yourself.</p>
++      <p id="sell-network-hint" class="hint"></p>
++      <input type="text" id="sell-deposit-address" data-i18n-placeholder="sell.depositPlaceholder" placeholder="MoonPay deposit address (0x...)" />
++      <input type="text" id="sell-deposit-amount" data-i18n-placeholder="sell.amountPlaceholder" placeholder="Amount MoonPay quoted" />
++      <button type="button" id="btn-sell-to-send" class="primary" data-i18n="sell.reviewInSendBtn">Review in Send</button>
++      <p id="sell-deposit-error" class="error hidden"></p>
++    </div>
+     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+     <p id="sell-error" class="error hidden"></p>
+   </section>
+diff -ru -x '*.zip' -x '*.png' -x '*.jpg' -x '*.apk' orig/toKen-exchange-main/prices.js work/toKen-exchange-main/prices.js
+--- orig/toKen-exchange-main/prices.js	2026-09-21 03:20:24.000000000 +0000
++++ work/toKen-exchange-main/prices.js	2026-09-21 04:33:55.553775513 +0000
+@@ -505,7 +505,9 @@
+   const out = [];
+   Object.keys(SUPPORTED_CURRENCIES).forEach((code) => {
+     const info = SUPPORTED_CURRENCIES[code];
+-    if (info.type !== "fiat" || code === display) return;
++    // The display currency is kept in the list (its own rate is 1) so the
++    // person's own currency -- USD for most users -- never disappears.
++    if (info.type !== "fiat") return;
+     const r = rates[code];
+     if (!r || !r.value) return;
+     out.push({ code: info.label, name: info.name, rate: base.value / r.value, stablecoin: info.stablecoin || null });

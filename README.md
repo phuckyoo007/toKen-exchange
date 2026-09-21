@@ -27,21 +27,10 @@ Chrome today.
 - Sanctioned-address screening: sends and swaps are checked against a bundled
   OFAC sanctions list before they go out (see "Sanctioned-address screening"
   below).
-- Live prices: a "Live prices" screen has a **Crypto** tab (18 core coins plus ~50
-  more, searchable, with 24h change and a star-to-pin watchlist) and a
-  **Currencies** tab (what 1 unit of each of 42 national currencies is worth
-  in your display currency). The main screen shows roughly what your connected
-  account's balance is worth. Settings -> Display currency offers 42 fiat
-  currencies (USD, EUR, GBP, JPY, CHF, CNY, MXN, NGN, ...) and 5 crypto
-  denominations (BTC, ETH, BNB, SOL, XRP). All powered by CoinGecko's free
-  public API (see "Live prices" below). Extra coins whose CoinGecko id isn't
-  returned are quietly left out rather than shown as "n/a".
-  Tapping a coin opens an in-app coin screen (price chart with 24H/7D/1M/1Y
-  ranges, market stats, a short description) with a **Swap for <coin>**
-  button. Swap is only offered when the coin is the selected network's native
-  coin or a token the user has added (matched by symbol) -- the wallet never
-  guesses token contract addresses -- and the Swap screen's From list shows
-  only what the user actually holds.
+- Live prices: a "Live prices" screen shows current USD prices (and 24h
+  change) for 18 widely-tracked cryptocurrencies, and the main screen shows
+  roughly what your connected account's balance is worth in USD -- both
+  powered by CoinGecko's free public API (see "Live prices" below).
 - Buy crypto: a "Buy" button opens MoonPay's hosted on-ramp widget in a new
   tab so you can purchase crypto with a card or bank transfer and send it to
   your wallet address (see "Buy crypto (MoonPay)" below).
@@ -193,29 +182,6 @@ Two things worth knowing:
   instead of guessing a code that might be wrong. See the comment in
   `lib/buy-config.js` for the full trail, and add a code there yourself once
   you can confirm one from your own MoonPay dashboard.
-
-## Swap, buy, and sell from any currency or coin
-
-Every row on the Live prices screen opens a detail screen with actions:
-
-- **Currencies tab** -- every currency is listed, including your own display
-  currency (USD used to drop out of the list when it was the display currency).
-  Tapping a currency offers **Swap for <stablecoin>** when a verified, liquid
-  token for it exists on your network (USD -> USDC on all six built-in
-  networks; EUR -> EURC, JPY -> JPYC, AUD -> AUDD, BRL -> BRZ where verified).
-  If a currency has no such token, or none on any supported network, the swap
-  falls back to USDC (a US-dollar stablecoin) with a note saying so -- it never
-  invents a token for a currency.
-- **Buy with <currency>** opens MoonPay's Buy widget in that currency.
-- **Sell to my bank (<currency>)** opens MoonPay's Sell widget paying out in that
-  currency. Cashing out is two steps because MoonPay hands you a deposit
-  address: paste it (and the quoted amount) into "Step 2" on the Sell screen and
-  the wallet opens Send with both filled in for you to review and confirm.
-  Nothing is sent automatically.
-- Currencies outside MoonPay's eight known codes (USD, EUR, GBP, JPY, CAD, AUD,
-  INR, BRL) open MoonPay with its own currency picker.
-- Not yet applied to the browser-extension popup (`extension-updated-icons/`),
-  which doesn't have the Currencies tab.
 
 ## Help & support chat
 
