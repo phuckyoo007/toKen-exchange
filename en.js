@@ -61,6 +61,7 @@
     "main.nftsEmpty": "No NFTs added yet -- tap “+ Add NFT” and enter a contract address and token ID to track one.",
     "main.networkLabel": "Network",
     "main.balanceFetchErrorPrefix": "Couldn't fetch balance: ",
+    "main.retryBtn": "Retry",
     "main.watchOnlySuffix": "(Watching)",
     "main.watchOnlyNotice": "You're viewing a watch-only address -- there's no private key for it in this wallet, so Send and Swap are turned off here.",
     "main.livePricesTitle": "Live Prices",

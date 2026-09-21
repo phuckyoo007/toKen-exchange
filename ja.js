@@ -12,6 +12,7 @@
     "common.send": "送金",
     "common.swap": "スワップ",
     "common.buy": "購入",
+    "common.sell": "売却",
     "common.seeAll": "すべて見る",
     "common.livePrices": "リアルタイム価格",
     "common.reject": "拒否",
@@ -53,6 +54,7 @@
     "main.tokensEmpty": "まだトークンが追加されていません。「+ トークンを追加」をタップし、コントラクトアドレスを入力すると残高を表示できます。",
     "main.networkLabel": "ネットワーク",
     "main.balanceFetchErrorPrefix": "残高を取得できませんでした: ",
+    "main.retryBtn": "再試行",
     "main.watchOnlySuffix": "（ウォッチ中）",
     "main.watchOnlyNotice": "ウォッチ専用アドレスを表示しています -- このウォレットにはこのアドレスの秘密鍵がないため、送金とスワップはここでは無効になっています。",
 

@@ -13,6 +13,7 @@
     "common.send": "Envoyer",
     "common.swap": "Échanger",
     "common.buy": "Acheter",
+    "common.sell": "Vendre",
     "common.seeAll": "Tout voir",
     "common.livePrices": "Cours en direct",
     "common.reject": "Refuser",
@@ -54,6 +55,7 @@
     "main.tokensEmpty": "Aucun token ajouté pour l'instant -- appuyez sur « + Ajouter un token » et saisissez une adresse de contrat pour en suivre un.",
     "main.networkLabel": "Réseau",
     "main.balanceFetchErrorPrefix": "Impossible de récupérer le solde : ",
+    "main.retryBtn": "Réessayer",
     "main.watchOnlySuffix": "(Observation)",
     "main.watchOnlyNotice": "Vous consultez une adresse en lecture seule -- il n'y a pas de clé privée pour elle dans ce portefeuille, donc Envoyer et Échanger sont désactivés ici.",
 

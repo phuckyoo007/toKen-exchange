@@ -634,6 +634,14 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   border-left: 3px solid var(--danger);
   padding: 9px 11px; border-radius: 7px;
 }
+/* Inline "Retry" link inside an .error banner (see showErrorWithRetry) --
+   sits right after the message text, so it reads as part of the same line
+   rather than a separate action floating below. */
+.error .error-retry-btn {
+  color: #f0a99d; text-decoration-color: currentColor;
+  font-size: 12px; padding: 0; font-weight: 700;
+}
+.error .error-retry-btn:hover { color: #ffcfc4; }
 .warn {
   color: #e8c37a; font-size: 12px; line-height: 1.5;
   background: #2a2110; border: 1px solid #4a3a17;

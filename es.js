@@ -12,6 +12,7 @@
     "common.send": "Enviar",
     "common.swap": "Intercambiar",
     "common.buy": "Comprar",
+    "common.sell": "Vender",
     "common.seeAll": "Ver todo",
     "common.livePrices": "Precios en vivo",
     "common.reject": "Rechazar",
@@ -53,6 +54,7 @@
     "main.tokensEmpty": "Aún no has agregado tokens -- toca “+ Agregar token” e ingresa una dirección de contrato para hacer seguimiento de uno.",
     "main.networkLabel": "Red",
     "main.balanceFetchErrorPrefix": "No se pudo obtener el saldo: ",
+    "main.retryBtn": "Reintentar",
     "main.watchOnlySuffix": "(Observando)",
     "main.watchOnlyNotice": "Estás viendo una dirección de solo observación -- no hay una clave privada para ella en esta wallet, así que Enviar e Intercambiar están desactivados aquí.",
 

@@ -13,6 +13,7 @@
     "common.send": "भेजें",
     "common.swap": "स्वैप",
     "common.buy": "खरीदें",
+    "common.sell": "बेचें",
     "common.seeAll": "सभी देखें",
     "common.livePrices": "लाइव कीमतें",
     "common.reject": "अस्वीकार करें",
@@ -54,6 +55,7 @@
     "main.tokensEmpty": "अभी तक कोई टोकन नहीं जोड़ा गया है -- किसी टोकन को ट्रैक करने के लिए “+ टोकन जोड़ें” पर टैप करें और उसका कॉन्ट्रैक्ट एड्रेस दर्ज करें।",
     "main.networkLabel": "नेटवर्क",
     "main.balanceFetchErrorPrefix": "बैलेंस प्राप्त नहीं हो सका: ",
+    "main.retryBtn": "पुनः प्रयास करें",
     "main.watchOnlySuffix": "(देखा जा रहा है)",
     "main.watchOnlyNotice": "आप एक वॉच-ओनली एड्रेस देख रहे हैं -- इस वॉलेट में इसके लिए कोई प्राइवेट की नहीं है, इसलिए यहां भेजें और स्वैप बंद हैं।",
 

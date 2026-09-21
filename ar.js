@@ -12,6 +12,7 @@
     "common.send": "إرسال",
     "common.swap": "مبادلة",
     "common.buy": "شراء",
+    "common.sell": "بيع",
     "common.seeAll": "عرض الكل",
     "common.livePrices": "الأسعار المباشرة",
     "common.reject": "رفض",
@@ -53,6 +54,7 @@
     "main.tokensEmpty": "لم تتم إضافة أي عملات بعد -- اضغط على «+ إضافة عملة» وأدخل عنوان العقد لتتبع عملة.",
     "main.networkLabel": "الشبكة",
     "main.balanceFetchErrorPrefix": "تعذّر جلب الرصيد: ",
+    "main.retryBtn": "إعادة المحاولة",
     "main.watchOnlySuffix": "(مراقبة فقط)",
     "main.watchOnlyNotice": "أنت تعرض عنوانًا للمراقبة فقط -- لا يوجد مفتاح خاص له في هذه المحفظة، لذا يتم تعطيل الإرسال والمبادلة هنا.",
 

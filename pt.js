@@ -11,6 +11,7 @@
     "common.send": "Enviar",
     "common.swap": "Trocar",
     "common.buy": "Comprar",
+    "common.sell": "Vender",
     "common.seeAll": "Ver tudo",
     "common.livePrices": "Preços em tempo real",
     "common.reject": "Rejeitar",
@@ -52,6 +53,7 @@
     "main.tokensEmpty": "Nenhum token adicionado ainda -- toque em “+ Adicionar token” e informe o endereço de um contrato para acompanhá-lo.",
     "main.networkLabel": "Rede",
     "main.balanceFetchErrorPrefix": "Não foi possível obter o saldo: ",
+    "main.retryBtn": "Tentar novamente",
     "main.watchOnlySuffix": "(Observando)",
     "main.watchOnlyNotice": "Você está vendo um endereço somente para observação -- não há chave privada para ele nesta carteira, então Enviar e Trocar ficam desativados aqui.",
 

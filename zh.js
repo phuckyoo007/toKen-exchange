@@ -13,6 +13,7 @@
     "common.send": "发送",
     "common.swap": "兑换",
     "common.buy": "购买",
+    "common.sell": "出售",
     "common.seeAll": "查看全部",
     "common.livePrices": "实时价格",
     "common.reject": "拒绝",
@@ -54,6 +55,7 @@
     "main.tokensEmpty": "尚未添加任何代币——点击「+ 添加代币」并输入合约地址即可添加追踪。",
     "main.networkLabel": "网络",
     "main.balanceFetchErrorPrefix": "无法获取余额：",
+    "main.retryBtn": "重试",
     "main.watchOnlySuffix": "（观察中）",
     "main.watchOnlyNotice": "你正在查看一个仅观察地址 -- 该钱包中没有此地址的私钥，因此这里的发送和兑换已关闭。",
 

@@ -26,7 +26,12 @@ const BUILTIN_NETWORKS = [
     chainId: 1,
     name: "Ethereum Mainnet",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: ["https://cloudflare-eth.com", "https://eth.llamarpc.com"],
+    // Four independent, keyless public endpoints (added 2026-09 after a user
+    // hit "Couldn't get a response from the network" -- background.js's
+    // pickHealthyRpcUrl/rpcPassthrough already fall through to the next URL
+    // on a bad one, but every other chain below only listed a single URL
+    // until now, meaning that fallback logic had nothing to fall back to).
+    rpcUrls: ["https://cloudflare-eth.com", "https://eth.llamarpc.com", "https://ethereum-rpc.publicnode.com", "https://rpc.ankr.com/eth"],
     blockExplorer: "https://etherscan.io",
     wrappedNative: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
     swapRouter: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // Uniswap V2 Router02
@@ -39,7 +44,7 @@ const BUILTIN_NETWORKS = [
     chainId: 8453,
     name: "Base",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: ["https://mainnet.base.org"],
+    rpcUrls: ["https://mainnet.base.org", "https://base-rpc.publicnode.com", "https://rpc.ankr.com/base"],
     blockExplorer: "https://basescan.org",
     wrappedNative: "0x4200000000000000000000000000000000000006", // WETH (Base predeploy)
     // Verified via BaseScan (contract labeled "Uniswap: V2 Router02", marked
@@ -55,7 +60,7 @@ const BUILTIN_NETWORKS = [
     chainId: 137,
     name: "Polygon",
     nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
-    rpcUrls: ["https://polygon-rpc.com"],
+    rpcUrls: ["https://polygon-rpc.com", "https://polygon-bor-rpc.publicnode.com", "https://rpc.ankr.com/polygon"],
     blockExplorer: "https://polygonscan.com",
     wrappedNative: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", // WMATIC/WPOL
     swapRouter: "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff", // QuickSwap V2 Router
@@ -68,7 +73,7 @@ const BUILTIN_NETWORKS = [
     chainId: 56,
     name: "BNB Smart Chain",
     nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
-    rpcUrls: ["https://bsc-dataseed.binance.org"],
+    rpcUrls: ["https://bsc-dataseed.binance.org", "https://bsc-rpc.publicnode.com", "https://rpc.ankr.com/bsc"],
     blockExplorer: "https://bscscan.com",
     wrappedNative: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // WBNB
     swapRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E", // PancakeSwap V2 Router
@@ -81,7 +86,7 @@ const BUILTIN_NETWORKS = [
     chainId: 42161,
     name: "Arbitrum One",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: ["https://arb1.arbitrum.io/rpc"],
+    rpcUrls: ["https://arb1.arbitrum.io/rpc", "https://arbitrum-one-rpc.publicnode.com", "https://rpc.ankr.com/arbitrum"],
     blockExplorer: "https://arbiscan.io",
     wrappedNative: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", // WETH
     // Same address as Base's Uniswap V2 Router02 above -- consistent with
@@ -102,7 +107,7 @@ const BUILTIN_NETWORKS = [
     chainId: 10,
     name: "OP Mainnet",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: ["https://mainnet.optimism.io"],
+    rpcUrls: ["https://mainnet.optimism.io", "https://optimism-rpc.publicnode.com", "https://rpc.ankr.com/optimism"],
     blockExplorer: "https://optimistic.etherscan.io",
     wrappedNative: "0x4200000000000000000000000000000000000006", // WETH
     // Same address as Ethereum mainnet's Uniswap V2 Router02 (this one WAS

@@ -303,6 +303,30 @@ function showError(id, message) {
 }
 function hideError(id) { $(id).classList.add("hidden"); }
 
+// Same as showError, but for a failure the person can actually do something
+// about right where they are (a flaky RPC call, most often) -- adds an
+// inline "Retry" link that re-runs retryFn, instead of just repeating "try
+// again" in the message with no way to act on it short of leaving the
+// screen and coming back (which happened to re-trigger the same fetch
+// anyway, just less obviously).
+function showErrorWithRetry(id, message, retryFn) {
+  const el = $(id);
+  el.textContent = "";
+  const span = document.createElement("span");
+  span.textContent = friendlyErrorMessage(message) + " ";
+  el.appendChild(span);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "link error-retry-btn";
+  btn.textContent = TM_I18N.t("main.retryBtn");
+  btn.addEventListener("click", () => {
+    hideError(id);
+    retryFn();
+  });
+  el.appendChild(btn);
+  el.classList.remove("hidden");
+}
+
 document.querySelectorAll(".back-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     showScreen(btn.dataset.back);
@@ -486,7 +510,15 @@ async function refreshBalance() {
     // as the lead number (via showUsdUnavailable) if nothing is.
     portfolioNativeUsd = null;
     renderPortfolioTotal();
-    showError("main-error", TM_I18N.t("main.balanceFetchErrorPrefix") + e.message);
+    // Tokens/NFTs fail silently on their own (see refreshTokens/refreshNfts)
+    // rather than each showing their own banner, so retrying here re-runs
+    // all three -- a person tapping "Retry" after a flaky RPC call almost
+    // certainly wants the whole screen re-fetched, not just the balance line.
+    showErrorWithRetry("main-error", TM_I18N.t("main.balanceFetchErrorPrefix") + e.message, () => {
+      refreshBalance();
+      refreshTokens();
+      refreshNfts();
+    });
   }
 }
 
