@@ -109,6 +109,7 @@
     "coin.swapNoRouter": "このネットワークではまだスワップを利用できません。",
     "coin.swapUnavailableNetwork": "{network} では {symbol} をまだスワップできません。ネットワークのネイティブコイン、または「トークンを追加」で追加したトークンである必要があります。",
     "coin.swapUnavailableSwitchNetwork": "{symbol} は {network} のネイティブコインのため、ここではスワップできません。直接スワップするには {network} に切り替えるか、ブリッジされた別バージョンをお考えの場合は「トークンを追加」をご利用ください。",
+    "coin.swapUnavailableSwitchNetworkToken": "{symbol} はここでは交換できませんが、{network} には確認済みのバージョンがあります。そちらに切り替えて交換するか、別のアドレスをお考えの場合は「トークンを追加」をご利用ください。",
     "coin.switchNetworkBtn": "スワップするには {network} に切り替え",
     "coin.swapUnavailableAddKnownToken": "{symbol} は {network} 自体では動作しませんが、{tokenSymbol} はそのネットワーク独自の {symbol} 裏付けバージョンです。以下から追加すると、ここで実際にスワップ可能なエクスポージャーを得られます。",
     "coin.swapUnavailableAddNativeToken": "{symbol} は {network} 上で実際に動作していますが、このウォレットにはまだ追加されていません。以下から追加すると、本物の資産を保有・スワップできます。",

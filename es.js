@@ -109,6 +109,7 @@
     "coin.swapNoRouter": "El intercambio aún no está habilitado en esta red.",
     "coin.swapUnavailableNetwork": "Todavía no se puede cambiar {symbol} en {network}. Debe ser la moneda propia de la red o un token que hayas añadido con Añadir token.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} es la moneda propia de {network}, así que no se puede intercambiar aquí. Cambia a {network} para intercambiarlo directamente, o usa Añadir token si te referías a una versión distinta y puenteada.",
+    "coin.swapUnavailableSwitchNetworkToken": "{symbol} no se puede intercambiar aquí, pero existe una versión verificada en {network} -- cambia allí para intercambiarlo, o usa Añadir token si te referías a otra dirección.",
     "coin.switchNetworkBtn": "Cambiar a {network} para intercambiar",
     "coin.swapUnavailableAddKnownToken": "{symbol} no funciona directamente en {network}, pero {tokenSymbol} es la versión respaldada por {symbol} propia de la red -- añádela abajo para tener exposición real e intercambiable aquí.",
     "coin.swapUnavailableAddNativeToken": "{symbol} sí funciona directamente en {network} -- solo que aún no lo has añadido a tu wallet aquí. Añádelo abajo para tener y poder intercambiar el activo real.",

@@ -129,6 +129,7 @@
     "coin.swapNoRouter": "Swapping isn't enabled on this network yet.",
     "coin.swapUnavailableNetwork": "{symbol} can't be swapped on {network} yet. It has to be the network's own coin, or a token you've added with Add token.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} is {network}'s own coin, so it can't be swapped here. Switch to {network} to swap it directly, or use Add token below if you meant a different, bridged version.",
+    "coin.swapUnavailableSwitchNetworkToken": "{symbol} isn't available to swap here, but a verified version exists on {network} -- switch there to swap it, or use Add token below if you meant a different address.",
     "coin.switchNetworkBtn": "Switch to {network} to swap",
     "coin.swapUnavailableAddKnownToken": "{symbol} doesn't run on {network} itself, but {tokenSymbol} is the network's own {symbol}-backed version of it -- add it below to get real, swappable exposure here.",
     "coin.swapUnavailableAddNativeToken": "{symbol} runs on {network} itself -- it just isn't added to your wallet here yet. Add it below to hold and swap the real thing.",

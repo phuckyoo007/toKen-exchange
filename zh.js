@@ -110,6 +110,7 @@
     "coin.swapNoRouter": "此网络暂未启用兑换功能。",
     "coin.swapUnavailableNetwork": "暂时无法在 {network} 上兑换 {symbol}。它必须是该网络的原生币，或您已通过“添加代币”添加的代币。",
     "coin.swapUnavailableSwitchNetwork": "{symbol} 是 {network} 的原生币，因此无法在此处兑换。请切换到 {network} 直接兑换，或者如果您指的是跨链桥接版本，请使用“添加代币”。",
+    "coin.swapUnavailableSwitchNetworkToken": "{symbol} 无法在此处兑换，但在 {network} 上存在已验证的版本 -- 切换到该网络即可兑换，如果您指的是其他地址，请使用“添加代币”。",
     "coin.switchNetworkBtn": "切换到 {network} 进行兑换",
     "coin.swapUnavailableAddKnownToken": "{symbol} 本身并不在 {network} 上运行，但 {tokenSymbol} 是该网络自己的 {symbol} 锚定版本——在下方添加它，即可在此处获得真实、可兑换的敞口。",
     "coin.swapUnavailableAddNativeToken": "{symbol} 确实直接在 {network} 上运行——只是您的钱包中尚未添加它。请在下方添加，以持有并兑换真实资产。",

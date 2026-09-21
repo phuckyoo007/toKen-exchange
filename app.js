@@ -1720,6 +1720,18 @@ const KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN = {
   AVAX: {
     56: { address: "0x1ce0C2827e2Ef14D5c4f29a091d735A204794041", symbol: "AVAX" }, // BNB Smart Chain -- Binance-Peg Avalanche, only chain with real liquidity
   },
+  FIL: {
+    56: { address: "0x0D8Ce2A99Bb6e3B7Db580eD848240e4a0F9aE153", symbol: "FIL" }, // BNB Smart Chain -- Binance-Peg Filecoin, actively priced/traded
+    // Ethereum: checked 2026-09-21. Filecoin's own docs
+    // (docs.filecoin.io/build-on-filecoin/advanced/wrapped-fil) only give a
+    // canonical wFIL address on Filecoin's OWN network -- not one of this
+    // wallet's built-in chains, and not Ethereum. Multiple unrelated
+    // third-party "Wrapped Filecoin"/"eFIL" contracts exist on Ethereum with
+    // no official endorsement tying any one of them back to real FIL --
+    // same situation as XRP above, excluded rather than risk the wrong one.
+    // Polygon/Arbitrum/Optimism/Base: no candidate found with confirmed real
+    // liquidity -- left blank rather than guess.
+  },
   XRP: {
     56: { address: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dbe", symbol: "XRP" }, // BNB Smart Chain -- Binance-Peg XRP
     8453: { address: "0xcb585250F852C6c6bf90434AB21A00f02833a4Af", symbol: "cbXRP" }, // Base -- Coinbase Wrapped XRP, 1:1 custody-backed
@@ -1823,6 +1835,37 @@ async function loadCoinSwapState(gen) {
       const addBtn = $("btn-coin-add-token");
       addBtn.textContent = TM_I18N.t("coin.addKnownTokenBtn", { tokenSymbol: knownToken.symbol });
       addBtn.classList.remove("hidden");
+      return;
+    }
+    // No verified address for this coin on the CURRENT network -- but one
+    // might still exist on some OTHER network this wallet supports (e.g.
+    // XRP has no safe Ethereum address, per the comment on XRP's entry
+    // above, but does have a Binance-Peg one on BNB Smart Chain). Rather
+    // than send someone to "+ Add token" with nothing safe to actually add,
+    // point them at the network where a verified version already exists --
+    // same "switch there" pattern as the native-coin case above. BNB Smart
+    // Chain is checked first when it's an option: this table's own coverage
+    // (checked 2026-09-21) shows the wallet has more verified entries there
+    // than on any other single chain, so it's the most likely to have this
+    // coin if any chain does.
+    const tokenEntries = KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {};
+    const elsewhereChainIds = Object.keys(tokenEntries)
+      .map(Number)
+      .filter((id) => id !== currentNetwork.chainId);
+    elsewhereChainIds.sort((a, b) => (a === 56 ? -1 : b === 56 ? 1 : 0));
+    const tokenElsewhereChainId = elsewhereChainIds.find((id) => currentNetworks.some((n) => n.chainId === id));
+    const tokenElsewhereNet = tokenElsewhereChainId
+      ? currentNetworks.find((n) => n.chainId === tokenElsewhereChainId)
+      : null;
+    if (tokenElsewhereNet) {
+      coinDetail.switchNetworkTarget = tokenElsewhereNet;
+      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetworkToken", { symbol: c.symbol, network: tokenElsewhereNet.name }));
+      const switchBtn = $("btn-coin-switch-network");
+      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: tokenElsewhereNet.name });
+      switchBtn.classList.remove("hidden");
+      // Still offered too, in case a different address on THIS network is
+      // actually what's meant.
+      $("btn-coin-add-token").classList.remove("hidden");
       return;
     }
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));

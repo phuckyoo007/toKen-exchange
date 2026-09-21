@@ -109,6 +109,7 @@
     "coin.swapNoRouter": "المبادلة غير مفعّلة على هذه الشبكة بعد.",
     "coin.swapUnavailableNetwork": "لا يمكن مبادلة {symbol} على {network} بعد. يجب أن تكون العملة الأصلية للشبكة أو رمزًا أضفته عبر إضافة رمز.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} هي العملة الأصلية لشبكة {network}، لذا لا يمكن مبادلتها هنا. بدّل إلى {network} لمبادلتها مباشرة، أو استخدم إضافة رمز إذا كنت تقصد نسخة مختلفة تم ربطها عبر جسر.",
+    "coin.swapUnavailableSwitchNetworkToken": "{symbol} لا يمكن مبادلتها هنا، لكن هناك نسخة موثّقة على شبكة {network} -- بدّل إليها لمبادلتها، أو استخدم إضافة رمز إذا كنت تقصد عنوانًا مختلفًا.",
     "coin.switchNetworkBtn": "التبديل إلى {network} للمبادلة",
     "coin.swapUnavailableAddKnownToken": "{symbol} لا يعمل مباشرة على {network}، لكن {tokenSymbol} هو نسخة الشبكة الخاصة المدعومة بـ{symbol} -- أضِفه أدناه للحصول على تعرض حقيقي وقابل للمبادلة هنا.",
     "coin.swapUnavailableAddNativeToken": "{symbol} يعمل بالفعل مباشرة على {network} -- إنه فقط لم يُضَف بعد إلى محفظتك هنا. أضِفه أدناه للاحتفاظ بالأصل الحقيقي ومبادلته.",

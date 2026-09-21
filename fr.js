@@ -110,6 +110,7 @@
     "coin.swapNoRouter": "L'échange n'est pas encore activé sur ce réseau.",
     "coin.swapUnavailableNetwork": "{symbol} ne peut pas encore être échangé sur {network}. Il doit s'agir de la monnaie native du réseau ou d'un jeton ajouté via Ajouter un jeton.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} est la monnaie native de {network}, il ne peut donc pas être échangé ici. Passez sur {network} pour l'échanger directement, ou utilisez Ajouter un jeton si vous pensiez à une version différente, pontée.",
+    "coin.swapUnavailableSwitchNetworkToken": "{symbol} ne peut pas être échangé ici, mais une version vérifiée existe sur {network} -- passez là-bas pour l'échanger, ou utilisez Ajouter un jeton si vous pensiez à une autre adresse.",
     "coin.switchNetworkBtn": "Passer sur {network} pour échanger",
     "coin.swapUnavailableAddKnownToken": "{symbol} ne fonctionne pas directement sur {network}, mais {tokenSymbol} est la version adossée au {symbol} propre au réseau -- ajoutez-la ci-dessous pour obtenir une exposition réelle et échangeable ici.",
     "coin.swapUnavailableAddNativeToken": "{symbol} fonctionne bien directement sur {network} -- il n'est simplement pas encore ajouté à votre wallet ici. Ajoutez-le ci-dessous pour détenir et échanger l'actif réel.",
