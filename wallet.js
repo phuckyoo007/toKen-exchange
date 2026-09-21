@@ -121,30 +121,8 @@ async function importPrivateKey(secret, password, privateKey) {
   return wallet.address;
 }
 
-// Adds a read-only account: just an address, no key material at all --
-// nothing to encrypt, nothing that needs the vault unlocked to add. Kept
-// behind the same Settings flow as other accounts purely for a consistent
-// UI, not because it technically requires it. Can't sign anything (see
-// getSigningWallet below); the UI is expected to disable Send/Swap/sign
-// actions for a "watch" account rather than let them reach here at all.
-async function addWatchAccount(address, label) {
-  if (!ethers.utils.isAddress(address)) throw new Error("That doesn't look like a valid address.");
-  const checksummed = ethers.utils.getAddress(address);
-  const meta = await getAccountsMeta();
-  if (meta.some((a) => a.address.toLowerCase() === checksummed.toLowerCase())) {
-    throw new Error("That address is already in this wallet.");
-  }
-  const watchCount = meta.filter((a) => a.type === "watch").length;
-  meta.push({ index: null, address: checksummed, name: label || `Watching ${watchCount + 1}`, type: "watch" });
-  await setAccountsMeta(meta);
-  return checksummed;
-}
-
 // Returns an ethers.Wallet (unconnected) for a given account meta entry.
 function getSigningWallet(secret, accountMeta) {
-  if (accountMeta.type === "watch") {
-    throw new Error("This is a watch-only address -- it has no private key in this wallet, so it can't sign or send.");
-  }
   if (accountMeta.type === "hd") {
     const { privateKey } = deriveAddressAndKeyFromMnemonic(secret.mnemonic, accountMeta.index);
     return new ethers.Wallet(privateKey);
@@ -160,14 +138,12 @@ if (typeof self !== "undefined") {
   self.TM_WALLET = {
     hasVault,
     getAccountsMeta,
-    setAccountsMeta,
     createNewVault,
     importFromMnemonic,
     unlockVault,
     persistVault,
     addHdAccount,
     importPrivateKey,
-    addWatchAccount,
     getSigningWallet,
     resetWallet,
   };
