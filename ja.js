@@ -74,6 +74,7 @@
     "addToken.invalidAddress": "有効なコントラクトアドレスを入力してください。",
     "addToken.noName": "（名称なし）",
     "addToken.swapUnavailableSuffix": "（スワップ利用不可）",
+    "network.coinbaseCashOutSuffix": "（Coinbase で現金化可）",
 
     "prices.description": "CoinGecko の公開 API による米ドル建て価格です。あくまで参考情報であり、この価格取得のためにウォレットの情報が送信されることはありません。",
     "prices.loading": "読み込み中...",

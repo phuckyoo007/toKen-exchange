@@ -73,6 +73,7 @@
     "addToken.invalidAddress": "Informe um endereço de contrato válido.",
     "addToken.noName": "(sem nome)",
     "addToken.swapUnavailableSuffix": " (troca indisponível)",
+    "network.coinbaseCashOutSuffix": " (saque via Coinbase)",
 
     "prices.description": "Preços em dólar (USD) da API pública da CoinGecko. Apenas informativo -- nenhum dado da sua carteira é enviado para essa consulta.",
     "prices.loading": "Carregando...",

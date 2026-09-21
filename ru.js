@@ -74,6 +74,7 @@
     "addToken.invalidAddress": "Введите корректный адрес контракта.",
     "addToken.noName": "(без названия)",
     "addToken.swapUnavailableSuffix": " (обмен недоступен)",
+    "network.coinbaseCashOutSuffix": " (вывод через Coinbase)",
 
     "prices.description": "Цены в USD берутся из публичного API CoinGecko. Это справочная информация — при её получении никакие данные вашего кошелька никуда не отправляются.",
     "prices.loading": "Загрузка...",

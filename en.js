@@ -81,6 +81,7 @@
     "addToken.invalidAddress": "Enter a valid contract address.",
     "addToken.noName": "(no name)",
     "addToken.swapUnavailableSuffix": " (swap unavailable)",
+    "network.coinbaseCashOutSuffix": " (Coinbase cash-out)",
 
     "nfts.loadError": "Couldn't load",
     "nfts.removeTitle": "Remove",

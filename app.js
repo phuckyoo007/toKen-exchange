@@ -448,7 +448,16 @@ async function refreshMain() {
   currentNetworks.forEach((n) => {
     const opt = document.createElement("option");
     opt.value = n.chainId;
-    opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
+    // Marks which networks Coinbase Sell (see lib/coinbase-onramp-config.js)
+    // actually works on, right in the network switcher, so the answer to
+    // "how do I turn this into cash" is visible before switching -- rather
+    // than only surfacing on the Sell screen after picking a network that
+    // turns out not to be supported.
+    const coinbaseCashOut = TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(n.key);
+    opt.textContent =
+      n.name +
+      (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix")) +
+      (coinbaseCashOut ? TM_I18N.t("network.coinbaseCashOutSuffix") : "");
     if (n.chainId === currentNetwork.chainId) opt.selected = true;
     netSel.appendChild(opt);
   });
@@ -3256,7 +3265,13 @@ document.addEventListener("tm-language-changed", () => {
     const netSel = $("network-select");
     Array.from(netSel.options).forEach((opt) => {
       const n = currentNetworks.find((net) => String(net.chainId) === opt.value);
-      if (n) opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
+      if (n) {
+        const coinbaseCashOut = TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(n.key);
+        opt.textContent =
+          n.name +
+          (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix")) +
+          (coinbaseCashOut ? TM_I18N.t("network.coinbaseCashOutSuffix") : "");
+      }
     });
   }
   if ($("support-chips") && $("support-chips").children.length) renderSupportChips();
