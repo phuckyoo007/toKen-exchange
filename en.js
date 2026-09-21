@@ -118,6 +118,7 @@
     "coin.swapUnavailableSwitchNetwork": "{symbol} is {network}'s own coin, so it can't be swapped here. Switch to {network} to swap it directly, or use Add token below if you meant a different, bridged version.",
     "coin.switchNetworkBtn": "Switch to {network} to swap",
     "coin.swapUnavailableAddKnownToken": "{symbol} doesn't run on {network} itself, but {tokenSymbol} is the network's own {symbol}-backed version of it -- add it below to get real, swappable exposure here.",
+    "coin.swapUnavailableAddNativeToken": "{symbol} runs on {network} itself -- it just isn't added to your wallet here yet. Add it below to hold and swap the real thing.",
     "coin.addKnownTokenBtn": "+ Add {tokenSymbol}",
     "coin.holding": "You hold {amount} {symbol}",
     "coin.statsTitle": "Market stats",
@@ -140,6 +141,8 @@
     "predictions.empty": "No trending markets right now.",
     "predictions.cardUnavailable": "Markets unavailable right now.",
     "predictions.volSuffix": "24h vol",
+    "predictions.openOnPolymarket": "Bet on Polymarket ↗",
+    "predictions.linkDisclosure": "Tapping a market opens Polymarket's own site in a new tab, where its own signup, eligibility, and location rules apply -- Token Exchange has no part in that.",
 
     "buy.title": "Buy crypto",
     "buy.description1": "Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.",

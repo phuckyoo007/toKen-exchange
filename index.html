@@ -394,10 +394,11 @@
     <button id="coin-back" class="link back-btn" data-back="screen-prices" data-i18n="common.back">Back</button>
   </section>
 
-  <!-- PREDICTIONS (read-only) -->
+  <!-- PREDICTIONS (data is read-only; each row links out to Polymarket's own site) -->
   <section id="screen-predictions" class="screen hidden">
     <h2 data-i18n="predictions.title">Trending Markets</h2>
     <p class="muted" data-i18n="predictions.description">Public odds from Polymarket's prediction markets -- informational only. Token Exchange does not place bets or hold positions on your behalf; nothing about your wallet is sent to look these up.</p>
+    <p class="muted" data-i18n="predictions.linkDisclosure">Tapping a market opens Polymarket's own site in a new tab, where its own signup, eligibility, and location rules apply -- Token Exchange has no part in that.</p>
     <div id="predictions-list" class="prices-list"></div>
     <p id="predictions-error" class="error hidden"></p>
     <p id="predictions-status" class="hint hidden"></p>

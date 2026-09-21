@@ -1044,7 +1044,7 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    language as the price rows above, but the left side is a wrapping
    question instead of a fixed-width coin name. */
 .market-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
   background: var(--bg-raised); border: 1px solid var(--line);
   border-radius: 8px; padding: 9px 12px; font-size: 13px;
 }
@@ -1054,6 +1054,10 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .market-row .market-pct.up { color: var(--success); }
 .market-row .market-pct.down { color: var(--danger); }
 .market-row .market-volume { font-size: 10.5px; color: var(--text-faint); font-family: var(--font-mono); }
+.market-row .market-open-link {
+  flex-basis: 100%; text-align: right; font-size: 12px;
+  padding-top: 4px; border-top: 1px dashed var(--line);
+}
 .prices-card-list .market-row { padding: 7px 10px; font-size: 12.5px; }
 .market-row.skeleton { justify-content: center; color: var(--text-faint); }
 

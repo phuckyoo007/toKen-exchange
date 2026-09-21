@@ -1575,6 +1575,96 @@ const KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN = {
     56: { address: "0xbA2aE424d960c26247Dd6c32edC70B295c744C43", symbol: "DOGE" }, // BNB Smart Chain (Binance-Peg)
     8453: { address: "0xcbD06E5A2B0C65597161de254AA074E489dEb510", symbol: "cbDOGE" }, // Base (Coinbase)
   },
+  // The rest of this table (checked 2026-09-21) extends the same coverage to
+  // every other coin in the price list. A few entries are a genuine, real
+  // first-party deployment of the coin itself (USDC/USDT/LINK/UNI/SHIB are
+  // often literally the same token on multiple chains, not a "wrapper"), so
+  // the swap-unavailable copy that calls this table "the network's own
+  // {symbol}-backed version" is a little imprecise for those -- it's still
+  // the correct, safe address, just not always a *wrapped* version.
+  USDT: {
+    1: { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", symbol: "USDT", native: true }, // Ethereum -- direct Tether issuance (tether.to/en/supported-protocols)
+    137: { address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", symbol: "USDT" }, // Polygon -- canonical PoS-bridge USDT, deep liquidity
+    56: { address: "0x55d398326f99059fF775485246999027B3197955", symbol: "BSC-USD" }, // BNB Smart Chain -- Binance-Peg; on-chain symbol is literally BSC-USD, not USDT
+    // Arbitrum, Optimism, Base: left blank. Arbitrum's old "USDT" contract has
+    // migrated to a different product (USD₮0); Optimism's bridged USDT
+    // carries an explicit on-chain disclaimer that it isn't issued or
+    // redeemable by Tether; no official/liquid Base deployment was found.
+  },
+  USDC: {
+    1: { address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", symbol: "USDC", native: true }, // Ethereum -- native Circle issuance
+    137: { address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", symbol: "USDC", native: true }, // Polygon -- native Circle issuance
+    42161: { address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", symbol: "USDC", native: true }, // Arbitrum -- native Circle issuance
+    10: { address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", symbol: "USDC", native: true }, // Optimism -- native Circle issuance
+    8453: { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", native: true }, // Base -- native Circle issuance
+    56: { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", symbol: "USDC" }, // BNB Smart Chain -- Circle doesn't issue here; this is Binance-Peg, same category as BTCB above
+    // developers.circle.com/stablecoins/usdc-contract-addresses for the 5 native ones.
+  },
+  LINK: {
+    1: { address: "0x514910771AF9Ca656af840dff83E8264EcF986CA", symbol: "LINK", native: true }, // Ethereum -- docs.chain.link
+    42161: { address: "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", symbol: "LINK", native: true }, // Arbitrum -- docs.chain.link
+    10: { address: "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6", symbol: "LINK", native: true }, // Optimism -- docs.chain.link
+    8453: { address: "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196", symbol: "LINK", native: true }, // Base -- docs.chain.link
+    // Polygon and BSC: Chainlink's own docs list a LINK address on each, but
+    // both have collapsed to near-zero on-chain liquidity. The addresses
+    // below are the ones actually carrying LINK's real trading volume there
+    // (Polygon's official bridge-mapped LINK; BSC's Binance-Peg LINK) --
+    // verified on their block explorers with a matching name/symbol, same
+    // bar as everything else here, just not the literal docs-table address.
+    137: { address: "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FAbAd39", symbol: "LINK" }, // Polygon (bridge-mapped, real liquidity)
+    56: { address: "0xf8A0BF9cF54Bb92F17374d9e9D321e6a11a51bd", symbol: "LINK" }, // BSC (Binance-Peg, real liquidity)
+  },
+  UNI: {
+    1: { address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", symbol: "UNI", native: true }, // Ethereum -- Uniswap's own default token list
+    137: { address: "0xb33EaAd8d922B1083446DC23f610c2567fB5180f", symbol: "UNI" }, // Polygon -- Uniswap's own default token list
+    42161: { address: "0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0", symbol: "UNI" }, // Arbitrum -- verified + real liquidity (not on Uniswap's own list)
+    8453: { address: "0xc3De830EA07524a0761646a6a4e4be0e114a3C83", symbol: "UNI" }, // Base -- Uniswap's own default token list
+    56: { address: "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1", symbol: "UNI" }, // BSC -- verified + real liquidity (not on Uniswap's own list)
+    // Optimism: the deployed UNI contract is real but its only pool is thin
+    // and an outlier low next to every other chain here -- excluded.
+  },
+  SHIB: {
+    1: { address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", symbol: "SHIB", native: true }, // Ethereum -- SHIB's native/original contract
+    56: { address: "0x2859e4544C4bB03966803b044A93563Bd2D0DD4D", symbol: "SHIB" }, // BNB Smart Chain -- Binance-Peg, real liquidity
+    // Polygon/Arbitrum/Optimism/Base: bridged SHIB candidates exist but are
+    // dead or unrelated copycat tokens -- excluded.
+  },
+  AVAX: {
+    56: { address: "0x1ce0C2827e2Ef14D5c4f29a091d735A204794041", symbol: "AVAX" }, // BNB Smart Chain -- Binance-Peg Avalanche, only chain with real liquidity
+  },
+  XRP: {
+    56: { address: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dbe", symbol: "XRP" }, // BNB Smart Chain -- Binance-Peg XRP
+    8453: { address: "0xcb585250F852C6c6bf90434AB21A00f02833a4Af", symbol: "cbXRP" }, // Base -- Coinbase Wrapped XRP, 1:1 custody-backed
+    // Ethereum: multiple colliding "Wrapped XRP" tokens from different,
+    // unclear issuers found -- excluded rather than risk the wrong one.
+  },
+  TRX: {
+    56: { address: "0xCE7de646e7208a4Ef112cb6ed5038FA6cC6b12e3", symbol: "TRX" }, // BNB Smart Chain -- official Binance-Peg TRX (post-2023 contract swap; do not use the older TRXOLD address)
+  },
+  ADA: {
+    56: { address: "0x3EE2200Efb3400fAbB9AAcf31297cBdd1d435D47", symbol: "ADA" }, // BNB Smart Chain -- Binance-Peg Cardano
+    8453: { address: "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c", symbol: "cbADA" }, // Base -- Coinbase Wrapped ADA, 1:1 custody-backed
+  },
+  SOL: {
+    1: { address: "0xD31a59c85aE9D8edEFeC411D448f90841571b89c", symbol: "SOL" }, // Ethereum -- Wormhole-bridged, verified + real liquidity
+    56: { address: "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF", symbol: "SOL" }, // BNB Smart Chain -- Binance-Peg SOL
+    // Polygon/Arbitrum/Optimism/Base: bridged SOL exists on each but every
+    // pool checked was dormant/near-zero volume -- excluded.
+  },
+  DOT: {
+    56: { address: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", symbol: "DOT" }, // BNB Smart Chain -- Binance-Peg Polkadot
+    // Ethereum: skip -- the only bridged-DOT pathway found there (Hyperbridge)
+    // was exploited in April 2026; not a safe recommendation right now.
+  },
+  LTC: {
+    56: { address: "0x4338665CBB7B2485A8855A139b75D5e34AB0DB94", symbol: "LTC" }, // BNB Smart Chain -- Binance-Peg Litecoin
+    8453: { address: "0xcb17C9Db87B595717C857a08468793f5bAb6445F", symbol: "cbLTC" }, // Base -- Coinbase Wrapped LTC, 1:1 custody-backed
+  },
+  TON: {
+    1: { address: "0x582d872A1B094FC48F5DE31D3B73F2D9be47def1", symbol: "TONCOIN" }, // Ethereum -- TON Foundation's own official EVM bridge
+    // BSC: the same official bridge token is deployed there too, but its
+    // liquidity is too thin (~$150K spread across dormant pools) -- excluded.
+  },
 };
 
 async function loadCoinSwapState(gen) {
@@ -1630,7 +1720,17 @@ async function loadCoinSwapState(gen) {
     }
     const knownToken = (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {})[currentNetwork.chainId];
     if (knownToken) {
-      showNote(TM_I18N.t("coin.swapUnavailableAddKnownToken", { symbol: c.symbol, network: currentNetwork.name, tokenSymbol: knownToken.symbol }));
+      // Most entries here are a genuinely different, wrapped/bridged token
+      // ("doesn't run on X itself, but here's the network's own version"),
+      // but a handful (USDC/USDT/LINK/UNI/SHIB on their real, first-party
+      // chains) are the literal coin itself, just not added to this wallet
+      // yet -- "doesn't run on Ethereum itself" would be simply false for
+      // real USDC on Ethereum. knownToken.native picks the accurate copy.
+      showNote(
+        knownToken.native
+          ? TM_I18N.t("coin.swapUnavailableAddNativeToken", { symbol: c.symbol, network: currentNetwork.name })
+          : TM_I18N.t("coin.swapUnavailableAddKnownToken", { symbol: c.symbol, network: currentNetwork.name, tokenSymbol: knownToken.symbol })
+      );
       coinDetail.prefillTokenAddress = knownToken.address;
       const addBtn = $("btn-coin-add-token");
       addBtn.textContent = TM_I18N.t("coin.addKnownTokenBtn", { tokenSymbol: knownToken.symbol });
@@ -1723,7 +1823,10 @@ function formatMarketVolume(v) {
   return `$${Math.round(v)}`;
 }
 
-function renderMarketRow(m) {
+// `compact` skips the "Bet on Polymarket" link -- used for the 3-row
+// main-dashboard card, which already has its own "See all" link into the
+// full screen-predictions list where the real link lives, one tap away.
+function renderMarketRow(m, { compact = false } = {}) {
   const row = document.createElement("div");
   row.className = "market-row";
   let metaHtml = "";
@@ -1736,7 +1839,16 @@ function renderMarketRow(m) {
   row.innerHTML = `
     <span class="market-question">${m.question}</span>
     <span class="market-meta">${metaHtml}</span>
+    ${compact ? "" : `<button type="button" class="link market-open-link">${TM_I18N.t("predictions.openOnPolymarket")}</button>`}
   `;
+  if (!compact) {
+    row.querySelector(".market-open-link").addEventListener("click", () => {
+      // Opens Polymarket's own site in a new tab -- this wallet never places
+      // the bet itself. Polymarket's own page enforces Polymarket's own
+      // location/eligibility restrictions, same as visiting it directly.
+      window.open(TM_POLYMARKET.buildMarketUrl(m), "_blank", "noopener,noreferrer");
+    });
+  }
   return row;
 }
 
@@ -1774,7 +1886,7 @@ async function refreshMainPredictionsCard() {
     if (!markets.length) {
       list.innerHTML = `<div class="market-row skeleton">${TM_I18N.t("predictions.empty")}</div>`;
     } else {
-      markets.forEach((m) => list.appendChild(renderMarketRow(m)));
+      markets.forEach((m) => list.appendChild(renderMarketRow(m, { compact: true })));
     }
   } catch (e) {
     list.innerHTML = `<div class="market-row skeleton">${TM_I18N.t("predictions.cardUnavailable")}</div>`;
