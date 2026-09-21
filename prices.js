@@ -505,7 +505,15 @@ async function getFiatRates(currency) {
   const out = [];
   Object.keys(SUPPORTED_CURRENCIES).forEach((code) => {
     const info = SUPPORTED_CURRENCIES[code];
-    if (info.type !== "fiat" || code === display) return;
+    if (info.type !== "fiat") return;
+    // The display currency itself is included too (rate 1) rather than
+    // hidden -- showing "1 USD = 1.00 USD" when displaying in USD is a
+    // little redundant, but people expect to see their own currency in
+    // the list rather than have it silently disappear.
+    if (code === display) {
+      out.push({ code: info.label, name: info.name, rate: 1, stablecoin: info.stablecoin || null, isDisplayCurrency: true });
+      return;
+    }
     const r = rates[code];
     if (!r || !r.value) return;
     out.push({ code: info.label, name: info.name, rate: base.value / r.value, stablecoin: info.stablecoin || null });
