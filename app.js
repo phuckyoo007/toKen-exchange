@@ -883,7 +883,7 @@ $("btn-nft-confirm-add").addEventListener("click", async () => {
 });
 
 // Pulled out of the lookup button's own click handler so a known-good
-// contract address (see KNOWN_BTC_TOKENS_BY_CHAIN above) can trigger the
+// contract address (see KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN above) can trigger the
 // exact same lookup+preview path automatically, instead of needing its own
 // separate, easier-to-drift-from-the-real-thing copy of this logic.
 async function lookupTokenForAddress(address) {
@@ -907,7 +907,7 @@ async function lookupTokenForAddress(address) {
 }
 
 // `prefillAddress` is only ever a contract address this wallet's own code
-// picked (KNOWN_BTC_TOKENS_BY_CHAIN), never anything from the coin's own
+// picked (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN), never anything from the coin's own
 // (CoinGecko-sourced) data -- looking it up automatically still shows the
 // normal preview card before anything is added, so the on-chain name/
 // symbol/decimals are always visible for a real look before confirming,
@@ -1392,24 +1392,42 @@ document.querySelectorAll(".coin-range").forEach((b) => {
 // chain doesn't do smart contracts, so there's nothing to "switch to" the
 // way POL -> Polygon or BNB -> BSC works) -- BTC on the Prices screen is
 // informational only. But every network this wallet DOES support has one
-// single, dominant, verifiable Bitcoin-backed token already circulating on
+// single, dominant, verifiable <coin>-backed token already circulating on
 // it, so "+ Add token" can point straight at that instead of leaving
 // someone to go find a contract address themselves. Getting one of these
 // wrong would mean prefilling someone's wallet with the wrong token, so
 // each address below was checked directly against that chain's own block
-// explorer (name/symbol/decimals matching) on 2026-09-20 -- not just
-// recalled -- and picked for being the most established/liquid option on
-// that specific chain, not necessarily the same brand everywhere (e.g.
-// BSC's own BTCB long predates and outweighs any bridged WBTC there; Base
-// is Coinbase's own chain, so Coinbase's own cbBTC is the obvious pick
-// over a bridged WBTC of uncertain provenance).
-const KNOWN_BTC_TOKENS_BY_CHAIN = {
-  1: { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", symbol: "WBTC" }, // Ethereum
-  137: { address: "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6", symbol: "WBTC" }, // Polygon
-  42161: { address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", symbol: "WBTC" }, // Arbitrum
-  10: { address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095", symbol: "WBTC" }, // Optimism
-  56: { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", symbol: "BTCB" }, // BNB Smart Chain
-  8453: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC" }, // Base
+// explorer (name/symbol/decimals matching), cross-referenced with
+// CoinGecko/DexScreener for real trading liquidity (not just an existing
+// contract) -- not just recalled -- and picked for being the most
+// established/liquid option on that specific chain, not necessarily the
+// same brand everywhere (e.g. BSC's own BTCB long predates and outweighs
+// any bridged WBTC there; Base is Coinbase's own chain, so Coinbase's own
+// cbBTC/cbDOGE are the obvious picks over a bridged token of uncertain
+// provenance).
+//
+// Keyed by the coin's own symbol, then by chainId -- most coins here have
+// no entry at all for most chains, and that's expected: a chain only gets
+// listed once a real, actively-traded token for it turns up. Bitcoin has
+// one on every network this wallet supports; Dogecoin (checked 2026-09-21)
+// only has one on BSC (Binance-Peg) and Base (Coinbase's cbDOGE) -- every
+// "wrapped DOGE" found on Ethereum, Polygon, Arbitrum and Optimism turned
+// out to be abandoned, near-zero-liquidity, or tied to the defunct
+// Multichain/CelsiusX bridges, so those are deliberately left blank rather
+// than pointing someone at a token nobody can actually trade.
+const KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN = {
+  BTC: {
+    1: { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", symbol: "WBTC" }, // Ethereum
+    137: { address: "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6", symbol: "WBTC" }, // Polygon
+    42161: { address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", symbol: "WBTC" }, // Arbitrum
+    10: { address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095", symbol: "WBTC" }, // Optimism
+    56: { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", symbol: "BTCB" }, // BNB Smart Chain
+    8453: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC" }, // Base
+  },
+  DOGE: {
+    56: { address: "0xbA2aE424d960c26247Dd6c32edC70B295c744C43", symbol: "DOGE" }, // BNB Smart Chain (Binance-Peg)
+    8453: { address: "0xcbD06E5A2B0C65597161de254AA074E489dEb510", symbol: "cbDOGE" }, // Base (Coinbase)
+  },
 };
 
 async function loadCoinSwapState(gen) {
@@ -1463,8 +1481,8 @@ async function loadCoinSwapState(gen) {
       $("btn-coin-add-token").classList.remove("hidden");
       return;
     }
-    const knownToken = KNOWN_BTC_TOKENS_BY_CHAIN[currentNetwork.chainId];
-    if (want === "BTC" && knownToken) {
+    const knownToken = (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {})[currentNetwork.chainId];
+    if (knownToken) {
       showNote(TM_I18N.t("coin.swapUnavailableAddKnownToken", { symbol: c.symbol, network: currentNetwork.name, tokenSymbol: knownToken.symbol }));
       coinDetail.prefillTokenAddress = knownToken.address;
       const addBtn = $("btn-coin-add-token");

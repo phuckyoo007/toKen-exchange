@@ -114,7 +114,7 @@
     "coin.swapUnavailableNetwork": "{symbol} can't be swapped on {network} yet. It has to be the network's own coin, or a token you've added with Add token.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} is {network}'s own coin, so it can't be swapped here. Switch to {network} to swap it directly, or use Add token below if you meant a different, bridged version.",
     "coin.switchNetworkBtn": "Switch to {network} to swap",
-    "coin.swapUnavailableAddKnownToken": "{symbol} doesn't run on {network} itself, but {tokenSymbol} is the network's own Bitcoin-backed version of it -- add it below to get real, swappable exposure here.",
+    "coin.swapUnavailableAddKnownToken": "{symbol} doesn't run on {network} itself, but {tokenSymbol} is the network's own {symbol}-backed version of it -- add it below to get real, swappable exposure here.",
     "coin.addKnownTokenBtn": "+ Add {tokenSymbol}",
     "coin.holding": "You hold {amount} {symbol}",
     "coin.statsTitle": "Market stats",
@@ -252,7 +252,7 @@
     "feedback.titleRequired": "Give it a short title first.",
     "feedback.upvoteBtn": "Upvote",
     "feedback.upvotedBtn": "Upvoted",
-    "feedback.contactLine": "Prefer email? Reach us at msandersod@gmail.com",
+    "feedback.contactLine": "Prefer email? Reach us at amunra325@gmail.com",
 
     "importKey.title": "Import private key",
     "importKey.description": "This adds a separate account to this wallet from a raw private key, not from your recovery phrase -- back it up on its own, since your recovery phrase won't restore it. Never share a private key with anyone; anyone who has it can spend everything in that account.",

@@ -88,7 +88,7 @@
     "coin.swapUnavailableNetwork": "Todavía no se puede cambiar {symbol} en {network}. Debe ser la moneda propia de la red o un token que hayas añadido con Añadir token.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} es la moneda propia de {network}, así que no se puede intercambiar aquí. Cambia a {network} para intercambiarlo directamente, o usa Añadir token si te referías a una versión distinta y puenteada.",
     "coin.switchNetworkBtn": "Cambiar a {network} para intercambiar",
-    "coin.swapUnavailableAddKnownToken": "{symbol} no funciona directamente en {network}, pero {tokenSymbol} es la versión respaldada por Bitcoin propia de la red -- añádela abajo para tener exposición real e intercambiable aquí.",
+    "coin.swapUnavailableAddKnownToken": "{symbol} no funciona directamente en {network}, pero {tokenSymbol} es la versión respaldada por {symbol} propia de la red -- añádela abajo para tener exposición real e intercambiable aquí.",
     "coin.addKnownTokenBtn": "+ Añadir {tokenSymbol}",
     "coin.holding": "Tienes {amount} {symbol}",
     "coin.statsTitle": "Datos de mercado",

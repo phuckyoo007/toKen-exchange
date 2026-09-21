@@ -89,7 +89,7 @@
     "coin.swapUnavailableNetwork": "{network} पर {symbol} अभी स्वैप नहीं हो सकता। यह नेटवर्क का अपना कॉइन या \"टोकन जोड़ें\" से जोड़ा गया टोकन होना चाहिए।",
     "coin.swapUnavailableSwitchNetwork": "{symbol}, {network} का अपना कॉइन है, इसलिए इसे यहां स्वैप नहीं किया जा सकता। इसे सीधे स्वैप करने के लिए {network} पर स्विच करें, या यदि आपका मतलब किसी अलग, ब्रिज किए गए वर्शन से था तो \"टोकन जोड़ें\" का उपयोग करें।",
     "coin.switchNetworkBtn": "स्वैप करने के लिए {network} पर स्विच करें",
-    "coin.swapUnavailableAddKnownToken": "{symbol}, {network} पर सीधे नहीं चलता, लेकिन {tokenSymbol} नेटवर्क का अपना बिटकॉइन-समर्थित वर्शन है -- वास्तविक, स्वैप करने योग्य एक्सपोज़र पाने के लिए इसे नीचे जोड़ें।",
+    "coin.swapUnavailableAddKnownToken": "{symbol}, {network} पर सीधे नहीं चलता, लेकिन {tokenSymbol} नेटवर्क का अपना {symbol}-समर्थित वर्शन है -- वास्तविक, स्वैप करने योग्य एक्सपोज़र पाने के लिए इसे नीचे जोड़ें।",
     "coin.addKnownTokenBtn": "+ {tokenSymbol} जोड़ें",
     "coin.holding": "आपके पास {amount} {symbol} है",
     "coin.statsTitle": "मार्केट आँकड़े",

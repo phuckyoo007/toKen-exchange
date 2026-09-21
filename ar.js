@@ -88,7 +88,7 @@
     "coin.swapUnavailableNetwork": "لا يمكن مبادلة {symbol} على {network} بعد. يجب أن تكون العملة الأصلية للشبكة أو رمزًا أضفته عبر إضافة رمز.",
     "coin.swapUnavailableSwitchNetwork": "{symbol} هي العملة الأصلية لشبكة {network}، لذا لا يمكن مبادلتها هنا. بدّل إلى {network} لمبادلتها مباشرة، أو استخدم إضافة رمز إذا كنت تقصد نسخة مختلفة تم ربطها عبر جسر.",
     "coin.switchNetworkBtn": "التبديل إلى {network} للمبادلة",
-    "coin.swapUnavailableAddKnownToken": "{symbol} لا يعمل مباشرة على {network}، لكن {tokenSymbol} هو نسخة الشبكة الخاصة المدعومة بالبيتكوين -- أضِفه أدناه للحصول على تعرض حقيقي وقابل للمبادلة هنا.",
+    "coin.swapUnavailableAddKnownToken": "{symbol} لا يعمل مباشرة على {network}، لكن {tokenSymbol} هو نسخة الشبكة الخاصة المدعومة بـ{symbol} -- أضِفه أدناه للحصول على تعرض حقيقي وقابل للمبادلة هنا.",
     "coin.addKnownTokenBtn": "+ إضافة {tokenSymbol}",
     "coin.holding": "لديك {amount} {symbol}",
     "coin.statsTitle": "إحصاءات السوق",

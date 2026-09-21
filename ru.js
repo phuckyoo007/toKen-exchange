@@ -88,7 +88,7 @@
     "coin.swapUnavailableNetwork": "Обменять {symbol} в сети {network} пока нельзя. Это должна быть основная монета сети или токен, добавленный через «Добавить токен».",
     "coin.swapUnavailableSwitchNetwork": "{symbol} — основная монета сети {network}, поэтому обменять её здесь нельзя. Переключитесь на {network}, чтобы обменять напрямую, либо используйте «Добавить токен», если вы имели в виду другую, перенесённую через мост версию.",
     "coin.switchNetworkBtn": "Переключиться на {network} для обмена",
-    "coin.swapUnavailableAddKnownToken": "{symbol} не работает напрямую в сети {network}, но {tokenSymbol} — это собственная версия сети, обеспеченная Bitcoin. Добавьте её ниже, чтобы получить реальную, обмениваемую здесь позицию.",
+    "coin.swapUnavailableAddKnownToken": "{symbol} не работает напрямую в сети {network}, но {tokenSymbol} — это собственная версия сети, обеспеченная {symbol}. Добавьте её ниже, чтобы получить реальную, обмениваемую здесь позицию.",
     "coin.addKnownTokenBtn": "+ Добавить {tokenSymbol}",
     "coin.holding": "У вас {amount} {symbol}",
     "coin.statsTitle": "Рыночные данные",
