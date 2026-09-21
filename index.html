@@ -385,6 +385,10 @@
       <button type="button" id="btn-coin-switch-network" class="secondary hidden"></button>
       <button type="button" id="btn-coin-add-token" class="link hidden" data-i18n="main.addTokenBtn">+ Add token</button>
     </div>
+    <div id="coin-cash-actions" class="coin-cash-actions hidden">
+      <button type="button" id="btn-coin-buy" class="secondary"></button>
+      <button type="button" id="btn-coin-sell" class="secondary"></button>
+    </div>
     <h3 id="coin-stats-title" data-i18n="coin.statsTitle">Market stats</h3>
     <div id="coin-stats" class="coin-stats"></div>
     <h3 id="coin-about-title" data-i18n="coin.aboutTitle">About</h3>
@@ -436,6 +440,15 @@
     <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
     <div id="sell-frame-wrap" class="widget-frame-wrap hidden">
       <iframe id="sell-frame" class="widget-frame" title="MoonPay Sell" allow="payment"></iframe>
+    </div>
+    <div id="sell-send-helper" class="sell-send-helper hidden">
+      <h3 data-i18n="sell.step2Title">Step 2: send your crypto to MoonPay</h3>
+      <p class="muted" data-i18n="sell.step2Desc">When MoonPay shows you a deposit address and amount, paste them here. This opens Send with them filled in, and you review and confirm the send yourself.</p>
+      <p id="sell-network-hint" class="hint"></p>
+      <input type="text" id="sell-deposit-address" data-i18n-placeholder="sell.depositPlaceholder" placeholder="MoonPay deposit address (0x...)" />
+      <input type="text" id="sell-deposit-amount" data-i18n-placeholder="sell.amountPlaceholder" placeholder="Amount MoonPay quoted" />
+      <button type="button" id="btn-sell-to-send" class="primary" data-i18n="sell.reviewInSendBtn">Review in Send</button>
+      <p id="sell-deposit-error" class="error hidden"></p>
     </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="sell-error" class="error hidden"></p>

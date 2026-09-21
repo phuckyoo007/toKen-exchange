@@ -194,6 +194,29 @@ Two things worth knowing:
   `lib/buy-config.js` for the full trail, and add a code there yourself once
   you can confirm one from your own MoonPay dashboard.
 
+## Swap, buy, and sell from any currency or coin
+
+Every row on the Live prices screen opens a detail screen with actions:
+
+- **Currencies tab** -- every currency is listed, including your own display
+  currency (USD used to drop out of the list when it was the display currency).
+  Tapping a currency offers **Swap for <stablecoin>** when a verified, liquid
+  token for it exists on your network (USD -> USDC on all six built-in
+  networks; EUR -> EURC, JPY -> JPYC, AUD -> AUDD, BRL -> BRZ where verified).
+  If a currency has no such token, or none on any supported network, the swap
+  falls back to USDC (a US-dollar stablecoin) with a note saying so -- it never
+  invents a token for a currency.
+- **Buy with <currency>** opens MoonPay's Buy widget in that currency.
+- **Sell to my bank (<currency>)** opens MoonPay's Sell widget paying out in that
+  currency. Cashing out is two steps because MoonPay hands you a deposit
+  address: paste it (and the quoted amount) into "Step 2" on the Sell screen and
+  the wallet opens Send with both filled in for you to review and confirm.
+  Nothing is sent automatically.
+- Currencies outside MoonPay's eight known codes (USD, EUR, GBP, JPY, CAD, AUD,
+  INR, BRL) open MoonPay with its own currency picker.
+- Not yet applied to the browser-extension popup (`extension-updated-icons/`),
+  which doesn't have the Currencies tab.
+
 ## Help & support chat
 
 A "Need help?" link on the onboarding and unlock screens, and a "Help &

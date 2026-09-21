@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
+<meta name="copyright" content="&copy; 2026 Sanders" />
 <title>Token Exchange</title>
 <link rel="stylesheet" href="popup.css" />
 </head>
@@ -28,6 +29,13 @@
       <span class="splash-tab-icon" aria-hidden="true">&#10148;</span>
       <span class="splash-tab-label" data-i18n="home.tabSend">Send</span>
     </button>
+  </div>
+  <div id="splash-continue-hint">
+    <div class="language-picker" id="splash-language-picker">
+      <label for="language-select-splash" data-i18n="common.languageLabel">Language</label>
+      <select id="language-select-splash" class="language-select" aria-label="Language"></select>
+    </div>
+    <button type="button" id="splash-continue-btn" class="primary" data-i18n="home.continueBtn">Continue</button>
   </div>
 </div>
 <div id="app">
@@ -142,6 +150,7 @@
       <!-- base plate -->
       <text x="160" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#5c4208" letter-spacing="3" opacity="0.85">EST. VAULT NO. 0500</text>
     </svg>
+    <select id="language-select-global" class="language-select global-lang-select" aria-label="Language" title="Language"></select>
     <div id="network-badge" class="hidden"></div>
   </header>
 
@@ -200,7 +209,33 @@
     <button class="link" id="btn-goto-support-unlock" data-i18n="common.needHelp">Need help?</button>
   </section>
 
-  <!-- MAIN -->
+  <!-- HOME / ACTIVITY / SEND -- three faces of one rotating cube (see
+       cube-nav.js). Everything else (Settings, Swap, Buy, Add token, the
+       dapp-approval dialogs, etc.) still opens as a plain overlay on top
+       of this, exactly like before -- its own Back button always returns
+       to screen-main, which lands back on the cube's Home face. -->
+  <div id="cube-shell" class="hidden">
+    <div id="cube-stage"></div>
+    <nav id="cube-tabbar" aria-label="Main">
+      <button type="button" class="cube-tab" id="cube-tab-home" data-cube-goto="0" data-i18n-title="home.tabHome" title="Home">
+        <span class="cube-tab-icon" aria-hidden="true">&#8962;</span>
+        <span class="cube-tab-label" data-i18n="home.tabHome">Home</span>
+      </button>
+      <button type="button" class="cube-tab" id="cube-tab-assets" data-cube-goto="assets" data-i18n-title="home.tabAssets" title="Assets">
+        <span class="cube-tab-icon" aria-hidden="true">&#9679;</span>
+        <span class="cube-tab-label" data-i18n="home.tabAssets">Assets</span>
+      </button>
+      <button type="button" class="cube-tab" id="cube-tab-activity" data-cube-goto="1" data-i18n-title="home.tabActivity" title="Activity">
+        <span class="cube-tab-icon" aria-hidden="true">&#128202;</span>
+        <span class="cube-tab-label" data-i18n="home.tabActivity">Activity</span>
+      </button>
+      <button type="button" class="cube-tab" id="cube-tab-send" data-cube-goto="2" data-i18n-title="home.tabSend" title="Send">
+        <span class="cube-tab-icon" aria-hidden="true">&#10148;</span>
+        <span class="cube-tab-label" data-i18n="home.tabSend">Send</span>
+      </button>
+    </nav>
+  </div>
+
   <section id="screen-main" class="screen hidden">
     <div class="account-row">
       <div class="account-picker">
@@ -262,71 +297,17 @@
     <p id="main-error" class="error hidden"></p>
   </section>
 
-  <!-- ADD TOKEN -->
-  <section id="screen-add-token" class="screen hidden">
-    <h2 data-i18n="addToken.title">Add token</h2>
-    <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
-    <label data-i18n="addToken.addressLabel">Token contract address</label>
-    <input type="text" id="add-token-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
-    <button id="btn-token-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
-    <div id="add-token-preview" class="hidden">
-      <p class="muted"><span data-i18n="addToken.nameLabel">Name:</span> <span id="add-token-name" class="mono"></span></p>
-      <p class="muted"><span data-i18n="addToken.symbolLabel">Symbol:</span> <span id="add-token-symbol" class="mono"></span></p>
-      <p class="muted"><span data-i18n="addToken.decimalsLabel">Decimals:</span> <span id="add-token-decimals" class="mono"></span></p>
-      <button id="btn-token-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
-    </div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-    <p id="add-token-error" class="error hidden"></p>
-  </section>
-
-  <!-- PRICES -->
-  <section id="screen-prices" class="screen hidden">
-    <h2 data-i18n="common.livePrices">Live prices</h2>
-    <p class="muted" data-i18n="prices.description">USD prices from CoinGecko's public API. Purely informational -- nothing about your wallet is sent to look these up.</p>
-    <div id="prices-list" class="prices-list"></div>
-    <p id="prices-error" class="error hidden"></p>
-    <p id="prices-status" class="hint hidden"></p>
+  <!-- ACTIVITY (moved into #cube-stage as a cube face at runtime -- see
+       mountCubeNav() in popup.js -- but lives here in the markup like any
+       other screen) -->
+  <section id="screen-activity" class="screen hidden">
+    <h2 data-i18n="activity.title">Activity</h2>
+    <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
+    <div id="activity-list"></div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
   </section>
 
-  <!-- PREDICTIONS (read-only) -->
-  <section id="screen-predictions" class="screen hidden">
-    <h2 data-i18n="predictions.title">Trending Markets</h2>
-    <p class="muted" data-i18n="predictions.description">Public odds from Polymarket's prediction markets -- informational only. Token Exchange does not place bets or hold positions on your behalf; nothing about your wallet is sent to look these up.</p>
-    <div id="predictions-list" class="prices-list"></div>
-    <p id="predictions-error" class="error hidden"></p>
-    <p id="predictions-status" class="hint hidden"></p>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-  </section>
-
-  <!-- BUY -->
-  <section id="screen-buy" class="screen hidden">
-    <h2 data-i18n="buy.title">Buy crypto</h2>
-    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
-    <p class="muted" data-i18n-html="buy.description2Html">MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:</p>
-    <div class="address-row">
-      <span id="buy-address-display" class="mono"></span>
-      <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
-    </div>
-    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-    <p id="buy-error" class="error hidden"></p>
-  </section>
-
-  <!-- SUPPORT -->
-  <section id="screen-support" class="screen hidden">
-    <h2 data-i18n="support.title">Help &amp; support</h2>
-    <p class="muted" data-i18n="support.description">Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.</p>
-    <div id="support-log" class="support-log"></div>
-    <div id="support-chips" class="support-chips"></div>
-    <div class="support-input-row">
-      <input type="text" id="support-input" data-i18n-placeholder="support.inputPlaceholder" placeholder="Type a question..." />
-      <button id="btn-support-send" class="primary" data-i18n="common.send">Send</button>
-    </div>
-    <button class="link" id="btn-support-back" data-i18n="common.back">Back</button>
-  </section>
-
-  <!-- SEND -->
+  <!-- SEND (also a cube face -- see note above) -->
   <section id="screen-send" class="screen hidden">
     <h2 data-i18n="common.send">Send</h2>
     <label data-i18n="send.assetLabel">Asset</label>
@@ -351,12 +332,118 @@
     <p id="send-error" class="error hidden"></p>
   </section>
 
-  <!-- ACTIVITY -->
-  <section id="screen-activity" class="screen hidden">
-    <h2 data-i18n="activity.title">Activity</h2>
-    <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
-    <div id="activity-list"></div>
+  <!-- ADD TOKEN -->
+  <section id="screen-add-token" class="screen hidden">
+    <h2 data-i18n="addToken.title">Add token</h2>
+    <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
+    <label data-i18n="addToken.addressLabel">Token contract address</label>
+    <input type="text" id="add-token-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
+    <button id="btn-token-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
+    <div id="add-token-preview" class="hidden">
+      <p class="muted"><span data-i18n="addToken.nameLabel">Name:</span> <span id="add-token-name" class="mono"></span></p>
+      <p class="muted"><span data-i18n="addToken.symbolLabel">Symbol:</span> <span id="add-token-symbol" class="mono"></span></p>
+      <p class="muted"><span data-i18n="addToken.decimalsLabel">Decimals:</span> <span id="add-token-decimals" class="mono"></span></p>
+      <button id="btn-token-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
+    </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="add-token-error" class="error hidden"></p>
+  </section>
+
+  <!-- PRICES -->
+  <section id="screen-prices" class="screen hidden">
+    <h2 data-i18n="common.livePrices">Live prices</h2>
+    <p class="muted" data-i18n="prices.description">USD prices from CoinGecko's public API. Purely informational -- nothing about your wallet is sent to look these up.</p>
+    <div class="prices-tabs" role="tablist">
+      <button type="button" class="prices-tab active" data-prices-tab="crypto" data-i18n="prices.tabCrypto">Crypto</button>
+      <button type="button" class="prices-tab" data-prices-tab="currencies" data-i18n="prices.tabCurrencies">Currencies</button>
+    </div>
+    <input type="search" id="prices-search" class="prices-search" data-i18n-placeholder="prices.searchPlaceholder" placeholder="Search..." autocomplete="off" />
+    <p id="prices-tab-note" class="muted hidden" data-i18n="prices.currenciesNote">What 1 unit of each currency is worth in your display currency.</p>
+    <div id="prices-list" class="prices-list"></div>
+    <p id="prices-error" class="error hidden"></p>
+    <p id="prices-status" class="hint hidden"></p>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- COIN DETAIL (opened from a Live prices row) -->
+  <section id="screen-coin" class="screen hidden">
+    <div class="coin-head">
+      <span id="coin-icon" class="coin-icon"></span>
+      <div class="coin-title">
+        <h2 id="coin-name"></h2>
+        <span id="coin-symbol" class="muted"></span>
+      </div>
+      <span id="coin-rank" class="coin-rank hidden"></span>
+    </div>
+    <div class="coin-price-block">
+      <div id="coin-price" class="coin-price"></div>
+      <span id="coin-change" class="price-change hidden"></span>
+    </div>
+    <div id="coin-chart" class="coin-chart"></div>
+    <p id="coin-chart-readout" class="muted small coin-chart-readout"></p>
+    <div class="coin-ranges" role="tablist">
+      <button type="button" class="coin-range" data-days="1">24H</button>
+      <button type="button" class="coin-range active" data-days="7">7D</button>
+      <button type="button" class="coin-range" data-days="30">1M</button>
+      <button type="button" class="coin-range" data-days="365">1Y</button>
+    </div>
+    <div class="coin-swap-card">
+      <p id="coin-holding" class="muted small hidden"></p>
+      <button type="button" id="btn-coin-swap" class="primary"></button>
+      <p id="coin-swap-note" class="hint hidden"></p>
+    </div>
+    <h3 data-i18n="coin.statsTitle">Market stats</h3>
+    <div id="coin-stats" class="coin-stats"></div>
+    <h3 data-i18n="coin.aboutTitle">About</h3>
+    <p id="coin-about" class="muted"></p>
+    <p><a id="coin-link-cg" class="link" target="_blank" rel="noopener noreferrer" data-i18n="coin.viewCoingecko">View on CoinGecko</a></p>
+    <p id="coin-error" class="error hidden"></p>
+    <button id="coin-back" class="link back-btn" data-back="screen-prices" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- PREDICTIONS (read-only) -->
+  <section id="screen-predictions" class="screen hidden">
+    <h2 data-i18n="predictions.title">Trending Markets</h2>
+    <p class="muted" data-i18n="predictions.description">Public odds from Polymarket's prediction markets -- informational only. Token Exchange does not place bets or hold positions on your behalf; nothing about your wallet is sent to look these up.</p>
+    <div id="predictions-list" class="prices-list"></div>
+    <p id="predictions-error" class="error hidden"></p>
+    <p id="predictions-status" class="hint hidden"></p>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- BUY -->
+  <section id="screen-buy" class="screen hidden">
+    <h2 data-i18n="buy.title">Buy crypto</h2>
+    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
+    <div class="no-third-party-callout">
+      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip MoonPay entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+      <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
+    </div>
+    <p class="muted" id="buy-description-manual" data-i18n-html="buy.description2Html">MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:</p>
+    <p class="muted hidden" id="buy-description-autofill" data-i18n="buy.description2AutoFill">MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.</p>
+    <div class="address-row" id="buy-address-row">
+      <span id="buy-address-display" class="mono"></span>
+      <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
+    </div>
+    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
+    <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="buy-frame" class="widget-frame" title="MoonPay Buy" allow="payment"></iframe>
+    </div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="buy-error" class="error hidden"></p>
+  </section>
+
+  <!-- SUPPORT -->
+  <section id="screen-support" class="screen hidden">
+    <h2 data-i18n="support.title">Help &amp; support</h2>
+    <p class="muted" data-i18n="support.description">Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.</p>
+    <div id="support-log" class="support-log"></div>
+    <div id="support-chips" class="support-chips"></div>
+    <div class="support-input-row">
+      <input type="text" id="support-input" data-i18n-placeholder="support.inputPlaceholder" placeholder="Type a question..." />
+      <button id="btn-support-send" class="primary" data-i18n="common.send">Send</button>
+    </div>
+    <button class="link" id="btn-support-back" data-i18n="common.back">Back</button>
   </section>
 
   <!-- SWAP -->
@@ -548,8 +635,11 @@
   </section>
 
   <footer id="app-footer">
-    <span class="footer-lock">&#128274;</span>
-    <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
+    <div class="footer-tagline">
+      <span class="footer-lock">&#128274;</span>
+      <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
+    </div>
+    <span class="footer-copyright">&copy; 2026 Sanders</span>
   </footer>
 
 </div>
@@ -570,6 +660,7 @@
 <script src="../lib/i18n/ru.js"></script>
 <script src="../lib/i18n.js"></script>
 <script src="../lib/support-config.js"></script>
+<script src="../lib/cube-nav.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>

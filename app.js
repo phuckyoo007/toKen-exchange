@@ -1275,6 +1275,7 @@ async function openCoinDetail(c, fromScreen) {
   coinDetail.switchNetworkTarget = null;
   coinDetail.prefillTokenAddress = null;
   setCoinDetailCryptoSectionsVisible(true);
+  showCoinCashActions(currentCurrency);
   $("coin-swap-card").classList.remove("hidden");
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
@@ -1334,6 +1335,34 @@ const KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN = {
   },
 };
 
+// USD's stablecoin is USDC. Its contracts are the same verified, native Circle
+// deployments already listed in KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN, so USD reuses
+// that table instead of repeating the addresses here. Every other currency
+// uses KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN above.
+function knownStablecoinsFor(code) {
+  if (code === "USD") return KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN.USDC || {};
+  return KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN[code] || {};
+}
+
+function fiatLabel(code) {
+  const info = TM_PRICES.SUPPORTED_CURRENCIES[String(code).toLowerCase()];
+  return info ? info.label : String(code).toUpperCase();
+}
+
+// Buy / Sell buttons shown under the swap card on every coin screen and every
+// currency screen. `fiatCode` is the currency the person is looking at (or,
+// for a coin, their display currency); it is carried into the MoonPay Buy and
+// Sell screens so the bank leg is in the right currency.
+function showCoinCashActions(fiatCode) {
+  coinDetail.fiat = fiatCode;
+  const label = fiatLabel(fiatCode);
+  $("btn-coin-buy").textContent = TM_I18N.t("coin.buyBtn", { currency: label });
+  $("btn-coin-sell").textContent = TM_I18N.t("coin.sellBtn", { currency: label });
+  const meta = ((currentStatus && currentStatus.accounts) || []).find((a) => a.address === currentStatus.selectedAddress);
+  $("btn-coin-sell").disabled = !!meta && meta.type === "watch"; // same gating as the main Sell button
+  $("coin-cash-actions").classList.remove("hidden");
+}
+
 // Re-applies the coin-swap-card's contents for whichever currency is
 // currently open (see openCurrencyDetail) -- pulled out on its own so the
 // "Switch to X to swap" button (shared with loadCoinSwapState above) can
@@ -1342,12 +1371,13 @@ const KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN = {
 function applyCurrencySwapState() {
   const r = coinDetail.currency;
   if (!r) return;
+  showCoinCashActions(String(r.code).toLowerCase());
   coinDetail.currencySwapAddress = null;
   coinDetail.switchNetworkTarget = null;
   $("coin-holding").classList.add("hidden");
   $("btn-coin-add-token").classList.add("hidden");
   $("btn-coin-switch-network").classList.add("hidden");
-  const knownByChain = KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN[r.code] || {};
+  const knownByChain = knownStablecoinsFor(r.code);
   const known = currentNetwork ? knownByChain[currentNetwork.chainId] : null;
   if (known) {
     coinDetail.currencySwapAddress = known.address;
@@ -1377,6 +1407,23 @@ function applyCurrencySwapState() {
     const switchBtn = $("btn-coin-switch-network");
     switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: elsewhereNet.name });
     switchBtn.classList.remove("hidden");
+    return;
+  }
+  // No verified, liquid token for this currency on any network this wallet
+  // supports. Rather than leave the currency with nothing to do, offer the
+  // closest thing that IS real and liquid: USDC, a US-dollar stablecoin, on
+  // the current network. The note says plainly that it's dollars, not the
+  // local currency; the Sell button below is the way out to a bank account.
+  const usdcHere = currentNetwork ? (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN.USDC || {})[currentNetwork.chainId] : null;
+  if (usdcHere && r.code !== "USD") {
+    coinDetail.currencySwapAddress = usdcHere.address;
+    $("coin-swap-card").classList.remove("hidden");
+    const fbBtn = $("btn-coin-swap");
+    fbBtn.textContent = TM_I18N.t("coin.swapBtn", { symbol: usdcHere.symbol });
+    fbBtn.disabled = false;
+    fbBtn.classList.remove("hidden");
+    $("coin-swap-note").textContent = TM_I18N.t("prices.currencyFallbackNote", { currency: r.name, code: r.code });
+    $("coin-swap-note").classList.remove("hidden");
     return;
   }
   $("coin-swap-card").classList.add("hidden");
@@ -1769,6 +1816,16 @@ $("btn-coin-swap").addEventListener("click", () => {
   showScreen("screen-swap");
 });
 
+$("btn-coin-buy").addEventListener("click", () => {
+  setupBuyScreen(coinDetail.fiat);
+  showScreen("screen-buy");
+});
+
+$("btn-coin-sell").addEventListener("click", () => {
+  setupSellScreen(coinDetail.fiat);
+  showScreen("screen-sell");
+});
+
 $("btn-coin-add-token").addEventListener("click", () => {
   resetAddTokenScreen(coinDetail.prefillTokenAddress || undefined);
   showScreen("screen-add-token");
@@ -1899,7 +1956,11 @@ async function refreshMainPredictionsCard() {
 // that's safe. Each time the screen is (re)opened, this resets back to the
 // "not loaded yet" state: description text, address row and Continue
 // button visible, iframe hidden -- ready for a fresh click.
-function setupBuyScreen() {
+// The fiat currency the MoonPay Buy widget should open in: whatever the person
+// was looking at (a currency or coin screen), else their display currency.
+let buyFiat = null;
+function setupBuyScreen(fiatCode) {
+  buyFiat = fiatCode || currentCurrency;
   hideError("buy-error");
   $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
   $("buy-description-manual").classList.remove("hidden");
@@ -1927,8 +1988,8 @@ $("btn-buy-open").addEventListener("click", async () => {
     // or can't be reached. Either way this always embeds in the iframe
     // below rather than opening a new tab.
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
-    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address, buyFiat);
+    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key, buyFiat);
     $("buy-frame").src = url;
     $("buy-frame-wrap").classList.remove("hidden");
     btn.classList.add("hidden");
@@ -1947,23 +2008,58 @@ $("btn-buy-open").addEventListener("click", async () => {
 // ---------------------------------------------------------------- SELL
 // Same embedding change as Buy -- see lib/sell-config.js's header comment
 // for why there's no address to auto-fill here.
-function setupSellScreen() {
+// The fiat currency MoonPay's Sell widget should pay out in: whatever the
+// person was looking at (a currency or coin screen), else their display currency.
+let sellFiat = null;
+function setupSellScreen(fiatCode) {
+  sellFiat = fiatCode || currentCurrency;
   hideError("sell-error");
+  hideError("sell-deposit-error");
   $("btn-sell-open").classList.remove("hidden");
   $("sell-frame-wrap").classList.add("hidden");
   $("sell-frame").src = "about:blank";
+  $("sell-send-helper").classList.add("hidden");
+  $("sell-deposit-address").value = "";
+  $("sell-deposit-amount").value = "";
 }
 
 $("btn-sell-open").addEventListener("click", () => {
   hideError("sell-error");
   try {
-    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
+    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, sellFiat || currentCurrency);
     $("sell-frame").src = url;
     $("sell-frame-wrap").classList.remove("hidden");
     $("btn-sell-open").classList.add("hidden");
+    // Step 2: once MoonPay shows a deposit address, the person pastes it
+    // here and we open Send with it filled in (they still review + confirm).
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
   } catch (e) {
     showError("sell-error", e.message);
   }
+});
+
+$("btn-sell-to-send").addEventListener("click", () => {
+  hideError("sell-deposit-error");
+  const addr = $("sell-deposit-address").value.trim();
+  const amt = $("sell-deposit-amount").value.trim();
+  if (!ethers.utils.isAddress(addr)) {
+    showError("sell-deposit-error", TM_I18N.t("sell.invalidAddress"));
+    return;
+  }
+  if (amt && !(Number(amt) > 0)) {
+    showError("sell-deposit-error", TM_I18N.t("sell.invalidAmount"));
+    return;
+  }
+  // Prefill only. The Send screen's own review/confirm step (and the
+  // sanctions check) still run, so nothing leaves the wallet unreviewed.
+  $("send-to").value = addr;
+  $("send-to").dispatchEvent(new Event("input"));
+  $("send-amount").value = amt;
+  $("send-amount").dispatchEvent(new Event("input"));
+  setSendSpeed("standard");
+  showScreen("screen-send");
+  refreshSendFeePreview();
 });
 
 // ---------------------------------------------------------------- SETTINGS

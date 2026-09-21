@@ -1462,3 +1462,10 @@ html[dir="rtl"] .prices-search { background-position: right 11px center; }
 .coin-stat .v { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; unicode-bidi: isolate; text-align: start; }
 /* Price rows now open the coin screen, so they are buttons, not anchors. */
 button.price-link { background: none; border: 0; padding: 0; font: inherit; text-align: start; width: auto; }
+
+/* Buy / Sell actions under the swap card, and Sell step 2 */
+.coin-cash-actions { display: flex; gap: 8px; margin: 10px 0 4px; }
+.coin-cash-actions button { flex: 1; }
+.coin-cash-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.sell-send-helper { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.sell-send-helper h3, .sell-send-helper p { margin: 0; }

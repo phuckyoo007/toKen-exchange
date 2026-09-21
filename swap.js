@@ -1,12 +1,34 @@
 // lib/swap.js
-// On-chain swap logic using a Uniswap-V2-compatible router (getAmountsOut /
-// swapExact...Tokens). No off-chain aggregator API/key needed -- everything
-// is a direct read/write against the router contract configured for the
-// active network (see lib/networks.js). Swaps are only enabled on networks
-// with a verified `swapRouter` address, or one the user has explicitly
-// supplied and confirmed for a custom network.
+// Two ways to get a swap done, tried in this order:
+//
+// 1. The 0x aggregator, via our own server (see swap-quote-api.js at the
+//    repo root for why -- 0x requires an API key that can't live in this
+//    client-side file). Shops the trade across many DEXs/liquidity
+//    sources for a better price than any single router. tryAggregatorQuote()
+//    below is the only thing that talks to it, and it returns null on ANY
+//    failure -- not configured yet, no route, network hiccup -- so callers
+//    always have a plain, uniform "did this work or not" to check.
+// 2. The original direct on-chain path: a single Uniswap-V2-compatible
+//    router (getAmountsOut / swapExact...Tokens) configured per network in
+//    lib/networks.js. This is the fallback whenever the aggregator can't
+//    help, and it's also the ONLY path on a network without a
+//    aggregator-supported chain id -- swaps stay enabled there exactly as
+//    before.
+//
+// Both paths are only enabled on networks with a verified `swapRouter`
+// address (or one the user has explicitly supplied and confirmed for a
+// custom network) -- the aggregator doesn't change that gate, since a
+// network with no verified router is a network this wallet has made no
+// safety claims about at all.
 
-const NATIVE_PSEUDO_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"; // convention (matches most aggregator UIs) for "the chain's native coin"
+const NATIVE_PSEUDO_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"; // convention (matches most aggregator UIs and 0x itself) for "the chain's own coin"
+
+// Deployed alongside the website on Railway -- see swap-quote-api.js at
+// the repo root for the server side. Same cross-context pattern as
+// MOONPAY_SIGN_ENDPOINT in lib/buy-config.js: the extension has no
+// server of its own, so both the website and the extension call this one
+// absolute URL.
+const SWAP_QUOTE_ENDPOINT = "https://web-wallet-production.up.railway.app/api/swap-quote";
 
 const ROUTER_ABI = [
   "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
@@ -26,6 +48,60 @@ const ERC20_ABI = [
 
 function isNative(tokenAddress) {
   return !tokenAddress || tokenAddress.toLowerCase() === NATIVE_PSEUDO_ADDRESS.toLowerCase();
+}
+
+// The chain ids this wallet knows about (see lib/networks.js) that 0x's
+// Swap API also covers. Checking this client-side too just saves a round
+// trip to our own server for a chain it would reject anyway -- the real
+// gate is server-side, in swap-quote-api.js.
+const AGGREGATOR_CHAIN_IDS = new Set([1, 8453, 137, 56, 42161, 10]);
+
+// Asks our own server (see swap-quote-api.js) for a firm 0x quote, shaped
+// so callers never need to know WHY it didn't work: not configured yet,
+// unsupported chain, no liquidity for this pair, or a network hiccup all
+// come back as a plain `null`, meaning "fall back to the direct router
+// path." Only ever called right before a real swap (the quote is firm,
+// not indicative, and 0x treats these as more expensive/rate-limited than
+// price checks).
+async function tryAggregatorQuote({ network, tokenIn, tokenOut, amountInWei, taker, slippageBps }) {
+  if (!network || !AGGREGATOR_CHAIN_IDS.has(network.chainId)) return null;
+  if (!taker) return null;
+  try {
+    const params = new URLSearchParams({
+      chainId: String(network.chainId),
+      sellToken: isNative(tokenIn) ? NATIVE_PSEUDO_ADDRESS : tokenIn,
+      buyToken: isNative(tokenOut) ? NATIVE_PSEUDO_ADDRESS : tokenOut,
+      sellAmount: ethers.BigNumber.from(amountInWei).toString(),
+      taker,
+      slippageBps: String(slippageBps || 100),
+    });
+    const res = await fetch(`${SWAP_QUOTE_ENDPOINT}?${params.toString()}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || !data.configured || !data.ok || !data.liquidityAvailable) return null;
+    if (!data.transaction || !data.transaction.to || !data.transaction.data || !data.buyAmount) return null;
+    return {
+      amountOutWei: ethers.BigNumber.from(data.buyAmount),
+      minAmountOutWei: ethers.BigNumber.from(data.minBuyAmount || data.buyAmount),
+      allowanceTarget: data.allowanceTarget || null,
+      transaction: data.transaction,
+    };
+  } catch (e) {
+    return null; // offline, bad JSON, CORS hiccup, etc -- fall back silently
+  }
+}
+
+// Broadcasts the exact transaction a prior tryAggregatorQuote() call
+// returned. Callers are responsible for making sure the quote is still
+// fresh and for the same tokenIn/tokenOut/amount they're now executing --
+// see the lastSwapRoute matching logic in wallet-engine.js/background.js,
+// which never reuses a quote across a different pair or amount.
+async function executeAggregatorSwap({ signer, transaction }) {
+  const txRequest = { to: transaction.to, data: transaction.data };
+  if (transaction.value) txRequest.value = ethers.BigNumber.from(transaction.value);
+  if (transaction.gas) txRequest.gasLimit = ethers.BigNumber.from(transaction.gas);
+  const tx = await signer.sendTransaction(txRequest);
+  return tx;
 }
 
 function assertSwapSupported(network) {
@@ -110,5 +186,7 @@ if (typeof self !== "undefined") {
     executeSwap,
     applySlippage,
     ERC20_ABI,
+    tryAggregatorQuote,
+    executeAggregatorSwap,
   };
 }
