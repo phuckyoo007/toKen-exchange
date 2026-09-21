@@ -149,6 +149,10 @@
     "sell.description2": "A MoonPay abre bem aqui, abaixo, e te dá uma cotação de pagamento em dinheiro. Ela mostrará um endereço de depósito para enviar sua cripto -- assim que a MoonPay recebê-la, ela converte e paga na sua conta bancária ou cartão vinculado.",
     "sell.description3Html": "Quando a MoonPay mostrar um endereço de depósito, cole-o na <strong>Etapa 2</strong> abaixo e esta wallet abrirá Enviar já preenchido. Você continua revisando e confirmando o envio -- esta wallet nunca envia fundos por conta própria.",
     "sell.continueBtn": "Continuar para a MoonPay",
+    "sell.coinbaseBtn": "Vender com a Coinbase",
+    "sell.coinbaseNote": "Abre a Coinbase em uma nova guia. Um serviço separado da MoonPay, operado pela Coinbase.",
+    "sell.coinbaseCheckBtn": "Terminei na Coinbase: obter meus dados de depósito",
+    "sell.coinbaseNotReady": "A Coinbase ainda não tem uma venda concluída -- termine primeiro na guia da Coinbase e tente novamente.",
 
     "support.title": "Ajuda e suporte",
     "support.description": "Faça uma pergunta ou toque em um dos tópicos abaixo. Isso é processado inteiramente no seu dispositivo -- nada do que você digitar aqui é enviado a lugar nenhum.",

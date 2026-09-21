@@ -1,7 +1,26 @@
 // coinbase-onramp-api.js
 // Small server-side helper that generates a Coinbase Onramp "session
-// token", so the Buy screen can offer Coinbase as a second on-ramp
-// alongside MoonPay while MoonPay's own account approval is pending.
+// token" (and looks up Offramp transaction status), so the Buy and Sell
+// screens can offer Coinbase as a second option alongside MoonPay while
+// MoonPay's own account approval is pending.
+//
+// OFFRAMP (SELL) FLOW -- confirmed against Coinbase's own Offramp
+// Integration Guide (docs.cdp.coinbase.com/onramp/offramp/offramp-integration-guide,
+// checked Sept 2026): unlike MoonPay's sell widget (which shows a deposit
+// address inside its own iframe for the person to copy by hand), Coinbase's
+// documented pattern has the INTEGRATING APP fetch the deposit address
+// programmatically, via a separate "Offramp Transaction Status" API call
+// keyed by a `partnerUserRef` the app makes up and passes when opening the
+// hosted sell page. handleCoinbaseOfframpStatusApi (below) is that lookup,
+// server-side for the same reason the session-token call is: it needs a
+// signed JWT, which needs the secret key. The client (see
+// lib/coinbase-onramp-config.js) generates the partnerUserRef, opens
+// Coinbase's hosted sell page with it, and after the person comes back
+// from completing the sell there, calls this endpoint to get the deposit
+// address/amount -- then feeds those into this wallet's EXISTING Sell
+// screen "paste deposit details -> Review in Send" flow (see
+// btn-sell-to-send in app.js), so the actual send is still reviewed and
+// confirmed by the person like every other send this wallet makes.
 //
 // WHY THIS EXISTS
 // Every call to Coinbase's Onramp API must be authenticated with a CDP
@@ -166,9 +185,105 @@ async function requestSessionToken(address, blockchain) {
   return data.token;
 }
 
+// A partnerUserRef is something WE make up (see lib/coinbase-onramp-config.js)
+// to correlate "the sell someone just did on Coinbase's hosted page" back
+// to a status lookup here -- not a Coinbase-issued id, so it only needs
+// validating as a safe, bounded string before it goes into a URL path.
+const PARTNER_USER_REF_RE = /^[A-Za-z0-9_-]{8,64}$/;
+const OFFRAMP_STATUS_HOST = "api.developer.coinbase.com";
+
+function offrampStatusPath(partnerUserRef) {
+  return `/onramp/v1/sell/user/${encodeURIComponent(partnerUserRef)}/transactions`;
+}
+
+// Looks up the most recent Offramp (sell) transaction Coinbase has on file
+// for this partnerUserRef. Returns null if there isn't one yet (the person
+// hasn't finished the sell on Coinbase's page, or Coinbase hasn't recorded
+// it yet) -- not an error, just "nothing to show yet".
+async function fetchLatestOfframpTransaction(partnerUserRef) {
+  const path = `${offrampStatusPath(partnerUserRef)}?page_size=1`;
+  const jwt = await generateJwt({
+    apiKeyId: COINBASE_CDP_API_KEY_ID,
+    apiKeySecret: COINBASE_CDP_API_SECRET,
+    requestMethod: "GET",
+    requestHost: OFFRAMP_STATUS_HOST,
+    requestPath: offrampStatusPath(partnerUserRef), // path only, no query -- matches how generateJwt's `uris` claim is meant to be built
+    expiresIn: 120,
+  });
+
+  const res = await fetch(`https://${OFFRAMP_STATUS_HOST}${path}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const detail = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+    throw new Error(`Coinbase declined the request: ${detail}`);
+  }
+  const tx = data && Array.isArray(data.transactions) ? data.transactions[0] : null;
+  if (!tx || !tx.to_address) return null;
+  return {
+    toAddress: tx.to_address,
+    amount: tx.sell_amount != null ? String(tx.sell_amount) : "",
+    asset: tx.asset || "",
+    network: tx.network || "",
+  };
+}
+
+// Returns true if the request was handled here (caller should not fall
+// through to the static file handler); false otherwise.
+function handleCoinbaseOfframpStatusApi(req, res) {
+  const [url, queryString] = req.url.split("?");
+  if (url !== "/api/coinbase-offramp-status") return false;
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+    });
+    res.end();
+    return true;
+  }
+
+  if (req.method !== "GET") {
+    sendJson(res, 405, { error: "Method not allowed." });
+    return true;
+  }
+
+  if (!isCoinbaseOnrampConfigured()) {
+    sendJson(res, 200, { configured: false });
+    return true;
+  }
+
+  if (!withinLimit(clientIp(req))) {
+    sendJson(res, 429, { error: "Too many requests recently. Try again later." });
+    return true;
+  }
+
+  const params = new URLSearchParams(queryString || "");
+  const partnerUserRef = (params.get("partnerUserRef") || "").trim();
+  if (!PARTNER_USER_REF_RE.test(partnerUserRef)) {
+    sendJson(res, 400, { error: "Missing or invalid partnerUserRef." });
+    return true;
+  }
+
+  fetchLatestOfframpTransaction(partnerUserRef)
+    .then((tx) => {
+      sendJson(res, 200, { configured: true, found: !!tx, transaction: tx || null });
+    })
+    .catch((e) => {
+      sendJson(res, 502, { error: (e && e.message) || "Could not reach Coinbase." });
+    });
+
+  return true;
+}
+
 // Returns true if the request was handled here (caller should not fall
 // through to the static file handler); false otherwise.
 function handleCoinbaseOnrampApi(req, res) {
+  if (handleCoinbaseOfframpStatusApi(req, res)) return true;
+
   const [url] = req.url.split("?");
   if (url !== "/api/coinbase-onramp-session") return false;
 

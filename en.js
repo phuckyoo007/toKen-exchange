@@ -171,6 +171,10 @@
     "sell.description2": "MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
     "sell.description3Html": "When MoonPay shows you a deposit address, paste it into <strong>Step 2</strong> below and this wallet opens Send with it filled in. You still review and confirm the send yourself -- this wallet never sends funds anywhere on its own.",
     "sell.continueBtn": "Continue to MoonPay",
+    "sell.coinbaseBtn": "Sell with Coinbase instead",
+    "sell.coinbaseNote": "Opens Coinbase in a new tab. A separate service from MoonPay, run by Coinbase.",
+    "sell.coinbaseCheckBtn": "I've finished on Coinbase -- get my deposit details",
+    "sell.coinbaseNotReady": "Coinbase doesn't have a completed sell yet -- finish it on the Coinbase tab first, then try again.",
 
     "support.title": "Help & support",
     "support.description": "Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.",

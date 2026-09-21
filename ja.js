@@ -150,6 +150,10 @@
     "sell.description2": "MoonPay はこのすぐ下に表示され、現金でのお支払い見積もりを提示します。暗号資産の送付先となる入金アドレスが表示されます -- MoonPay が受け取り次第、変換してご登録の銀行口座またはカードへお支払いします。",
     "sell.description3Html": "MoonPay が入金アドレスを表示したら、下記の<strong>ステップ2</strong>に貼り付けてください。このウォレットはその内容で送金画面を開きます。送金の確認と確定はご自身で行っていただきます -- このウォレットが自動で資金を送ることは一切ありません。",
     "sell.continueBtn": "MoonPay に進む",
+    "sell.coinbaseBtn": "代わりにCoinbaseで売却",
+    "sell.coinbaseNote": "新しいタブでCoinbaseを開きます。MoonPayとは別の、Coinbase運営のサービスです。",
+    "sell.coinbaseCheckBtn": "Coinbaseで完了しました—入金詳細を取得",
+    "sell.coinbaseNotReady": "Coinbaseにはまだ完了した売却がありません—先にCoinbaseのタブで完了させてから、もう一度お試しください。",
 
     "support.title": "ヘルプ＆サポート",
     "support.description": "質問を入力するか、下のトピックをタップしてください。この機能はすべてお使いのデバイス上で完結しており、ここに入力した内容が外部に送信されることはありません。",

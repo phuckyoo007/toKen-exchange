@@ -151,6 +151,10 @@
     "sell.description2": "MoonPay 将在下方直接打开，并为您提供现金付款报价。它会给您一个存款地址，用于接收您的加密货币 -- MoonPay 收到后会进行兑换，并支付到您绑定的银行账户或银行卡。",
     "sell.description3Html": "当 MoonPay 向您显示存款地址后，请将其粘贴到下方的<strong>第 2 步</strong>，本钱包会打开已填好信息的发送界面。您仍需自己核对并确认发送 -- 本钱包绝不会自行发送任何资金。",
     "sell.continueBtn": "前往 MoonPay",
+    "sell.coinbaseBtn": "改用 Coinbase 出售",
+    "sell.coinbaseNote": "在新标签页中打开 Coinbase。这是独立于 MoonPay 的服务，由 Coinbase 运营。",
+    "sell.coinbaseCheckBtn": "我已在 Coinbase 完成—获取我的充值详情",
+    "sell.coinbaseNotReady": "Coinbase 还没有已完成的出售记录—请先在 Coinbase 标签页中完成，然后重试。",
 
     "support.title": "帮助与支持",
     "support.description": "在下方提问，或点击一个主题。此功能完全在您的设备本地运行——您在此输入的内容不会被发送到任何地方。",

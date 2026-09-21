@@ -2078,6 +2078,15 @@ function setupSellScreen(fiatCode) {
   $("sell-send-helper").classList.add("hidden");
   $("sell-deposit-address").value = "";
   $("sell-deposit-amount").value = "";
+  // Coinbase Offramp -- see lib/coinbase-onramp-config.js's header comment
+  // for the two-step flow (open Coinbase in a tab, then come back and
+  // fetch the deposit details). Same network-support gating as Buy.
+  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
+  $("btn-sell-coinbase").classList.toggle("hidden", !coinbaseSupported);
+  $("sell-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
+  $("btn-sell-coinbase-check").classList.add("hidden");
+  $("btn-sell-coinbase").disabled = false;
+  $("btn-sell-coinbase-check").disabled = false;
 }
 
 $("btn-sell-open").addEventListener("click", () => {
@@ -2093,6 +2102,50 @@ $("btn-sell-open").addEventListener("click", () => {
     $("sell-send-helper").classList.remove("hidden");
   } catch (e) {
     showError("sell-error", e.message);
+  }
+});
+
+$("btn-sell-coinbase").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-coinbase");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOfframpUrl(currentNetwork.key, address);
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Now that a sell session exists, reveal the "I've finished -- get my
+    // deposit details" step. Coinbase's own page is where the person
+    // actually picks an asset/amount and completes the sell; this wallet
+    // only fetches what to send afterwards (see the click handler below).
+    $("btn-sell-coinbase-check").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-sell-coinbase-check").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-coinbase-check");
+  btn.disabled = true;
+  try {
+    const tx = await TM_COINBASE_ONRAMP_CONFIG.checkCoinbaseOfframpStatus();
+    if (!tx) {
+      showError("sell-error", TM_I18N.t("sell.coinbaseNotReady"));
+      return;
+    }
+    // Same "paste deposit details -> Review in Send" UI as MoonPay's Sell
+    // flow uses, just filled in for us instead of pasted by hand -- the
+    // Send screen's own review/confirm step still runs either way.
+    $("sell-deposit-address").value = tx.toAddress || "";
+    $("sell-deposit-amount").value = tx.amount || "";
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
