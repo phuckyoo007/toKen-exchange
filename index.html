@@ -512,43 +512,63 @@
 
   <!-- SWAP -->
   <section id="screen-swap" class="screen hidden">
-    <h2 data-i18n="common.swap">Swap</h2>
-    <p id="swap-unsupported" class="warn hidden" data-i18n="swap.unsupportedWarning">Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings &rarr; Networks first.</p>
-    <div id="swap-form">
-      <label data-i18n="swap.fromLabel">From</label>
-      <div class="swap-row">
-        <select id="swap-from-select">
-          <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
-        </select>
-        <input type="text" id="swap-from-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
-        <input type="text" id="swap-amount-in" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
-      </div>
-      <label data-i18n="swap.toLabel">To</label>
-      <div class="swap-row">
-        <select id="swap-to-select">
-          <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
-        </select>
-        <input type="text" id="swap-to-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
-      </div>
-      <button id="btn-swap-quote" class="secondary" data-i18n="swap.getQuoteBtn">Get quote</button>
-      <div id="swap-quote-display" class="hidden">
-        <p id="swap-fee-line" class="muted"></p>
-        <p id="swap-net-line" class="muted"></p>
-        <p id="swap-quote-line"></p>
-        <label data-i18n="swap.slippageLabel">Slippage tolerance</label>
-        <select id="swap-slippage">
-          <option value="50">0.5%</option>
-          <option value="100" selected>1%</option>
-          <option value="300">3%</option>
-        </select>
-        <button id="btn-swap-approve" class="secondary hidden" data-i18n="swap.approveBtn">Approve token first</button>
-        <button id="btn-swap-execute" class="primary" data-i18n="common.swap">Swap</button>
-      </div>
-    </div>
     <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
       <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
       <span data-i18n="common.back">Back</span>
     </button>
+    <h2 data-i18n="common.swap">Swap</h2>
+    <p id="swap-unsupported" class="warn hidden" data-i18n="swap.unsupportedWarning">Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings &rarr; Networks first.</p>
+    <div id="swap-form">
+      <div class="swap-card">
+        <label class="swap-card-label" data-i18n="swap.fromLabel">From</label>
+        <div class="swap-row">
+          <select id="swap-from-select">
+            <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
+          </select>
+          <input type="text" id="swap-from-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
+        </div>
+        <input type="text" id="swap-amount-in" class="swap-amount-input" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+      </div>
+
+      <div class="swap-flip-wrap">
+        <button type="button" id="btn-swap-flip" class="swap-flip-btn" aria-label="Reverse swap direction">&#8645;</button>
+      </div>
+
+      <div class="swap-card">
+        <label class="swap-card-label" data-i18n="swap.toLabel">To</label>
+        <div class="swap-row">
+          <select id="swap-to-select">
+            <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
+          </select>
+          <input type="text" id="swap-to-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
+        </div>
+      </div>
+
+      <button id="btn-swap-quote" class="primary swap-quote-btn" data-i18n="swap.getQuoteBtn">Get quote</button>
+
+      <div id="swap-quote-display" class="swap-quote-card hidden">
+        <p id="swap-net-line" class="muted swap-quote-subline"></p>
+        <p id="swap-quote-line" class="swap-quote-headline"></p>
+        <p id="swap-fee-line" class="muted swap-quote-subline"></p>
+
+        <div class="swap-slippage-block">
+          <span class="swap-card-label" data-i18n="swap.slippageLabel">Slippage tolerance</span>
+          <div class="swap-slippage-pills" role="tablist">
+            <button type="button" class="swap-slippage-pill" data-slippage="50">0.5%</button>
+            <button type="button" class="swap-slippage-pill active" data-slippage="100">1%</button>
+            <button type="button" class="swap-slippage-pill" data-slippage="300">3%</button>
+          </div>
+          <select id="swap-slippage" class="hidden">
+            <option value="50">0.5%</option>
+            <option value="100" selected>1%</option>
+            <option value="300">3%</option>
+          </select>
+        </div>
+
+        <button id="btn-swap-approve" class="secondary hidden" data-i18n="swap.approveBtn">Approve token first</button>
+        <button id="btn-swap-execute" class="primary" data-i18n="common.swap">Swap</button>
+      </div>
+    </div>
     <p id="swap-status" class="hint hidden"></p>
     <p id="swap-error" class="error hidden"></p>
   </section>

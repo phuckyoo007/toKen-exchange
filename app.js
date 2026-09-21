@@ -1270,6 +1270,43 @@ async function populateSwapSelects(pre) {
   $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
 });
 
+// Flip button between the From/To cards. Only swaps when it's actually
+// safe to: both selects have the OTHER side's current value as one of
+// their own options (From only lists held assets, To lists all known
+// assets, so those option lists don't always match -- e.g. flipping while
+// "buying" a coin not held yet would leave From pointing at an option that
+// doesn't exist). A custom pasted address on either side is the same
+// story -- nothing to safely swap it into on the other side -- so this
+// just clears the stale quote and lets the person repick instead of
+// guessing.
+$("btn-swap-flip").addEventListener("click", () => {
+  const fromSel = $("swap-from-select");
+  const toSel = $("swap-to-select");
+  const fromVal = fromSel.value;
+  const toVal = toSel.value;
+  const fromHasToOption = Array.from(fromSel.options).some((o) => o.value === toVal);
+  const toHasFromOption = Array.from(toSel.options).some((o) => o.value === fromVal);
+  if (fromVal !== "custom" && toVal !== "custom" && fromHasToOption && toHasFromOption) {
+    fromSel.value = toVal;
+    toSel.value = fromVal;
+    syncSwapAsset("from");
+    syncSwapAsset("to");
+  } else {
+    $("swap-quote-display").classList.add("hidden");
+  }
+});
+
+// Slippage pills are a nicer-looking stand-in for the real #swap-slippage
+// select below them -- that select is what btn-swap-execute's handler
+// actually reads, so these just keep it in sync rather than replacing it.
+document.querySelectorAll(".swap-slippage-pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".swap-slippage-pill").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    $("swap-slippage").value = btn.dataset.slippage;
+  });
+});
+
 // ---- Coin screen
 function renderCoinPrice(price, change) {
   $("coin-price").textContent = price == null ? TM_I18N.t("prices.naText") : TM_PRICES.formatMoney(price, currentCurrency, { price: true });

@@ -877,6 +877,65 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
    once when a token needs approval before it can swap. */
 #swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 11px; }
 
+/* Swap screen redesign: the From/To pickers and the amount field used to
+   be bare labels + selects stacked straight down the screen -- functional,
+   but reading as a plain form rather than an actual swap interface. This
+   groups From and To into their own cards (matching .coin-swap-card's look
+   elsewhere), adds a circular flip button between them like every
+   mainstream swap UI has, and turns the quote result into its own card
+   with the estimated-out amount as the headline rather than one paragraph
+   among several. None of this changes what any element IS (every #id
+   app.js reads/writes is untouched) -- only how it's grouped and styled. */
+.swap-card {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.swap-card .swap-row { margin-bottom: 0; }
+.swap-card-label {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--text-muted); margin: 0; display: block;
+}
+.swap-amount-input {
+  font-size: 22px; font-weight: 700; font-family: var(--font-body);
+  background: transparent; border: none; padding: 4px 0 0; color: var(--gold-bright);
+}
+.swap-amount-input:focus { outline: none; box-shadow: none; }
+.swap-amount-input::placeholder { color: var(--text-faint); }
+
+.swap-flip-wrap { display: flex; justify-content: center; margin: -13px 0; z-index: 1; position: relative; }
+.swap-flip-btn {
+  width: 38px; height: 38px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #3a3018 0%, #241d10 100%);
+  border: 3px solid var(--bg); color: var(--gold-bright);
+  font-size: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.swap-flip-btn:hover { border-color: var(--bg); filter: brightness(1.25); color: var(--gold-bright); }
+.swap-flip-btn:active { transform: translateY(1px) scale(0.96); }
+
+.swap-quote-btn { margin-top: 2px; }
+
+.swap-quote-card {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; display: flex; flex-direction: column; gap: 4px; text-align: center;
+}
+.swap-quote-subline { margin: 0; }
+.swap-quote-headline {
+  margin: 2px 0 6px; font-size: 21px; font-weight: 800; color: var(--gold-bright);
+}
+.swap-slippage-block { margin-top: 10px; text-align: left; }
+.swap-slippage-pills {
+  display: flex; gap: 6px; margin-top: 6px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+}
+.swap-slippage-pill {
+  flex: 1; background: transparent; border: 0; border-radius: 7px;
+  color: var(--text-muted); font: inherit; font-weight: 600; font-size: 12px; padding: 7px 4px;
+}
+.swap-slippage-pill.active { background: var(--gold); color: var(--gold-ink); }
+.swap-slippage-pill:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
+#swap-quote-display .primary, #swap-quote-display .secondary { margin-top: 10px; }
+
 /* A soft gold glow across the top of a card, fading into the card's own
    solid fill by 44px down -- a small decorative accent, without making
    any part of the card itself see-through. This used to be a cropped
