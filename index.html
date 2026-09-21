@@ -82,6 +82,7 @@
     </div>
     <button id="btn-goto-create" class="primary" data-i18n="onboarding.createBtn">Create a new wallet</button>
     <button id="btn-goto-import" class="secondary" data-i18n="onboarding.importBtn">Import an existing wallet</button>
+    <button id="btn-goto-signin" class="link">Sign in to restore a backup</button>
     <button id="btn-goto-support-onboarding" class="link" data-i18n="common.needHelp">Need help?</button>
   </section>
 
@@ -125,6 +126,20 @@
     <p id="unlock-error" class="error hidden"></p>
     <button class="link" id="btn-goto-reset" data-i18n="unlock.resetInsteadBtn">Reset wallet instead</button>
     <button class="link" id="btn-goto-support-unlock" data-i18n="common.needHelp">Need help?</button>
+  </section>
+
+  <!-- SIGN IN -- restores an encrypted wallet backup saved to a Token
+       Exchange account (see lib/account.js / auth-api.js) from another
+       device. Only reachable pre-wallet, from onboarding, since it writes
+       a fresh vault to this device the same way Create/Import do. -->
+  <section id="screen-signin" class="screen hidden">
+    <h2>Sign in to restore</h2>
+    <p class="muted">If you've backed up a wallet to a Token Exchange account from another device, sign in here to restore it on this one. Your password decrypts it locally -- it's never sent anywhere.</p>
+    <input type="text" id="signin-username" autocomplete="username" placeholder="Username" />
+    <input type="password" id="signin-password" autocomplete="current-password" placeholder="Password" />
+    <button id="btn-signin-submit" class="primary">Sign in</button>
+    <p id="signin-error" class="error hidden"></p>
+    <button class="link back-btn" data-back="screen-onboarding">Back</button>
   </section>
 
   <!-- HOME / ACTIVITY / SEND -- three faces of one rotating cube (see
@@ -477,6 +492,7 @@
   <!-- SETTINGS -->
   <section id="screen-settings" class="screen hidden">
     <h2 data-i18n="settings.title">Settings</h2>
+    <button id="btn-goto-account" class="secondary">Backup &amp; account</button>
     <button id="btn-add-account" class="secondary" data-i18n="settings.addAccountBtn">Add account</button>
     <button id="btn-goto-import-key" class="secondary" data-i18n="settings.importKeyBtn">Import private key</button>
     <button id="btn-goto-add-watch" class="secondary" data-i18n="settings.addWatchBtn">Add watch-only address</button>
@@ -533,6 +549,50 @@
     <div id="feedback-list"></div>
     <p id="feedback-empty" class="muted hidden" data-i18n="feedback.empty">No requests yet -- be the first!</p>
     <p class="muted" data-i18n="feedback.contactLine">Prefer email? Reach us at amunra325@gmail.com</p>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- ACCOUNT / BACKUP -- optional online backup of the encrypted vault
+       (see lib/account.js / auth-api.js), plus the wallet's local password
+       change (TM_PREPARE_PASSWORD_CHANGE / TM_COMMIT_PASSWORD_CHANGE),
+       which lives here rather than in Settings since changing the wallet
+       password also has to update the account's backup encryption. -->
+  <section id="screen-account" class="screen hidden">
+    <h2>Backup &amp; account</h2>
+    <p id="account-unavailable" class="warn hidden">Accounts aren't available on this server yet.</p>
+
+    <div id="account-signed-out">
+      <p class="muted">Create a free account to keep an encrypted backup of this wallet, so you can restore it on another device with your password. Your recovery phrase still works too -- this is an extra option, not a replacement.</p>
+      <input type="text" id="account-username" autocomplete="username" placeholder="Choose a username" />
+      <input type="password" id="account-password" autocomplete="new-password" placeholder="Password (min 12 characters)" />
+      <input type="password" id="account-password-confirm" autocomplete="new-password" placeholder="Confirm password" />
+      <p class="muted small">This has to match your wallet's current unlock password -- change it below first if you'd rather use a different one.</p>
+      <button id="btn-account-create" class="primary">Create account &amp; back up</button>
+    </div>
+
+    <div id="account-signed-in" class="hidden">
+      <p>Signed in as <strong id="account-name"></strong></p>
+      <p id="account-sync-status" class="muted small"></p>
+      <button id="btn-account-sync" class="secondary">Back up now</button>
+      <button id="btn-account-signout" class="link">Sign out</button>
+    </div>
+
+    <p id="account-status" class="hint hidden"></p>
+    <p id="account-error" class="error hidden"></p>
+
+    <div class="tokens-header"><span class="tokens-title">CHANGE WALLET PASSWORD</span></div>
+    <input type="password" id="pw-current" autocomplete="current-password" placeholder="Current password" />
+    <input type="password" id="pw-new" autocomplete="new-password" placeholder="New password" />
+    <input type="password" id="pw-new-confirm" autocomplete="new-password" placeholder="Confirm new password" />
+    <button id="btn-pw-change" class="secondary">Change password</button>
+
+    <div id="account-delete-box" class="hidden">
+      <div class="tokens-header"><span class="tokens-title">DELETE ACCOUNT</span></div>
+      <p class="muted small">Removes your online backup only -- the wallet on this device is unaffected.</p>
+      <input type="password" id="account-delete-password" placeholder="Password" />
+      <button id="btn-account-delete" class="danger">Delete account</button>
+    </div>
+
     <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
   </section>
 
@@ -727,6 +787,7 @@
 <script src="wallet-engine.js"></script>
 <script src="cube-nav.js"></script>
 <script src="app.js"></script>
+<script src="lib/account.js"></script>
 <script src="lib/feature-requests.js"></script>
 </body>
 </html>

@@ -340,6 +340,7 @@ $("backup-confirm-check").addEventListener("change", (e) => {
 $("btn-backup-done").addEventListener("click", async () => {
   await refreshMain();
   showScreen("screen-main");
+  window.TM_ACCOUNT_UI?.autoSync(); // new wallet -- nothing to back up yet unless already signed in from a prior account
 });
 
 $("btn-import-submit").addEventListener("click", async () => {
@@ -353,6 +354,7 @@ $("btn-import-submit").addEventListener("click", async () => {
     await sendMsg("TM_IMPORT_MNEMONIC", { mnemonic, password: pw });
     await refreshMain();
     showScreen("screen-main");
+    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) {
     showError("import-error", e.message);
   }
@@ -502,6 +504,7 @@ $("account-select").addEventListener("change", async (e) => {
       return showError("main-error", err.message);
     }
     await refreshMain();
+    window.TM_ACCOUNT_UI?.autoSync();
     return;
   }
   await sendMsg("TM_SELECT_ACCOUNT", { address: e.target.value });
@@ -1684,6 +1687,7 @@ $("btn-add-account").addEventListener("click", async () => {
   try {
     await sendMsg("TM_ADD_ACCOUNT", {});
     await refreshMain();
+    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) { alert(friendlyErrorMessage(e.message)); }
 });
 $("btn-goto-import-key").addEventListener("click", () => showScreen("screen-import-key"));
@@ -1713,6 +1717,7 @@ $("btn-import-key-submit").addEventListener("click", async () => {
     await sendMsg("TM_IMPORT_PRIVATE_KEY", { privateKey: $("import-key-input").value });
     await refreshMain();
     showScreen("screen-main");
+    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) {
     showError("import-key-error", e.message);
   }
@@ -1726,6 +1731,7 @@ $("btn-add-watch-submit").addEventListener("click", async () => {
     $("add-watch-label").value = "";
     await refreshMain();
     showScreen("screen-main");
+    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) {
     showError("add-watch-error", e.message);
   }

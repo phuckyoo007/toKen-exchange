@@ -160,6 +160,7 @@ if (typeof self !== "undefined") {
   self.TM_WALLET = {
     hasVault,
     getAccountsMeta,
+    setAccountsMeta,
     createNewVault,
     importFromMnemonic,
     unlockVault,

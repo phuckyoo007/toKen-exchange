@@ -5,6 +5,7 @@ const handler = require("serve-handler");
 const { handleFeatureRequestsApi } = require("./feature-requests-api");
 const { handleMoonpaySignApi } = require("./moonpay-sign-api");
 const { handleSwapQuoteApi } = require("./swap-quote-api");
+const { handleAuthApi } = require("./auth-api");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -17,7 +18,7 @@ const PORT = process.env.PORT || 3000;
 
 const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "manifest.json"];
 const LIB_FILES = [
-"buy-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
+"account.js", "buy-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
 "identicon.js", "networks.js", "polymarket.js", "prices.js", "sell-config.js",
 "sanctions-list.js", "support-config.js", "swap.js", "wallet.js",
 "walletconnect-config.js",
@@ -79,6 +80,7 @@ const server = http.createServer((req, res) => {
 if (handleFeatureRequestsApi(req, res)) return;
 if (handleMoonpaySignApi(req, res)) return;
 if (handleSwapQuoteApi(req, res)) return;
+if (handleAuthApi(req, res)) return;
 handler(req, res, { public: PUBLIC_DIR });
 });
 server.listen(PORT, () => console.log("Serving on port " + PORT));

@@ -69,6 +69,9 @@ function assertNotSanctioned(address, label) {
 let unlockedSecret = null; // { mnemonic, importedKeys }
 let unlockedPassword = null;
 let selectedAddress = null;
+// Set by TM_PREPARE_PASSWORD_CHANGE, consumed by TM_COMMIT_PASSWORD_CHANGE --
+// see those cases below for why this is split into two steps.
+let pendingNewPassword = null;
 
 // Set by TM_SWAP_QUOTE, read by TM_SWAP_ALLOWANCE/TM_SWAP_APPROVE/
 // TM_SWAP_EXECUTE so those steps use whichever spender/transaction the
@@ -569,6 +572,7 @@ async function handleMessage(msg) {
           case "TM_LOCK": {
             unlockedSecret = null;
             unlockedPassword = null;
+            pendingNewPassword = null;
             sendResponse({ ok: true });
             break;
           }
@@ -606,10 +610,95 @@ async function handleMessage(msg) {
             break;
           }
 
+          // ---- optional online account backup (lib/account.js / auth-api.js) ----
+          // These four exist for the "Backup & account" screen: confirming the
+          // wallet password before linking an account, exporting/restoring the
+          // whole wallet as one encrypted blob the account server can store
+          // (it never sees the plaintext), and changing the local wallet
+          // password in lockstep with that account's backup.
+
+          case "TM_VERIFY_PASSWORD": {
+            requireUnlocked();
+            if (msg.password !== unlockedPassword) throw new Error("Incorrect password.");
+            sendResponse({ ok: true });
+            break;
+          }
+
+          // Packages everything needed to fully restore this wallet elsewhere
+          // (seed phrase, any imported private keys, and the account list --
+          // names, watch addresses, HD/imported indices) into one blob
+          // encrypted the same way the local vault already is, under the
+          // wallet's own current password. The server only ever sees this
+          // ciphertext (see auth-api.js's header comment).
+          case "TM_EXPORT_BUNDLE": {
+            requireUnlocked();
+            const accountsMeta = await TM_WALLET.getAccountsMeta();
+            const payload = { v: 1, mnemonic: unlockedSecret.mnemonic, importedKeys: unlockedSecret.importedKeys, accountsMeta };
+            const bundle = await TM_CRYPTO.encryptJSON(payload, unlockedPassword);
+            sendResponse({ ok: true, bundle });
+            break;
+          }
+
+          // The inverse of TM_EXPORT_BUNDLE -- only ever called from the
+          // sign-in screen, which is only reachable pre-wallet (onboarding),
+          // so this refuses rather than silently overwriting if a vault
+          // already exists on this device.
+          case "TM_RESTORE_BUNDLE": {
+            if (await TM_WALLET.hasVault()) {
+              throw new Error("A wallet already exists on this device. Reset it first if you want to restore a different one.");
+            }
+            const payload = await TM_CRYPTO.decryptJSON(msg.bundle, msg.password);
+            if (payload.v !== 1 || typeof payload.mnemonic !== "string" || !Array.isArray(payload.importedKeys) || !Array.isArray(payload.accountsMeta)) {
+              throw new Error("This backup looks corrupted and can't be restored.");
+            }
+            const secret = { mnemonic: payload.mnemonic, importedKeys: payload.importedKeys };
+            await TM_WALLET.persistVault(secret, msg.password);
+            await TM_WALLET.setAccountsMeta(payload.accountsMeta);
+            unlockedSecret = secret;
+            unlockedPassword = msg.password;
+            selectedAddress = payload.accountsMeta[0]?.address || null;
+            sendResponse({ ok: true, address: selectedAddress });
+            break;
+          }
+
+          // Phase 1 of a password change (see lib/account.js's changePassword):
+          // verifies the current password and builds a bundle encrypted under
+          // the new one, but changes nothing on this device yet. If there's a
+          // linked account, the caller uploads this bundle to replace the
+          // server's copy BEFORE phase 3 commits locally -- so a failed
+          // upload (offline, server error) leaves the device's password
+          // exactly as it was, never out of step with the account.
+          case "TM_PREPARE_PASSWORD_CHANGE": {
+            requireUnlocked();
+            if (msg.oldPassword !== unlockedPassword) throw new Error("Incorrect password.");
+            if (!msg.newPassword || msg.newPassword.length < 8) throw new Error("Choose a password of at least 8 characters.");
+            const accountsMeta = await TM_WALLET.getAccountsMeta();
+            const payload = { v: 1, mnemonic: unlockedSecret.mnemonic, importedKeys: unlockedSecret.importedKeys, accountsMeta };
+            const bundle = await TM_CRYPTO.encryptJSON(payload, msg.newPassword);
+            pendingNewPassword = msg.newPassword;
+            sendResponse({ ok: true, bundle });
+            break;
+          }
+
+          // Phase 3: re-encrypts the local vault under the password staged by
+          // TM_PREPARE_PASSWORD_CHANGE. Always the last step, whether or not
+          // there's a linked account -- this IS the wallet's own "change
+          // password" (there is no separate, account-free path).
+          case "TM_COMMIT_PASSWORD_CHANGE": {
+            requireUnlocked();
+            if (!pendingNewPassword) throw new Error("No password change is pending.");
+            await TM_WALLET.persistVault(unlockedSecret, pendingNewPassword);
+            unlockedPassword = pendingNewPassword;
+            pendingNewPassword = null;
+            sendResponse({ ok: true });
+            break;
+          }
+
           case "TM_RESET_WALLET": {
             await TM_WALLET.resetWallet();
             unlockedSecret = null;
             unlockedPassword = null;
+            pendingNewPassword = null;
             selectedAddress = null;
             sendResponse({ ok: true });
             break;
