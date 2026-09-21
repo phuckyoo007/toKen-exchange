@@ -75,7 +75,7 @@
     "addToken.invalidAddress": "Saisissez une adresse de contrat valide.",
     "addToken.noName": "(sans nom)",
     "addToken.swapUnavailableSuffix": " (échange indisponible)",
-    "network.coinbaseCashOutSuffix": " (retrait via Coinbase)",
+    "network.coinbaseCashOutSuffix": " \ud83d\udcb5",
 
     "prices.description": "Cours en USD fournis par l'API publique de CoinGecko. À titre purement informatif -- aucune information sur votre portefeuille n'est envoyée pour obtenir ces données.",
     "prices.loading": "Chargement...",

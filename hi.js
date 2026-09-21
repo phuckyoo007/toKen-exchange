@@ -75,7 +75,7 @@
     "addToken.invalidAddress": "एक मान्य कॉन्ट्रैक्ट एड्रेस दर्ज करें।",
     "addToken.noName": "(कोई नाम नहीं)",
     "addToken.swapUnavailableSuffix": " (स्वैप उपलब्ध नहीं)",
-    "network.coinbaseCashOutSuffix": " (Coinbase से नकद निकासी)",
+    "network.coinbaseCashOutSuffix": " \ud83d\udcb5",
 
     "prices.description": "CoinGecko के पब्लिक API से USD में कीमतें। यह पूरी तरह जानकारी के लिए है -- इन्हें देखने के लिए आपके वॉलेट की कोई भी जानकारी कहीं नहीं भेजी जाती।",
     "prices.loading": "लोड हो रहा है...",

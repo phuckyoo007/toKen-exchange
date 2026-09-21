@@ -75,7 +75,7 @@
     "addToken.invalidAddress": "请输入有效的合约地址。",
     "addToken.noName": "（无名称）",
     "addToken.swapUnavailableSuffix": "（不支持兑换）",
-    "network.coinbaseCashOutSuffix": "（可通过 Coinbase 提现）",
+    "network.coinbaseCashOutSuffix": " \ud83d\udcb5",
 
     "prices.description": "美元价格来自 CoinGecko 的公共 API，仅供参考——查询过程中不会发送任何与您钱包相关的信息。",
     "prices.loading": "加载中...",

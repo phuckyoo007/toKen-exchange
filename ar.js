@@ -74,7 +74,7 @@
     "addToken.invalidAddress": "أدخل عنوان عقد صالحًا.",
     "addToken.noName": "(بلا اسم)",
     "addToken.swapUnavailableSuffix": " (المبادلة غير متاحة)",
-    "network.coinbaseCashOutSuffix": " (سحب نقدي عبر Coinbase)",
+    "network.coinbaseCashOutSuffix": " \ud83d\udcb5",
 
     "prices.description": "أسعار الدولار الأمريكي مأخوذة من واجهة CoinGecko العامة. لأغراض إعلامية فقط -- لا يتم إرسال أي بيانات عن محفظتك للحصول عليها.",
     "prices.loading": "جارٍ التحميل...",
