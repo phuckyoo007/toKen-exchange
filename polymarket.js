@@ -45,15 +45,40 @@
     // 0 is "Yes" for the near-universal Yes/No framing this wallet displays).
     const leadName = outcomes[0] != null ? String(outcomes[0]) : null;
     const leadPct = Number.isFinite(prices[0]) ? Math.round(prices[0] * 100) : null;
+    // Polymarket's public site pages live at polymarket.com/event/<slug>,
+    // keyed by the EVENT's slug -- not necessarily the same as this market's
+    // own `slug` field (a market can belong to a multi-outcome event whose
+    // slug differs). The Gamma API's /markets response nests a back-reference
+    // to its parent event(s) in an `events` array; use that event's slug when
+    // present, and fall back to the market's own slug otherwise (the common
+    // case for simple Yes/No markets, where the two are typically the same).
+    const events = Array.isArray(m.events) ? m.events : [];
+    const eventSlug = events[0] && events[0].slug ? String(events[0].slug) : "";
+    const marketSlug = m.slug ? String(m.slug) : "";
     return {
       id: m.id,
       question: m.question || "",
-      slug: m.slug || "",
+      slug: marketSlug,
+      eventSlug,
       leadName,
       leadPct,
       volume24hr: Number(m.volume24hr) || 0,
       endDate: m.endDate || null,
     };
+  }
+
+  // Builds a link to view (and, on Polymarket's own site, act on) this
+  // market. This wallet never places the bet itself -- see the file header
+  // -- it only opens Polymarket's own page, which enforces Polymarket's own
+  // location/eligibility restrictions same as if the user had navigated
+  // there directly. Falls back to a search-by-question link when no usable
+  // slug is available at all, so this never produces a link that's
+  // guaranteed to 404.
+  function buildMarketUrl(m) {
+    const slug = (m && (m.eventSlug || m.slug)) || "";
+    if (slug) return `https://polymarket.com/event/${encodeURIComponent(slug)}`;
+    const q = (m && m.question) || "";
+    return `https://polymarket.com/search?q=${encodeURIComponent(q)}`;
   }
 
   async function fetchTrendingRaw(limit) {
@@ -89,6 +114,7 @@
   if (typeof self !== "undefined") {
     self.TM_POLYMARKET = {
       getTrendingMarkets,
+      buildMarketUrl,
     };
   }
 })();
