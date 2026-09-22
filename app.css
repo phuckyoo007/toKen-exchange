@@ -909,6 +909,17 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .swap-amount-input:focus { outline: none; box-shadow: none; }
 .swap-amount-input::placeholder { color: var(--text-faint); }
 
+/* Balance + Max under the From amount field, matching mainstream swap
+   UIs (MetaMask, Coinbase Wallet) that show what you hold right where
+   you're typing how much to spend, with a one-tap way to spend all of it. */
+.swap-balance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.swap-balance-row .small { font-size: 12px; }
+#btn-swap-max {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--gold-bright);
+}
+#btn-swap-max:hover { filter: brightness(1.2); }
+
 .swap-flip-wrap { display: flex; justify-content: center; margin: -13px 0; z-index: 1; position: relative; }
 .swap-flip-btn {
   width: 38px; height: 38px; padding: 0; border-radius: 50%;
@@ -930,6 +941,15 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .swap-quote-headline {
   margin: 2px 0 6px; font-size: 21px; font-weight: 800; color: var(--gold-bright);
 }
+
+/* Rate / App fee / Minimum received -- the same label-left, value-right
+   breakdown rows every mainstream swap UI shows under the headline amount,
+   so the cost and worst-case outcome are visible before confirming. */
+.swap-quote-rows { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.swap-quote-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; }
+.swap-quote-row-label { color: var(--text-muted); }
+.swap-quote-row-value { color: var(--text); font-weight: 600; text-align: right; }
+
 .swap-slippage-block { margin-top: 10px; text-align: left; }
 .swap-slippage-pills {
   display: flex; gap: 6px; margin-top: 6px;

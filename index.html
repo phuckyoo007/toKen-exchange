@@ -529,6 +529,10 @@
           <input type="text" id="swap-from-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
         </div>
         <input type="text" id="swap-amount-in" class="swap-amount-input" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+        <div id="swap-balance-row" class="swap-balance-row hidden">
+          <span id="swap-balance-text" class="muted small"></span>
+          <button type="button" id="btn-swap-max" class="link" data-i18n="swap.maxBtn">Max</button>
+        </div>
       </div>
 
       <div class="swap-flip-wrap">
@@ -550,7 +554,21 @@
       <div id="swap-quote-display" class="swap-quote-card hidden">
         <p id="swap-net-line" class="muted swap-quote-subline"></p>
         <p id="swap-quote-line" class="swap-quote-headline"></p>
-        <p id="swap-fee-line" class="muted swap-quote-subline"></p>
+
+        <div class="swap-quote-rows">
+          <div class="swap-quote-row">
+            <span class="swap-quote-row-label" data-i18n="swap.rateLabel">Rate</span>
+            <span id="swap-rate-line" class="swap-quote-row-value"></span>
+          </div>
+          <div class="swap-quote-row">
+            <span class="swap-quote-row-label" data-i18n="swap.appFeeLabel">App fee</span>
+            <span id="swap-fee-line" class="swap-quote-row-value"></span>
+          </div>
+          <div class="swap-quote-row">
+            <span class="swap-quote-row-label" data-i18n="swap.minReceivedLabel">Minimum received</span>
+            <span id="swap-min-received-line" class="swap-quote-row-value"></span>
+          </div>
+        </div>
 
         <div class="swap-slippage-block">
           <span class="swap-card-label" data-i18n="swap.slippageLabel">Slippage tolerance</span>

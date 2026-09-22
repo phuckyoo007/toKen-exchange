@@ -1237,6 +1237,8 @@ function assetLabel(a) {
 
 // ---- Swap screen asset pickers (From = what you hold, To = any of your assets)
 let swapPopulateGen = 0;
+let swapHeldAssets = []; // cached from the last populateSwapSelects, reused for the balance/Max row
+let swapBalanceReqToken = 0; // guards against a slow custom-token lookup landing after a newer one
 
 function syncSwapAsset(side) {
   const sel = $(`swap-${side}-select`);
@@ -1249,12 +1251,67 @@ function syncSwapAsset(side) {
     input.value = sel.value === "native" ? "" : sel.value; // blank = native coin, as the quote code expects
   }
   $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
+  if (side === "from") updateSwapBalanceRow();
 }
+
+// Balance + Max under the From field. For a held asset (native or a
+// tracked token) this is free -- populateSwapSelects already fetched every
+// held balance for the dropdown labels, so it's just a cache lookup. Only
+// a pasted custom address needs its own RPC call.
+async function updateSwapBalanceRow() {
+  const sel = $("swap-from-select");
+  const myToken = ++swapBalanceReqToken;
+  if (sel.value !== "custom") {
+    const held = swapHeldAssets.find((a) => a.key === sel.value);
+    if (!held) { $("swap-balance-row").classList.add("hidden"); return; }
+    showSwapBalance(held.balance, held.symbol, held.decimals);
+    return;
+  }
+  const address = $("swap-from-custom").value.trim();
+  if (!ethers.utils.isAddress(address)) { $("swap-balance-row").classList.add("hidden"); return; }
+  try {
+    const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: address });
+    if (myToken !== swapBalanceReqToken) return; // a newer lookup has since started
+    showSwapBalance(ethers.utils.formatUnits(info.balanceWei, info.decimals), info.symbol, info.decimals);
+  } catch (e) {
+    if (myToken !== swapBalanceReqToken) return;
+    $("swap-balance-row").classList.add("hidden"); // not a real token on this network -- Get quote will surface the real error
+  }
+}
+
+function showSwapBalance(balanceStr, symbol, decimals) {
+  const n = Number(balanceStr);
+  $("swap-balance-text").textContent = TM_I18N.t("swap.balanceLabel", {
+    amount: isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 5 }) : balanceStr,
+    symbol,
+  });
+  $("swap-balance-row").classList.remove("hidden");
+  const btn = $("btn-swap-max");
+  btn.dataset.balance = balanceStr;
+  btn.dataset.decimals = decimals;
+}
+
+$("btn-swap-max").addEventListener("click", () => {
+  const btn = $("btn-swap-max");
+  if (!btn.dataset.balance) return;
+  $("swap-amount-in").value = btn.dataset.balance;
+  $("swap-quote-display").classList.add("hidden"); // amount changed -- old quote no longer applies
+});
+
+// A pasted custom "From" address needs its own balance lookup, unlike a
+// held asset picked from the dropdown -- debounced so it doesn't fire on
+// every keystroke.
+let swapFromCustomDebounce = null;
+$("swap-from-custom").addEventListener("input", () => {
+  clearTimeout(swapFromCustomDebounce);
+  swapFromCustomDebounce = setTimeout(updateSwapBalanceRow, 400);
+});
 
 async function populateSwapSelects(pre) {
   const myGen = ++swapPopulateGen;
   const held = await getHeldAssets();
   if (myGen !== swapPopulateGen) return;
+  swapHeldAssets = held;
   const fromSel = $("swap-from-select");
   const toSel = $("swap-to-select");
   const toKey = pre && pre.toKey;
@@ -1327,11 +1384,29 @@ $("btn-swap-flip").addEventListener("click", () => {
 // Slippage pills are a nicer-looking stand-in for the real #swap-slippage
 // select below them -- that select is what btn-swap-execute's handler
 // actually reads, so these just keep it in sync rather than replacing it.
+// Minimum received: the quoted output amount after slippage tolerance is
+// applied -- the same basis-point math lib/swap.js's applySlippage uses on
+// the signing side, mirrored here so the number shown before confirming
+// matches what the transaction itself will actually enforce as amountOutMin.
+// Recomputed from the cached quote (no new request) whenever the slippage
+// choice changes, so it never goes stale next to the pill/select above it.
+function updateSwapMinReceived() {
+  const d = $("swap-quote-display").dataset;
+  if (!d.amountOutWei) return;
+  const slippageBps = Number($("swap-slippage").value);
+  const minWei = ethers.BigNumber.from(d.amountOutWei).mul(10000 - slippageBps).div(10000);
+  $("swap-min-received-line").textContent = TM_I18N.t("swap.minReceivedValueLine", {
+    amount: ethers.utils.formatUnits(minWei, Number(d.decimalsOut)),
+    symbol: d.symbolOut,
+  });
+}
+
 document.querySelectorAll(".swap-slippage-pill").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".swap-slippage-pill").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     $("swap-slippage").value = btn.dataset.slippage;
+    updateSwapMinReceived();
   });
 });
 
@@ -2885,6 +2960,7 @@ function setupSwapScreen(pre) {
   hideError("swap-error");
   $("swap-status").classList.add("hidden");
   $("swap-quote-display").classList.add("hidden");
+  $("swap-balance-row").classList.add("hidden");
   const unsupported = !currentNetwork.swapRouter;
   $("swap-unsupported").classList.toggle("hidden", !unsupported);
   $("swap-form").classList.toggle("hidden", unsupported);
@@ -2909,13 +2985,21 @@ $("btn-swap-quote").addEventListener("click", async () => {
     const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
 
     let decimalsOut = 18;
+    let symbolOut = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
     if (tokenOut !== TM_NATIVE()) {
       const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenOut });
       decimalsOut = info.decimals;
+      symbolOut = info.symbol;
     }
-    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
+    let symbolIn = (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
+    if (tokenIn !== TM_NATIVE()) {
+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenIn });
+      symbolIn = info.symbol;
+    }
+    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeValueLine", {
       percent: quote.feePercentLabel,
       amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
+      symbol: symbolIn,
     });
     $("swap-net-line").textContent = TM_I18N.t("swap.netAmountLine", {
       amount: ethers.utils.formatUnits(quote.netAmountInWei, decimalsIn),
@@ -2923,10 +3007,25 @@ $("btn-swap-quote").addEventListener("click", async () => {
     $("swap-quote-line").textContent = TM_I18N.t("swap.estimatedOutLine", {
       amount: ethers.utils.formatUnits(quote.amountOutWei, decimalsOut),
     });
+    // Rate: price of 1 unit of the NET amount actually routed, in terms of
+    // what comes out -- matches what mainstream swap UIs label "Rate",
+    // computed client-side from the same quote so no extra request is needed.
+    const netInNum = Number(ethers.utils.formatUnits(quote.netAmountInWei, decimalsIn));
+    const outNum = Number(ethers.utils.formatUnits(quote.amountOutWei, decimalsOut));
+    const rateNum = netInNum > 0 ? outNum / netInNum : 0;
+    $("swap-rate-line").textContent = TM_I18N.t("swap.rateLine", {
+      symIn: symbolIn,
+      symOut: symbolOut,
+      rate: rateNum.toPrecision(6).replace(/\.?0+$/, ""),
+    });
     $("swap-quote-display").dataset.tokenIn = tokenIn;
     $("swap-quote-display").dataset.tokenOut = tokenOut;
     $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
     $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
+    $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei;
+    $("swap-quote-display").dataset.decimalsOut = decimalsOut;
+    $("swap-quote-display").dataset.symbolOut = symbolOut;
+    updateSwapMinReceived();
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
