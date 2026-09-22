@@ -175,6 +175,24 @@ function sendMsg(type, payload) {
   });
 }
 
+// Races a promise against a timeout. Used for the very first TM_GET_STATUS
+// call on startup (see init() below) -- if the background/service-worker
+// side ever fails to call sendResponse at all (a dropped message, a
+// terminated service worker, etc.), sendMsg()'s promise above just hangs
+// forever with no rejection, since chrome.runtime.lastError is only
+// checked inside a callback that would never fire. Without this, that
+// left the whole app stuck on the loading spinner permanently, with no
+// error and no way out.
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Timed out.")), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
+
 // ---------------------------------------------------------------- CUBE NAV
 // Home, Activity and Send are the app's three "peer" destinations -- the
 // same three the splash screen's own tab bar already treats as equal
@@ -1134,6 +1152,16 @@ function setPricesTab(tab) {
   document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
   $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
   $("prices-stablecoin-note").classList.toggle("hidden", tab !== "currencies");
+  // Re-render immediately with whatever's already in memory for this tab
+  // (pricesBoardData for crypto, pricesRatesData for currencies) BEFORE the
+  // fresh fetch below resolves. Without this, switching tabs left the OLD
+  // tab's rows sitting in #prices-list until the new fetch finished -- and
+  // if that fetch failed (e.g. the "Couldn't reach CoinGecko for currency
+  // rates" error), it never finished at all, so tapping "Currencies" could
+  // permanently strand the previous tab's crypto rows on screen under the
+  // Currencies tab. Calling this here means a tab switch always shows the
+  // right TYPE of row (even if stale/empty) and never the other tab's data.
+  renderPricesList();
   refreshPrices();
 }
 
@@ -1268,6 +1296,43 @@ async function populateSwapSelects(pre) {
 
 ["from", "to"].forEach((side) => {
   $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
+});
+
+// Flip button between the From/To cards. Only swaps when it's actually
+// safe to: both selects have the OTHER side's current value as one of
+// their own options (From only lists held assets, To lists all known
+// assets, so those option lists don't always match -- e.g. flipping while
+// "buying" a coin not held yet would leave From pointing at an option that
+// doesn't exist). A custom pasted address on either side is the same
+// story -- nothing to safely swap it into on the other side -- so this
+// just clears the stale quote and lets the person repick instead of
+// guessing.
+$("btn-swap-flip").addEventListener("click", () => {
+  const fromSel = $("swap-from-select");
+  const toSel = $("swap-to-select");
+  const fromVal = fromSel.value;
+  const toVal = toSel.value;
+  const fromHasToOption = Array.from(fromSel.options).some((o) => o.value === toVal);
+  const toHasFromOption = Array.from(toSel.options).some((o) => o.value === fromVal);
+  if (fromVal !== "custom" && toVal !== "custom" && fromHasToOption && toHasFromOption) {
+    fromSel.value = toVal;
+    toSel.value = fromVal;
+    syncSwapAsset("from");
+    syncSwapAsset("to");
+  } else {
+    $("swap-quote-display").classList.add("hidden");
+  }
+});
+
+// Slippage pills are a nicer-looking stand-in for the real #swap-slippage
+// select below them -- that select is what btn-swap-execute's handler
+// actually reads, so these just keep it in sync rather than replacing it.
+document.querySelectorAll(".swap-slippage-pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".swap-slippage-pill").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    $("swap-slippage").value = btn.dataset.slippage;
+  });
 });
 
 // ---- Coin screen
@@ -1837,6 +1902,37 @@ async function loadCoinSwapState(gen) {
       addBtn.classList.remove("hidden");
       return;
     }
+    // No verified address for this coin on the CURRENT network -- but one
+    // might still exist on some OTHER network this wallet supports (e.g.
+    // XRP has no safe Ethereum address, per the comment on XRP's entry
+    // above, but does have a Binance-Peg one on BNB Smart Chain). Rather
+    // than send someone to "+ Add token" with nothing safe to actually add,
+    // point them at the network where a verified version already exists --
+    // same "switch there" pattern as the native-coin case above. BNB Smart
+    // Chain is checked first when it's an option: this table's own coverage
+    // (checked 2026-09-21) shows the wallet has more verified entries there
+    // than on any other single chain, so it's the most likely to have this
+    // coin if any chain does.
+    const tokenEntries = KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {};
+    const elsewhereChainIds = Object.keys(tokenEntries)
+      .map(Number)
+      .filter((id) => id !== currentNetwork.chainId);
+    elsewhereChainIds.sort((a, b) => (a === 56 ? -1 : b === 56 ? 1 : 0));
+    const tokenElsewhereChainId = elsewhereChainIds.find((id) => currentNetworks.some((n) => n.chainId === id));
+    const tokenElsewhereNet = tokenElsewhereChainId
+      ? currentNetworks.find((n) => n.chainId === tokenElsewhereChainId)
+      : null;
+    if (tokenElsewhereNet) {
+      coinDetail.switchNetworkTarget = tokenElsewhereNet;
+      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetworkToken", { symbol: c.symbol, network: tokenElsewhereNet.name }));
+      const switchBtn = $("btn-coin-switch-network");
+      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: tokenElsewhereNet.name });
+      switchBtn.classList.remove("hidden");
+      // Still offered too, in case a different address on THIS network is
+      // actually what's meant.
+      $("btn-coin-add-token").classList.remove("hidden");
+      return;
+    }
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
     // Not a dead end -- this is almost always the reason a coin shows as
     // unswappable (see the note above), so put the fix one tap away instead
@@ -2004,46 +2100,40 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
-// of opening a new tab -- see lib/buy-config.js's header comment for why
-// that's safe. Each time the screen is (re)opened, this resets back to the
-// "not loaded yet" state: description text, address row and Continue
-// button visible, iframe hidden -- ready for a fresh click.
-// The fiat currency the MoonPay Buy widget should open in: whatever the person
-// was looking at (a currency or coin screen), else their display currency.
+// MoonPay was removed from this screen (MoonPay declined Token Exchange's
+// business application -- there is no account to embed here anymore).
+// Coinbase Onramp and Onramper are the two remaining, independent Buy
+// providers; either, both, or neither may show depending on what's
+// configured/supported, and Onramper shares this screen's iframe (below)
+// since Coinbase always opens in a new tab instead.
+// The fiat currency a Buy widget should open in: whatever the person was
+// looking at (a currency or coin screen), else their display currency.
 let buyFiat = null;
 function setupBuyScreen(fiatCode) {
   buyFiat = fiatCode || currentCurrency;
   hideError("buy-error");
-  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
-  $("buy-description-manual").classList.remove("hidden");
-  $("buy-description-autofill").classList.add("hidden");
-  $("buy-address-row").classList.remove("hidden");
-  $("btn-buy-open").classList.remove("hidden");
   $("buy-frame-wrap").classList.add("hidden");
   $("buy-frame").src = "about:blank";
-  // MoonPay is muted (hidden entirely, not just left to error) until
-  // lib/buy-config.js's MOONPAY_PUBLISHABLE_API_KEY is swapped for a real
-  // pk_live_ key -- see isBuyLive()'s comment there. Until then Coinbase
-  // (below) is the only Buy path shown, on networks it supports.
-  const moonpayLive = TM_BUY_CONFIG.isBuyLive();
-  $("buy-moonpay-section").classList.toggle("hidden", !moonpayLive);
-  $("buy-moonpay-muted-note").classList.toggle("hidden", moonpayLive);
-  // Coinbase Onramp is a second, independent Buy option -- see
-  // lib/coinbase-onramp-config.js's header comment for why it exists
-  // (MoonPay's own account approval is still pending) and why it opens in
-  // a new tab instead of embedding like the MoonPay iframe above. Only
-  // shown for networks Coinbase is confirmed to support; hidden entirely
-  // otherwise rather than showing a button that would just error.
+  // Coinbase Onramp -- see lib/coinbase-onramp-config.js's header comment.
+  // Only shown for networks Coinbase is confirmed to support; hidden
+  // entirely otherwise rather than showing a button that would just error.
   const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
   $("btn-buy-coinbase").classList.toggle("hidden", !coinbaseSupported);
   $("buy-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
   $("btn-buy-coinbase").disabled = false;
+  // Onramper -- an aggregator covering 20+ underlying providers. See
+  // lib/onramper-config.js's header comment for why it needs no signing
+  // backend and so isn't network-gated the way Coinbase is above:
+  // Onramper's own widget handles network/asset selection, so it's simply
+  // muted until an API key is configured.
+  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
+  $("btn-buy-onramper").classList.toggle("hidden", !onramperLive);
+  $("buy-onramper-note").classList.toggle("hidden", !onramperLive);
+  $("btn-buy-onramper").disabled = false;
+  // Neither provider configured/supported -- say so plainly instead of
+  // leaving an empty screen with no explanation.
+  $("buy-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
 }
-
-$("btn-buy-copy-address").addEventListener("click", () => {
-  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
-});
 
 $("btn-buy-coinbase").addEventListener("click", async () => {
   hideError("buy-error");
@@ -2060,29 +2150,21 @@ $("btn-buy-coinbase").addEventListener("click", async () => {
   }
 });
 
-$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
-
-$("btn-buy-open").addEventListener("click", async () => {
+$("btn-buy-onramper").addEventListener("click", () => {
   hideError("buy-error");
-  const btn = $("btn-buy-open");
+  const btn = $("btn-buy-onramper");
   btn.disabled = true;
   try {
-    // Try for a signed URL with the address already filled in first (see
-    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
-    // manual "paste your address" flow) if that backend isn't configured
-    // or can't be reached. Either way this always embeds in the iframe
-    // below rather than opening a new tab.
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address, buyFiat);
-    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key, buyFiat);
+    // Onramper's widget loads fine with the address in the URL directly --
+    // no signing backend needed (see lib/onramper-config.js) -- so this
+    // embeds straight into the same shared iframe MoonPay's Buy uses,
+    // rather than opening a new tab like Coinbase.
+    const url = TM_ONRAMPER_CONFIG.buildOnramperBuyUrl(currentNetwork.key, address, buyFiat);
     $("buy-frame").src = url;
     $("buy-frame-wrap").classList.remove("hidden");
-    btn.classList.add("hidden");
-    if (signedUrl) {
-      $("buy-description-manual").classList.add("hidden");
-      $("buy-description-autofill").classList.remove("hidden");
-      $("buy-address-row").classList.add("hidden");
-    }
+    $("btn-buy-onramper").classList.add("hidden");
+    $("btn-buy-coinbase").classList.add("hidden");
   } catch (e) {
     showError("buy-error", e.message);
   } finally {
@@ -2090,26 +2172,24 @@ $("btn-buy-open").addEventListener("click", async () => {
   }
 });
 
+$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+
 // ---------------------------------------------------------------- SELL
-// Same embedding change as Buy -- see lib/sell-config.js's header comment
-// for why there's no address to auto-fill here.
-// The fiat currency MoonPay's Sell widget should pay out in: whatever the
-// person was looking at (a currency or coin screen), else their display currency.
+// MoonPay was removed from this screen for the same reason as Buy above.
+// Coinbase Offramp and Onramper are the two remaining, independent Sell
+// providers.
+// The fiat currency a Sell widget should pay out in: whatever the person
+// was looking at (a currency or coin screen), else their display currency.
 let sellFiat = null;
 function setupSellScreen(fiatCode) {
   sellFiat = fiatCode || currentCurrency;
   hideError("sell-error");
   hideError("sell-deposit-error");
-  $("btn-sell-open").classList.remove("hidden");
   $("sell-frame-wrap").classList.add("hidden");
   $("sell-frame").src = "about:blank";
   $("sell-send-helper").classList.add("hidden");
   $("sell-deposit-address").value = "";
   $("sell-deposit-amount").value = "";
-  // Same MoonPay-muting as Buy -- see setupBuyScreen()'s comment above.
-  const moonpayLive = TM_SELL_CONFIG.isSellLive();
-  $("sell-moonpay-section").classList.toggle("hidden", !moonpayLive);
-  $("sell-moonpay-muted-note").classList.toggle("hidden", moonpayLive);
   // Coinbase Offramp -- see lib/coinbase-onramp-config.js's header comment
   // for the two-step flow (open Coinbase in a tab, then come back and
   // fetch the deposit details). Same network-support gating as Buy.
@@ -2119,17 +2199,27 @@ function setupSellScreen(fiatCode) {
   $("btn-sell-coinbase-check").classList.add("hidden");
   $("btn-sell-coinbase").disabled = false;
   $("btn-sell-coinbase-check").disabled = false;
+  // Onramper Sell -- same muting-until-configured pattern as Buy above.
+  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
+  $("btn-sell-onramper").classList.toggle("hidden", !onramperLive);
+  $("sell-onramper-note").classList.toggle("hidden", !onramperLive);
+  $("btn-sell-onramper").disabled = false;
+  // Neither provider configured/supported -- say so plainly.
+  $("sell-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
 }
 
-$("btn-sell-open").addEventListener("click", () => {
+$("btn-sell-onramper").addEventListener("click", () => {
   hideError("sell-error");
   try {
-    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, sellFiat || currentCurrency);
+    const url = TM_ONRAMPER_CONFIG.buildOnramperSellUrl(sellFiat || currentCurrency);
     $("sell-frame").src = url;
     $("sell-frame-wrap").classList.remove("hidden");
-    $("btn-sell-open").classList.add("hidden");
-    // Step 2: once MoonPay shows a deposit address, the person pastes it
-    // here and we open Send with it filled in (they still review + confirm).
+    $("btn-sell-onramper").classList.add("hidden");
+    $("btn-sell-coinbase").classList.add("hidden");
+    // Same "paste the deposit address Onramper gives you -> Review in
+    // Send" step as MoonPay's Sell flow -- see lib/onramper-config.js's
+    // buildOnramperSellUrl() comment for why there's nothing to
+    // auto-fill here.
     $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
     $("sell-send-helper").classList.remove("hidden");
   } catch (e) {
@@ -2909,6 +2999,14 @@ async function initApprovalFlow(requestId) {
       } catch (e) {
         showError("approve-unlock-error", e.message);
       }
+    });
+    // Previously there was no way out of this screen at all -- unlock or be
+    // stuck, even if the site you didn't recognize just popped this dialog
+    // unprompted. This properly rejects the pending request (same as every
+    // other approve screen's reject button) rather than leaving the dapp's
+    // request hanging.
+    $("btn-approve-unlock-cancel").addEventListener("click", () => {
+      respondApproval(requestId, false, null, "User rejected -- wallet was locked.");
     });
     return;
   }
@@ -3786,7 +3884,16 @@ function renderActivity() {
   }
 
   showScreen("screen-loading");
-  const status = await sendMsg("TM_GET_STATUS");
+  let status;
+  try {
+    status = await withTimeout(sendMsg("TM_GET_STATUS"), 8000);
+  } catch (e) {
+    $("loading-text").classList.add("hidden");
+    $("loading-spinner").classList.add("hidden");
+    $("loading-stuck").classList.remove("hidden");
+    $("btn-loading-retry").addEventListener("click", () => location.reload());
+    return;
+  }
   if (!status.hasVault) {
     showScreen("screen-onboarding");
     activateSplashLanding();

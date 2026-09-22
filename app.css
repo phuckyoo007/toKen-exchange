@@ -141,12 +141,15 @@ body {
   position: absolute;
   inset: 0;
   z-index: -1;
+  /* Always the Ethereum-coin watermark (card-watermark.jpg), regardless of
+     the visitor's OS light/dark preference -- previously this swapped to
+     the Bitcoin-coin card-watermark-light.jpg under prefers-color-scheme:
+     light, which is the "wrong coin" look reported on a light-mode
+     browser. Token Exchange's own dark theme doesn't otherwise change
+     with OS light/dark preference, so this watermark shouldn't either. */
   background: url(img/card-watermark.jpg) center / cover no-repeat;
   opacity: 0.14;
   pointer-events: none;
-}
-@media (prefers-color-scheme: light) {
-  #app::before { background-image: url(img/card-watermark-light.jpg); }
 }
 
 /* ---------------- splash screen ----------------

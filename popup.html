@@ -445,26 +445,19 @@
   <!-- BUY -->
   <section id="screen-buy" class="screen hidden">
     <h2 data-i18n="buy.title">Buy crypto</h2>
-    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
+    <p class="muted" data-i18n="buy.description1">Buy crypto with cash through a third-party payment provider below -- Token Exchange never touches your payment details.</p>
     <div class="no-third-party-callout">
-      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip MoonPay entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip the on-ramp entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
       <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
     </div>
-    <div id="buy-moonpay-section">
-      <p class="muted" id="buy-description-manual" data-i18n-html="buy.description2Html">MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:</p>
-      <p class="muted hidden" id="buy-description-autofill" data-i18n="buy.description2AutoFill">MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.</p>
-      <div class="address-row" id="buy-address-row">
-        <span id="buy-address-display" class="mono"></span>
-        <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
-      </div>
-      <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
-      <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
-        <iframe id="buy-frame" class="widget-frame" title="MoonPay Buy" allow="payment"></iframe>
-      </div>
+    <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="buy-frame" class="widget-frame" title="Buy crypto" allow="payment"></iframe>
     </div>
-    <p class="muted small hidden" id="buy-moonpay-muted-note" data-i18n="buy.moonpayMutedNote">MoonPay isn't live here yet -- buying with Coinbase below works now.</p>
-    <button type="button" id="btn-buy-coinbase" class="secondary hidden" data-i18n="buy.coinbaseBtn">Buy with Coinbase instead</button>
-    <p class="muted small hidden" id="buy-coinbase-note" data-i18n="buy.coinbaseNote">Opens Coinbase in a new tab, with this address already filled in. A separate service from MoonPay, run by Coinbase.</p>
+    <p class="muted small hidden" id="buy-none-note" data-i18n="buy.noneConfiguredNote">Buy isn't set up yet -- this wallet's developer needs to add a payment provider first.</p>
+    <button type="button" id="btn-buy-coinbase" class="secondary hidden" data-i18n="buy.coinbaseBtn">Buy with Coinbase</button>
+    <p class="muted small hidden" id="buy-coinbase-note" data-i18n="buy.coinbaseNote">Opens Coinbase in a new tab, with this address already filled in.</p>
+    <button type="button" id="btn-buy-onramper" class="secondary hidden" data-i18n="buy.onramperBtn">Buy with Onramper</button>
+    <p class="muted small hidden" id="buy-onramper-note" data-i18n="buy.onramperNote">Opens right here, below, with a choice of over a dozen payment providers.</p>
     <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
       <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
       <span data-i18n="common.back">Back</span>
@@ -475,19 +468,16 @@
   <!-- SELL -->
   <section id="screen-sell" class="screen hidden">
     <h2 data-i18n="sell.title">Sell for cash</h2>
-    <div id="sell-moonpay-section">
-      <p class="muted" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
-      <p class="muted" data-i18n="sell.description2">MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
-      <p class="muted" data-i18n-html="sell.description3Html">When MoonPay shows you a deposit address, paste it into <strong>Step 2</strong> below and this wallet opens Send with it filled in. You still review and confirm the send yourself -- this wallet never sends funds anywhere on its own.</p>
-      <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to MoonPay</button>
-      <div id="sell-frame-wrap" class="widget-frame-wrap hidden">
-        <iframe id="sell-frame" class="widget-frame" title="MoonPay Sell" allow="payment"></iframe>
-      </div>
+    <p class="muted" data-i18n="sell.description1">Sell crypto for cash through a third-party payout provider below -- Token Exchange never touches your payout details.</p>
+    <div id="sell-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="sell-frame" class="widget-frame" title="Sell crypto" allow="payment"></iframe>
     </div>
-    <p class="muted small hidden" id="sell-moonpay-muted-note" data-i18n="sell.moonpayMutedNote">MoonPay isn't live here yet -- selling with Coinbase below works now.</p>
-    <button type="button" id="btn-sell-coinbase" class="secondary hidden" data-i18n="sell.coinbaseBtn">Sell with Coinbase instead</button>
-    <p class="muted small hidden" id="sell-coinbase-note" data-i18n="sell.coinbaseNote">Opens Coinbase in a new tab. A separate service from MoonPay, run by Coinbase.</p>
+    <p class="muted small hidden" id="sell-none-note" data-i18n="sell.noneConfiguredNote">Sell isn't set up yet -- this wallet's developer needs to add a payout provider first.</p>
+    <button type="button" id="btn-sell-coinbase" class="secondary hidden" data-i18n="sell.coinbaseBtn">Sell with Coinbase</button>
+    <p class="muted small hidden" id="sell-coinbase-note" data-i18n="sell.coinbaseNote">Opens Coinbase in a new tab.</p>
     <button type="button" id="btn-sell-coinbase-check" class="link hidden" data-i18n="sell.coinbaseCheckBtn">I've finished on Coinbase -- get my deposit details</button>
+    <button type="button" id="btn-sell-onramper" class="secondary hidden" data-i18n="sell.onramperBtn">Sell with Onramper</button>
+    <p class="muted small hidden" id="sell-onramper-note" data-i18n="sell.onramperNote">Opens right here, below, with a choice of off-ramp providers.</p>
     <div id="sell-send-helper" class="sell-send-helper hidden">
       <h3 data-i18n="sell.step2Title">Step 2: send your crypto</h3>
       <p class="muted" data-i18n="sell.step2Desc">Paste the deposit address and amount you were given below. This opens Send with them filled in, and you review and confirm the send yourself.</p>
@@ -778,9 +768,8 @@
 <script src="../vendor/qrcode-generator.js"></script>
 <script src="../lib/prices.js"></script>
 <script src="../lib/polymarket.js"></script>
-<script src="../lib/buy-config.js"></script>
 <script src="../lib/coinbase-onramp-config.js"></script>
-<script src="../lib/sell-config.js"></script>
+<script src="../lib/onramper-config.js"></script>
 <script src="../lib/i18n/en.js"></script>
 <script src="../lib/i18n/ar.js"></script>
 <script src="../lib/i18n/zh.js"></script>

@@ -38,7 +38,7 @@ function currencySymbol() {
 }
 
 function formatCurrency(amount) {
-  return `${currencySymbol()}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return TM_PRICES.formatMoney(amount, currentCurrency);
 }
 
 // ---------------------------------------------------------------- NETWORK COLORS
@@ -112,10 +112,107 @@ function sendMsg(type, payload) {
   });
 }
 
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
-  $(id).classList.remove("hidden");
+// sendMsg()'s promise above only ever resolves/rejects from inside the
+// chrome.runtime.sendMessage callback -- if the background/service-worker
+// side ever fails to call sendResponse at all (a dropped message, a
+// terminated service worker, etc.), that promise just hangs forever with
+// no rejection, since chrome.runtime.lastError is only checked inside a
+// callback that would never fire. Without this, that left the whole app
+// stuck on the loading spinner permanently, with no error and no way out.
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Timed out.")), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
 }
+
+// ---------------------------------------------------------------- CUBE NAV
+// Home, Activity and Send are the app's three "peer" destinations -- the
+// same three the splash screen's own tab bar already treats as equal
+// starting points (see activateSplashHome() below; Assets is the fourth
+// icon there, but it's always just been screen-main scrolled to the
+// tokens list, not a separate screen, so it stays that way here too).
+// Once inside the app these three now live as three faces of a rotating
+// cube (see cube-nav.js) instead of plain sibling screens that just swap
+// with a hard cut: clicking Send from Home, or hitting Back from Send,
+// turns the cube instead. Every other screen -- Settings, Swap, Buy, Add
+// token, the dapp-approval dialogs, and so on -- still shows/hides exactly
+// like before, as a plain overlay on top of the cube (its own Back button
+// always returns to screen-main, landing back on the cube's Home face).
+const CUBE_FACE_ORDER = ["screen-main", "screen-activity", "screen-send"];
+let cubeNav = null;
+
+function mountCubeNav() {
+  if (cubeNav || !window.CubeNav) return;
+  const stageRoot = $("cube-stage");
+  if (!stageRoot) return;
+  const faces = CUBE_FACE_ORDER.map((id) => ({ id, el: $(id) }));
+  if (faces.some((f) => !f.el)) return;
+  cubeNav = window.CubeNav.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
+  // The cube keeps every face permanently in the DOM (just rotated out of
+  // view) so the 3D transform has something to show on every side -- so
+  // these three stop being ".hidden"-toggled like a normal screen the
+  // moment the cube takes them over. CubeNav's own aria-hidden/inert/dim
+  // handles "not the current face" instead.
+  CUBE_FACE_ORDER.forEach((id) => $(id).classList.remove("hidden"));
+  stageRoot.addEventListener("facechange", updateCubeTabbarActive);
+  updateCubeTabbarActive();
+}
+
+function updateCubeTabbarActive() {
+  const bar = $("cube-tabbar");
+  if (!bar || !cubeNav) return;
+  const activeId = CUBE_FACE_ORDER[cubeNav.index];
+  bar.querySelectorAll(".cube-tab").forEach((btn) => {
+    const goto = btn.dataset.cubeGoto;
+    btn.classList.toggle("active", goto !== "assets" && CUBE_FACE_ORDER[Number(goto)] === activeId);
+  });
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach((el) => {
+    if (!CUBE_FACE_ORDER.includes(el.id)) el.classList.add("hidden");
+  });
+  const shell = $("cube-shell");
+  const faceIndex = CUBE_FACE_ORDER.indexOf(id);
+  if (faceIndex >= 0) {
+    mountCubeNav();
+    if (shell) shell.classList.remove("hidden");
+    if (cubeNav) cubeNav.go(faceIndex);
+    else $(id).classList.remove("hidden"); // CubeNav script missing/failed -- fall back to a plain screen
+  } else {
+    if (shell) shell.classList.add("hidden");
+    $(id).classList.remove("hidden");
+  }
+}
+
+// Persistent tab bar for the cube's three faces (plus the Assets shortcut),
+// visible only while a cube face is showing -- its own CSS follows
+// #cube-shell's hidden state, same as the cube itself.
+(function wireCubeTabbar() {
+  const bar = $("cube-tabbar");
+  if (!bar) return;
+  bar.querySelectorAll(".cube-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const goto = btn.dataset.cubeGoto;
+      if (goto === "assets") {
+        showScreen("screen-main");
+        const tokensHeader = document.querySelector("#screen-main .tokens-header");
+        if (tokensHeader) tokensHeader.scrollIntoView({ block: "start" });
+      } else if (goto === "1") {
+        renderActivity();
+        showScreen("screen-activity");
+      } else if (goto === "2") {
+        showScreen("screen-send");
+      } else {
+        showScreen("screen-main");
+      }
+    });
+  });
+})();
 
 function showError(id, message) {
   const el = $(id);
@@ -215,7 +312,16 @@ async function refreshMain() {
   currentNetworks.forEach((n) => {
     const opt = document.createElement("option");
     opt.value = n.chainId;
-    opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
+    // Marks which networks Coinbase Sell (see lib/coinbase-onramp-config.js)
+    // actually works on, right in the network switcher, so the answer to
+    // "how do I turn this into cash" is visible before switching -- rather
+    // than only surfacing on the Sell screen after picking a network that
+    // turns out not to be supported.
+    const coinbaseCashOut = TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(n.key);
+    opt.textContent =
+      n.name +
+      (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix")) +
+      (coinbaseCashOut ? TM_I18N.t("network.coinbaseCashOutSuffix") : "");
     if (n.chainId === currentNetwork.chainId) opt.selected = true;
     netSel.appendChild(opt);
   });
@@ -411,9 +517,9 @@ async function refreshTokens() {
   });
 }
 
-function resetAddTokenScreen() {
+function resetAddTokenScreen(prefillAddress) {
   hideError("add-token-error");
-  $("add-token-address").value = "";
+  $("add-token-address").value = prefillAddress || "";
   $("add-token-preview").classList.add("hidden");
   delete $("add-token-preview").dataset.address;
 }
@@ -521,7 +627,7 @@ function renderPriceRow(c) {
   const priceText =
     c.price == null
       ? TM_I18N.t("prices.naText")
-      : `${currencySymbol()}${c.price.toLocaleString(undefined, { minimumFractionDigits: c.price < 1 ? 4 : 2, maximumFractionDigits: c.price < 1 ? 4 : 2 })}`;
+      : TM_PRICES.formatMoney(c.price, currentCurrency, { price: true });
   let changeHtml = "";
   if (typeof c.change24h === "number") {
     const cls = c.change24h >= 0 ? "up" : "down";
@@ -529,10 +635,16 @@ function renderPriceRow(c) {
     changeHtml = `<span class="price-change ${cls}">${sign}${c.change24h.toFixed(2)}%</span>`;
   }
   const starred = isWatchlisted(c.symbol);
+  // The whole row (logo, name, price) opens the in-app coin screen; the
+  // star is a separate button so pinning a coin doesn't navigate away.
+  const linkLabel = TM_I18N.t("prices.viewCoin", { name: c.name });
   row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(c.symbol)}<span><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>
-    <span class="price-right"><button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button><span class="price-usd">${priceText}</span>${changeHtml}</span>
+    <button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol)}<span class="price-id"><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>
+    <button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button>
   `;
+  row.querySelector(".price-link").addEventListener("click", () => {
+    openCoinDetail(c, $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices");
+  });
   row.querySelector(".star-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     toggleWatchlist(c.symbol);
@@ -541,21 +653,621 @@ function renderPriceRow(c) {
   return row;
 }
 
+// Prices screen state: two tabs (crypto coins / fiat currencies) sharing one
+// search box. Data is fetched once per refresh and filtered client-side as
+// the person types, so searching never triggers another CoinGecko request.
+let pricesTab = "crypto";
+let pricesBoardData = [];
+let pricesRatesData = [];
+
+function renderCurrencyRow(r) {
+  const row = document.createElement("div");
+  row.className = "price-row";
+  row.innerHTML = `
+    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
+    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
+  `;
+  return row;
+}
+
+function renderPricesList() {
+  const list = $("prices-list");
+  const q = ($("prices-search").value || "").trim().toLowerCase();
+  list.innerHTML = "";
+  let count = 0;
+  if (pricesTab === "crypto") {
+    sortByWatchlist(pricesBoardData).forEach((c) => {
+      if (q && !(c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q))) return;
+      list.appendChild(renderPriceRow(c));
+      count++;
+    });
+  } else {
+    pricesRatesData.forEach((r) => {
+      if (q && !(r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))) return;
+      list.appendChild(renderCurrencyRow(r));
+      count++;
+    });
+  }
+  if (!count) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = TM_I18N.t("prices.noResults");
+    list.appendChild(p);
+  }
+}
+
+function setPricesTab(tab) {
+  pricesTab = tab;
+  document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
+  $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
+  // Re-render immediately with whatever's already in memory for this tab
+  // (pricesBoardData for crypto, pricesRatesData for currencies) BEFORE the
+  // fresh fetch below resolves. Without this, switching tabs left the OLD
+  // tab's rows sitting in #prices-list until the new fetch finished -- and
+  // if that fetch failed (e.g. the "Couldn't reach CoinGecko for currency
+  // rates" error), it never finished at all, so tapping "Currencies" could
+  // permanently strand the previous tab's crypto rows on screen under the
+  // Currencies tab. Calling this here means a tab switch always shows the
+  // right TYPE of row (even if stale/empty) and never the other tab's data.
+  renderPricesList();
+  refreshPrices();
+}
+
+document.querySelectorAll(".prices-tab").forEach((b) => b.addEventListener("click", () => setPricesTab(b.dataset.pricesTab)));
+$("prices-search").addEventListener("input", renderPricesList);
+
 async function refreshPrices() {
   hideError("prices-error");
   $("prices-status").innerHTML = coinSpinnerHtml(TM_I18N.t("prices.loading"));
   $("prices-status").classList.remove("hidden");
   try {
-    const board = sortByWatchlist(await TM_PRICES.getPriceBoard(currentCurrency));
-    const list = $("prices-list");
-    list.innerHTML = "";
-    board.forEach((c) => list.appendChild(renderPriceRow(c)));
+    if (pricesTab === "crypto") pricesBoardData = await TM_PRICES.getPriceBoard(currentCurrency);
+    else pricesRatesData = await TM_PRICES.getFiatRates(currentCurrency);
+    renderPricesList();
     $("prices-status").classList.add("hidden");
   } catch (e) {
     $("prices-status").classList.add("hidden");
     showError("prices-error", e.message);
   }
 }
+
+// ---------------------------------------------------------------- COIN DETAIL
+// The screen a Live prices row opens (same idea as MetaMask's token page):
+// price + 24h change, a price chart with a few time ranges, market stats, a
+// short description, and a Swap button. Swap here means "swap INTO this
+// coin": it is only offered when the coin exists on the selected network as
+// the native coin or as a token the person has added (matched by symbol) --
+// this wallet never guesses a token contract address. The Swap screen then
+// lets them choose which of their own holdings to pay with.
+let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null, prefillTokenAddress: null };
+
+const KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN = {
+  BTC: {
+    1: { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", symbol: "WBTC" }, // Ethereum
+    137: { address: "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6", symbol: "WBTC" }, // Polygon
+    42161: { address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", symbol: "WBTC" }, // Arbitrum
+    10: { address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095", symbol: "WBTC" }, // Optimism
+    56: { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", symbol: "BTCB" }, // BNB Smart Chain
+    8453: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC" }, // Base
+  },
+  DOGE: {
+    56: { address: "0xbA2aE424d960c26247Dd6c32edC70B295c744C43", symbol: "DOGE" }, // BNB Smart Chain (Binance-Peg)
+    8453: { address: "0xcbD06E5A2B0C65597161de254AA074E489dEb510", symbol: "cbDOGE" }, // Base (Coinbase)
+  },
+  // The rest of this table (checked 2026-09-21) extends the same coverage to
+  // every other coin in the price list. A few entries are a genuine, real
+  // first-party deployment of the coin itself (USDC/USDT/LINK/UNI/SHIB are
+  // often literally the same token on multiple chains, not a "wrapper"), so
+  // the swap-unavailable copy that calls this table "the network's own
+  // {symbol}-backed version" is a little imprecise for those -- it's still
+  // the correct, safe address, just not always a *wrapped* version.
+  USDT: {
+    1: { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", symbol: "USDT", native: true }, // Ethereum -- direct Tether issuance (tether.to/en/supported-protocols)
+    137: { address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", symbol: "USDT" }, // Polygon -- canonical PoS-bridge USDT, deep liquidity
+    56: { address: "0x55d398326f99059fF775485246999027B3197955", symbol: "BSC-USD" }, // BNB Smart Chain -- Binance-Peg; on-chain symbol is literally BSC-USD, not USDT
+    // Arbitrum, Optimism, Base: left blank. Arbitrum's old "USDT" contract has
+    // migrated to a different product (USD₮0); Optimism's bridged USDT
+    // carries an explicit on-chain disclaimer that it isn't issued or
+    // redeemable by Tether; no official/liquid Base deployment was found.
+  },
+  USDC: {
+    1: { address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", symbol: "USDC", native: true }, // Ethereum -- native Circle issuance
+    137: { address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", symbol: "USDC", native: true }, // Polygon -- native Circle issuance
+    42161: { address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", symbol: "USDC", native: true }, // Arbitrum -- native Circle issuance
+    10: { address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", symbol: "USDC", native: true }, // Optimism -- native Circle issuance
+    8453: { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", native: true }, // Base -- native Circle issuance
+    56: { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", symbol: "USDC" }, // BNB Smart Chain -- Circle doesn't issue here; this is Binance-Peg, same category as BTCB above
+    // developers.circle.com/stablecoins/usdc-contract-addresses for the 5 native ones.
+  },
+  LINK: {
+    1: { address: "0x514910771AF9Ca656af840dff83E8264EcF986CA", symbol: "LINK", native: true }, // Ethereum -- docs.chain.link
+    42161: { address: "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", symbol: "LINK", native: true }, // Arbitrum -- docs.chain.link
+    10: { address: "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6", symbol: "LINK", native: true }, // Optimism -- docs.chain.link
+    8453: { address: "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196", symbol: "LINK", native: true }, // Base -- docs.chain.link
+    // Polygon and BSC: Chainlink's own docs list a LINK address on each, but
+    // both have collapsed to near-zero on-chain liquidity. The addresses
+    // below are the ones actually carrying LINK's real trading volume there
+    // (Polygon's official bridge-mapped LINK; BSC's Binance-Peg LINK) --
+    // verified on their block explorers with a matching name/symbol, same
+    // bar as everything else here, just not the literal docs-table address.
+    137: { address: "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FAbAd39", symbol: "LINK" }, // Polygon (bridge-mapped, real liquidity)
+    56: { address: "0xf8A0BF9cF54Bb92F17374d9e9D321e6a11a51bd", symbol: "LINK" }, // BSC (Binance-Peg, real liquidity)
+  },
+  UNI: {
+    1: { address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", symbol: "UNI", native: true }, // Ethereum -- Uniswap's own default token list
+    137: { address: "0xb33EaAd8d922B1083446DC23f610c2567fB5180f", symbol: "UNI" }, // Polygon -- Uniswap's own default token list
+    42161: { address: "0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0", symbol: "UNI" }, // Arbitrum -- verified + real liquidity (not on Uniswap's own list)
+    8453: { address: "0xc3De830EA07524a0761646a6a4e4be0e114a3C83", symbol: "UNI" }, // Base -- Uniswap's own default token list
+    56: { address: "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1", symbol: "UNI" }, // BSC -- verified + real liquidity (not on Uniswap's own list)
+    // Optimism: the deployed UNI contract is real but its only pool is thin
+    // and an outlier low next to every other chain here -- excluded.
+  },
+  SHIB: {
+    1: { address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", symbol: "SHIB", native: true }, // Ethereum -- SHIB's native/original contract
+    56: { address: "0x2859e4544C4bB03966803b044A93563Bd2D0DD4D", symbol: "SHIB" }, // BNB Smart Chain -- Binance-Peg, real liquidity
+    // Polygon/Arbitrum/Optimism/Base: bridged SHIB candidates exist but are
+    // dead or unrelated copycat tokens -- excluded.
+  },
+  AVAX: {
+    56: { address: "0x1ce0C2827e2Ef14D5c4f29a091d735A204794041", symbol: "AVAX" }, // BNB Smart Chain -- Binance-Peg Avalanche, only chain with real liquidity
+  },
+  FIL: {
+    56: { address: "0x0D8Ce2A99Bb6e3B7Db580eD848240e4a0F9aE153", symbol: "FIL" }, // BNB Smart Chain -- Binance-Peg Filecoin, actively priced/traded
+    // Ethereum: checked 2026-09-21. Filecoin's own docs
+    // (docs.filecoin.io/build-on-filecoin/advanced/wrapped-fil) only give a
+    // canonical wFIL address on Filecoin's OWN network -- not one of this
+    // wallet's built-in chains, and not Ethereum. Multiple unrelated
+    // third-party "Wrapped Filecoin"/"eFIL" contracts exist on Ethereum with
+    // no official endorsement tying any one of them back to real FIL --
+    // same situation as XRP above, excluded rather than risk the wrong one.
+    // Polygon/Arbitrum/Optimism/Base: no candidate found with confirmed real
+    // liquidity -- left blank rather than guess.
+  },
+  XRP: {
+    56: { address: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dbe", symbol: "XRP" }, // BNB Smart Chain -- Binance-Peg XRP
+    8453: { address: "0xcb585250F852C6c6bf90434AB21A00f02833a4Af", symbol: "cbXRP" }, // Base -- Coinbase Wrapped XRP, 1:1 custody-backed
+    // Ethereum: multiple colliding "Wrapped XRP" tokens from different,
+    // unclear issuers found -- excluded rather than risk the wrong one.
+  },
+  TRX: {
+    56: { address: "0xCE7de646e7208a4Ef112cb6ed5038FA6cC6b12e3", symbol: "TRX" }, // BNB Smart Chain -- official Binance-Peg TRX (post-2023 contract swap; do not use the older TRXOLD address)
+  },
+  ADA: {
+    56: { address: "0x3EE2200Efb3400fAbB9AAcf31297cBdd1d435D47", symbol: "ADA" }, // BNB Smart Chain -- Binance-Peg Cardano
+    8453: { address: "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c", symbol: "cbADA" }, // Base -- Coinbase Wrapped ADA, 1:1 custody-backed
+  },
+  SOL: {
+    1: { address: "0xD31a59c85aE9D8edEFeC411D448f90841571b89c", symbol: "SOL" }, // Ethereum -- Wormhole-bridged, verified + real liquidity
+    56: { address: "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF", symbol: "SOL" }, // BNB Smart Chain -- Binance-Peg SOL
+    // Polygon/Arbitrum/Optimism/Base: bridged SOL exists on each but every
+    // pool checked was dormant/near-zero volume -- excluded.
+  },
+  DOT: {
+    56: { address: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", symbol: "DOT" }, // BNB Smart Chain -- Binance-Peg Polkadot
+    // Ethereum: skip -- the only bridged-DOT pathway found there (Hyperbridge)
+    // was exploited in April 2026; not a safe recommendation right now.
+  },
+  LTC: {
+    56: { address: "0x4338665CBB7B2485A8855A139b75D5e34AB0DB94", symbol: "LTC" }, // BNB Smart Chain -- Binance-Peg Litecoin
+    8453: { address: "0xcb17C9Db87B595717C857a08468793f5bAb6445F", symbol: "cbLTC" }, // Base -- Coinbase Wrapped LTC, 1:1 custody-backed
+  },
+  TON: {
+    1: { address: "0x582d872A1B094FC48F5DE31D3B73F2D9be47def1", symbol: "TONCOIN" }, // Ethereum -- TON Foundation's own official EVM bridge
+    // BSC: the same official bridge token is deployed there too, but its
+    // liquidity is too thin (~$150K spread across dormant pools) -- excluded.
+  },
+};
+
+
+function normalizeCoinSymbol(s) {
+  const up = String(s || "").toUpperCase();
+  return up === "MATIC" ? "POL" : up; // Polygon's native coin was renamed
+}
+
+// Native coin + tracked tokens on the selected network, with balances.
+async function getHeldAssets() {
+  const assets = [];
+  if (!currentStatus || !currentStatus.selectedAddress || !currentNetwork) return assets;
+  try {
+    const bal = await sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress });
+    assets.push({
+      key: "native", address: "", symbol: bal.symbol || currentNetwork.nativeCurrency.symbol,
+      decimals: bal.decimals, balance: ethers.utils.formatUnits(bal.balanceWei, bal.decimals),
+    });
+  } catch (e) {
+    assets.push({ key: "native", address: "", symbol: currentNetwork.nativeCurrency.symbol, decimals: 18, balance: "0" });
+  }
+  try {
+    const res = await sendMsg("TM_GET_TRACKED_TOKEN_BALANCES");
+    (res.tokens || []).forEach((t) => {
+      if (t.error) return;
+      assets.push({
+        key: t.address, address: t.address, symbol: t.symbol, decimals: t.decimals,
+        balance: ethers.utils.formatUnits(t.balanceWei, t.decimals),
+      });
+    });
+  } catch (e) { /* best-effort: native coin only */ }
+  return assets;
+}
+
+function assetLabel(a) {
+  const n = Number(a.balance);
+  return `${a.symbol} (${isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 5 }) : a.balance})`;
+}
+
+// ---- Swap screen asset pickers (From = what you hold, To = any of your assets)
+let swapPopulateGen = 0;
+
+function syncSwapAsset(side) {
+  const sel = $(`swap-${side}-select`);
+  const input = $(`swap-${side}-custom`);
+  if (sel.value === "custom") {
+    input.classList.remove("hidden");
+    input.value = "";
+  } else {
+    input.classList.add("hidden");
+    input.value = sel.value === "native" ? "" : sel.value; // blank = native coin, as the quote code expects
+  }
+  $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
+}
+
+async function populateSwapSelects(pre) {
+  const myGen = ++swapPopulateGen;
+  const held = await getHeldAssets();
+  if (myGen !== swapPopulateGen) return;
+  const fromSel = $("swap-from-select");
+  const toSel = $("swap-to-select");
+  const toKey = pre && pre.toKey;
+  const fill = (sel, items) => {
+    sel.innerHTML = "";
+    items.forEach((a) => {
+      const o = document.createElement("option");
+      o.value = a.key;
+      o.textContent = assetLabel(a);
+      sel.appendChild(o);
+    });
+    const custom = document.createElement("option");
+    custom.value = "custom";
+    custom.textContent = TM_I18N.t("swap.customAddressOption");
+    sel.appendChild(custom);
+  };
+  // "From" only offers what the person actually holds (plus a paste-address
+  // escape hatch); the coin being bought is never offered as its own source.
+  let fromItems = held.filter((a) => Number(a.balance) > 0 && a.key !== toKey);
+  if (!fromItems.length) fromItems = held.filter((a) => a.key === "native" && a.key !== toKey);
+  fill(fromSel, fromItems);
+  fill(toSel, held);
+  if (toKey && held.some((a) => a.key === toKey)) toSel.value = toKey;
+  else toSel.value = (held.find((a) => a.key !== fromSel.value) || held[0] || { key: "custom" }).key;
+  syncSwapAsset("from");
+  syncSwapAsset("to");
+}
+
+["from", "to"].forEach((side) => {
+  $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
+});
+
+// Flip button between the From/To cards. Only swaps when it's actually
+// safe to: both selects have the OTHER side's current value as one of
+// their own options (From only lists held assets, To lists all known
+// assets, so those option lists don't always match -- e.g. flipping while
+// "buying" a coin not held yet would leave From pointing at an option that
+// doesn't exist). A custom pasted address on either side is the same
+// story -- nothing to safely swap it into on the other side -- so this
+// just clears the stale quote and lets the person repick instead of
+// guessing.
+$("btn-swap-flip").addEventListener("click", () => {
+  const fromSel = $("swap-from-select");
+  const toSel = $("swap-to-select");
+  const fromVal = fromSel.value;
+  const toVal = toSel.value;
+  const fromHasToOption = Array.from(fromSel.options).some((o) => o.value === toVal);
+  const toHasFromOption = Array.from(toSel.options).some((o) => o.value === fromVal);
+  if (fromVal !== "custom" && toVal !== "custom" && fromHasToOption && toHasFromOption) {
+    fromSel.value = toVal;
+    toSel.value = fromVal;
+    syncSwapAsset("from");
+    syncSwapAsset("to");
+  } else {
+    $("swap-quote-display").classList.add("hidden");
+  }
+});
+
+// Slippage pills are a nicer-looking stand-in for the real #swap-slippage
+// select below them -- that select is what btn-swap-execute's handler
+// actually reads, so these just keep it in sync rather than replacing it.
+document.querySelectorAll(".swap-slippage-pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".swap-slippage-pill").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    $("swap-slippage").value = btn.dataset.slippage;
+  });
+});
+
+// ---- Coin screen
+function renderCoinPrice(price, change) {
+  $("coin-price").textContent = price == null ? TM_I18N.t("prices.naText") : TM_PRICES.formatMoney(price, currentCurrency, { price: true });
+  const el = $("coin-change");
+  if (typeof change === "number") {
+    el.className = `price-change ${change >= 0 ? "up" : "down"}`;
+    el.textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+  } else {
+    el.className = "price-change hidden";
+  }
+}
+
+function coinStat(label, value) {
+  const d = document.createElement("div");
+  d.className = "coin-stat";
+  const k = document.createElement("span");
+  k.className = "k";
+  k.textContent = label;
+  const v = document.createElement("span");
+  v.className = "v";
+  v.textContent = value;
+  d.appendChild(k);
+  d.appendChild(v);
+  return d;
+}
+
+async function openCoinDetail(c, fromScreen) {
+  const gen = ++coinDetail.gen;
+  coinDetail.coin = c;
+  coinDetail.swapTarget = null;
+  coinDetail.switchNetworkTarget = null;
+  coinDetail.prefillTokenAddress = null;
+  $("btn-coin-switch-network").classList.add("hidden");
+  $("coin-back").dataset.back = fromScreen || "screen-prices";
+  hideError("coin-error");
+  $("coin-icon").innerHTML = tokenIconHtml(c.symbol);
+  $("coin-name").textContent = c.name;
+  $("coin-symbol").textContent = c.symbol;
+  $("coin-rank").classList.add("hidden");
+  renderCoinPrice(c.price, c.change24h);
+  $("coin-stats").innerHTML = "";
+  $("coin-about").textContent = TM_I18N.t("prices.loading");
+  $("coin-link-cg").href = c.url || "https://www.coingecko.com/";
+  const btn = $("btn-coin-swap");
+  btn.textContent = TM_I18N.t("coin.swapBtn", { symbol: c.symbol });
+  btn.disabled = true;
+  $("coin-holding").classList.add("hidden");
+  $("coin-swap-note").classList.add("hidden");
+  $("btn-coin-add-token").classList.add("hidden");
+  document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
+  showScreen("screen-coin");
+  loadCoinChart(gen);
+  loadCoinInfo(gen);
+  loadCoinSwapState(gen);
+}
+
+async function loadCoinInfo(gen) {
+  const c = coinDetail.coin;
+  try {
+    const d = await TM_PRICES.getCoinDetail(c.symbol, currentCurrency);
+    if (gen !== coinDetail.gen) return;
+    if (d.price != null) renderCoinPrice(d.price, d.change24h != null ? d.change24h : c.change24h);
+    if (d.rank != null) {
+      $("coin-rank").textContent = `#${d.rank}`;
+      $("coin-rank").classList.remove("hidden");
+    }
+    const stats = $("coin-stats");
+    stats.innerHTML = "";
+    const fm = (n) => TM_PRICES.formatMoney(n, currentCurrency, { price: true });
+    if (d.marketCap != null) stats.appendChild(coinStat(TM_I18N.t("coin.marketCap"), TM_PRICES.formatMoneyCompact(d.marketCap, currentCurrency)));
+    if (d.volume != null) stats.appendChild(coinStat(TM_I18N.t("coin.volume24h"), TM_PRICES.formatMoneyCompact(d.volume, currentCurrency)));
+    if (d.high24h != null) stats.appendChild(coinStat(TM_I18N.t("coin.high24h"), fm(d.high24h)));
+    if (d.low24h != null) stats.appendChild(coinStat(TM_I18N.t("coin.low24h"), fm(d.low24h)));
+    if (d.circulatingSupply != null) stats.appendChild(coinStat(TM_I18N.t("coin.supply"), d.circulatingSupply.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 })));
+    if (d.ath != null) {
+      const pct = d.athChange != null ? ` (${d.athChange.toFixed(1)}%)` : "";
+      stats.appendChild(coinStat(TM_I18N.t("coin.ath"), fm(d.ath) + pct));
+    }
+    $("coin-about").textContent = d.description || TM_I18N.t("coin.aboutUnavailable");
+  } catch (e) {
+    if (gen !== coinDetail.gen) return;
+    $("coin-about").textContent = TM_I18N.t("coin.aboutUnavailable");
+    showError("coin-error", TM_I18N.t("coin.loadError"));
+  }
+}
+
+async function loadCoinChart(gen) {
+  const c = coinDetail.coin;
+  const token = ++coinDetail.chartGen;
+  const box = $("coin-chart");
+  box.className = "coin-chart";
+  box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("prices.loading"))}</div>`;
+  $("coin-chart-readout").textContent = "";
+  try {
+    const pts = await TM_PRICES.getCoinChart(c.symbol, currentCurrency, coinDetail.days);
+    if (gen !== coinDetail.gen || token !== coinDetail.chartGen) return;
+    drawCoinChart(pts);
+  } catch (e) {
+    if (gen !== coinDetail.gen || token !== coinDetail.chartGen) return;
+    box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("coin.chartUnavailable"))}</div>`;
+  }
+}
+
+function coinRangeSummary() {
+  const pts = coinDetail.chartPoints;
+  if (pts.length < 2) return "";
+  const first = pts[0][1];
+  const last = pts[pts.length - 1][1];
+  const pct = first ? ((last - first) / first) * 100 : 0;
+  const label = { 1: "24H", 7: "7D", 30: "1M", 365: "1Y" }[coinDetail.days] || "";
+  return `${label}: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
+}
+
+function drawCoinChart(pts) {
+  const box = $("coin-chart");
+  coinDetail.chartPoints = pts;
+  if (!pts || pts.length < 2) {
+    box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("coin.chartUnavailable"))}</div>`;
+    return;
+  }
+  const W = 320, H = 130, PAD = 6;
+  const prices = pts.map((p) => p[1]);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const span = max - min || 1;
+  const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
+  const ys = prices.map((p) => H - PAD - ((p - min) / span) * (H - PAD * 2));
+  const line = xs.map((x, i) => `${i ? "L" : "M"}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(" ");
+  const area = `${line} L${W} ${H} L0 ${H} Z`;
+  box.className = `coin-chart ${prices[prices.length - 1] >= prices[0] ? "up" : "down"}`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(coinRangeSummary())}">
+    <path d="${area}" fill="currentColor" fill-opacity="0.12" stroke="none"></path>
+    <path d="${line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+    <line id="coin-chart-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" opacity="0" stroke-dasharray="3 3"></line>
+  </svg>`;
+  $("coin-chart-readout").textContent = coinRangeSummary();
+}
+
+// Drag/hover over the chart to read the price at that moment.
+(function wireCoinChartScrub() {
+  const box = $("coin-chart");
+  const show = (e) => {
+    const pts = coinDetail.chartPoints;
+    if (!pts || pts.length < 2) return;
+    const rect = box.getBoundingClientRect();
+    if (!rect.width) return;
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const idx = Math.round(ratio * (pts.length - 1));
+    const [ts, price] = pts[idx];
+    const cursor = $("coin-chart-cursor");
+    if (cursor) {
+      const x = (idx / (pts.length - 1)) * 320;
+      cursor.setAttribute("x1", x);
+      cursor.setAttribute("x2", x);
+      cursor.setAttribute("opacity", "0.7");
+    }
+    const when = new Date(ts).toLocaleString(undefined, coinDetail.days === 1
+      ? { hour: "numeric", minute: "2-digit" }
+      : coinDetail.days <= 7 ? { month: "short", day: "numeric", hour: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+    $("coin-chart-readout").textContent = `${TM_PRICES.formatMoney(price, currentCurrency, { price: true })} - ${when}`;
+  };
+  const reset = () => {
+    const cursor = $("coin-chart-cursor");
+    if (cursor) cursor.setAttribute("opacity", "0");
+    $("coin-chart-readout").textContent = coinRangeSummary();
+  };
+  box.addEventListener("pointermove", show);
+  box.addEventListener("pointerdown", show);
+  box.addEventListener("pointerleave", reset);
+  box.addEventListener("pointerup", reset);
+  box.addEventListener("pointercancel", reset);
+})();
+
+document.querySelectorAll(".coin-range").forEach((b) => {
+  b.addEventListener("click", () => {
+    coinDetail.days = Number(b.dataset.days);
+    document.querySelectorAll(".coin-range").forEach((x) => x.classList.toggle("active", x === b));
+    loadCoinChart(coinDetail.gen);
+  });
+});
+
+async function loadCoinSwapState(gen) {
+  const c = coinDetail.coin;
+  const btn = $("btn-coin-swap");
+  const note = $("coin-swap-note");
+  const showNote = (text) => { note.textContent = text; note.classList.remove("hidden"); };
+  // This can re-run on the same coin-detail screen (e.g. right after
+  // "Switch to X to swap" changes currentNetwork), not just once on open --
+  // so it has to reset the switch-network button back to hidden every time
+  // rather than only ever showing it, or a coin that becomes swappable
+  // after a switch would still show it as a leftover from the previous,
+  // unswappable state.
+  coinDetail.switchNetworkTarget = null;
+  coinDetail.prefillTokenAddress = null;
+  $("btn-coin-switch-network").classList.add("hidden");
+  if (!currentNetwork || !currentStatus || !currentStatus.selectedAddress) {
+    showNote(TM_I18N.t("coin.swapNeedsWallet"));
+    return;
+  }
+  if (!currentNetwork.swapRouter) {
+    showNote(TM_I18N.t("coin.swapNoRouter"));
+    return;
+  }
+  const held = await getHeldAssets();
+  if (gen !== coinDetail.gen) return;
+  const want = normalizeCoinSymbol(c.symbol);
+  const match = held.find((a) => normalizeCoinSymbol(a.symbol) === want);
+  if (!match) {
+    // No verified address for this coin on the CURRENT network -- but one
+    // might still exist on some OTHER network this wallet supports (e.g.
+    // XRP has no safe Ethereum address, per the comment on XRP's entry in
+    // KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN above, but does have a Binance-Peg
+    // one on BNB Smart Chain). Rather than send someone to "+ Add token"
+    // with nothing safe to actually add, point them at the network where a
+    // verified version already exists. BNB Smart Chain is checked first
+    // when it's an option: this table's own coverage (checked 2026-09-21)
+    // shows the wallet has more verified entries there than on any other
+    // single chain, so it's the most likely to have this coin if any chain
+    // does.
+    const tokenEntries = KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {};
+    const elsewhereChainIds = Object.keys(tokenEntries)
+      .map(Number)
+      .filter((id) => id !== currentNetwork.chainId);
+    elsewhereChainIds.sort((a, b) => (a === 56 ? -1 : b === 56 ? 1 : 0));
+    const tokenElsewhereChainId = elsewhereChainIds.find((id) => currentNetworks.some((n) => n.chainId === id));
+    const tokenElsewhereNet = tokenElsewhereChainId
+      ? currentNetworks.find((n) => n.chainId === tokenElsewhereChainId)
+      : null;
+    if (tokenElsewhereNet) {
+      coinDetail.switchNetworkTarget = tokenElsewhereNet;
+      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetworkToken", { symbol: c.symbol, network: tokenElsewhereNet.name }));
+      const switchBtn = $("btn-coin-switch-network");
+      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: tokenElsewhereNet.name });
+      switchBtn.classList.remove("hidden");
+      // Still offered too, in case a different address on THIS network is
+      // actually what's meant.
+      $("btn-coin-add-token").classList.remove("hidden");
+      return;
+    }
+    showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
+    // Not a dead end -- this is almost always the reason a coin shows as
+    // unswappable (see the note above), so put the fix one tap away instead
+    // of making the person go find "+ Add token" back on the main screen.
+    $("btn-coin-add-token").classList.remove("hidden");
+    return;
+  }
+  coinDetail.swapTarget = match;
+  if (Number(match.balance) > 0) {
+    const holding = $("coin-holding");
+    holding.textContent = TM_I18N.t("coin.holding", {
+      amount: Number(match.balance).toLocaleString(undefined, { maximumFractionDigits: 5 }),
+      symbol: match.symbol,
+    });
+    holding.classList.remove("hidden");
+  }
+  btn.disabled = false;
+  showNote(TM_I18N.t("coin.swapHint"));
+}
+
+$("btn-coin-swap").addEventListener("click", () => {
+  const m = coinDetail.swapTarget;
+  if (!m) return;
+  setupSwapScreen({ toKey: m.key });
+  showScreen("screen-swap");
+});
+
+$("btn-coin-add-token").addEventListener("click", () => {
+  resetAddTokenScreen(coinDetail.prefillTokenAddress || undefined);
+  showScreen("screen-add-token");
+});
+
+$("btn-coin-switch-network").addEventListener("click", async () => {
+  const net = coinDetail.switchNetworkTarget;
+  if (!net) return;
+  const switchBtn = $("btn-coin-switch-network");
+  switchBtn.disabled = true;
+  try {
+    await sendMsg("TM_SELECT_NETWORK", { chainId: net.chainId });
+    await refreshMain(); // same call the main screen's own network picker uses
+    if (coinDetail.coin) loadCoinSwapState(coinDetail.gen);
+  } finally {
+    switchBtn.disabled = false;
+  }
+});
 
 // Compact live-prices card on the main screen -- just the first handful of
 // PRICE_BOARD's coins, at a glance, without navigating away. Best-effort
@@ -646,23 +1358,188 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-function setupBuyScreen() {
+// MoonPay was removed from this screen (MoonPay declined Token Exchange's
+// business application -- there is no account to embed here anymore).
+// Coinbase Onramp and Onramper are the two remaining, independent Buy
+// providers; either, both, or neither may show depending on what's
+// configured/supported, and Onramper shares this screen's iframe (below)
+// since Coinbase always opens in a new tab instead.
+// The fiat currency a Buy widget should open in: whatever the person was
+// looking at (a currency or coin screen), else their display currency.
+let buyFiat = null;
+function setupBuyScreen(fiatCode) {
+  buyFiat = fiatCode || currentCurrency;
   hideError("buy-error");
-  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+  $("buy-frame-wrap").classList.add("hidden");
+  $("buy-frame").src = "about:blank";
+  // Coinbase Onramp -- see lib/coinbase-onramp-config.js's header comment.
+  // Only shown for networks Coinbase is confirmed to support; hidden
+  // entirely otherwise rather than showing a button that would just error.
+  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
+  $("btn-buy-coinbase").classList.toggle("hidden", !coinbaseSupported);
+  $("buy-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
+  $("btn-buy-coinbase").disabled = false;
+  // Onramper -- an aggregator, so no network-support gate like Coinbase
+  // above; it shows its own picker. See lib/onramper-config.js's header
+  // comment. Muted until an ONRAMPER_API_KEY is filled in there.
+  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
+  $("btn-buy-onramper").classList.toggle("hidden", !onramperLive);
+  $("buy-onramper-note").classList.toggle("hidden", !onramperLive);
+  $("btn-buy-onramper").disabled = false;
+  // Neither provider configured/supported -- say so plainly instead of
+  // leaving an empty screen with no explanation.
+  $("buy-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
 }
 
-$("btn-buy-copy-address").addEventListener("click", () => {
-  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
-});
-
-$("btn-buy-open").addEventListener("click", () => {
+$("btn-buy-coinbase").addEventListener("click", async () => {
   hideError("buy-error");
+  const btn = $("btn-buy-coinbase");
+  btn.disabled = true;
   try {
-    const url = TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
-    chrome.tabs.create({ url });
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOnrampUrl(currentNetwork.key, address);
+    window.open(url, "_blank", "noopener,noreferrer");
   } catch (e) {
     showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
+});
+
+$("btn-buy-onramper").addEventListener("click", () => {
+  hideError("buy-error");
+  const btn = $("btn-buy-onramper");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = TM_ONRAMPER_CONFIG.buildOnramperBuyUrl(currentNetwork.key, address, buyFiat);
+    $("buy-frame").src = url;
+    $("buy-frame-wrap").classList.remove("hidden");
+    $("btn-buy-onramper").classList.add("hidden");
+    $("btn-buy-coinbase").classList.add("hidden");
+  } catch (e) {
+    showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+
+// ---------------------------------------------------------------- SELL
+// MoonPay was removed from this screen for the same reason as Buy above.
+// Coinbase Offramp and Onramper are the two remaining, independent Sell
+// providers.
+// The fiat currency a Sell widget should pay out in: whatever the person
+// was looking at (a currency or coin screen), else their display currency.
+let sellFiat = null;
+function setupSellScreen(fiatCode) {
+  sellFiat = fiatCode || currentCurrency;
+  hideError("sell-error");
+  hideError("sell-deposit-error");
+  $("sell-frame-wrap").classList.add("hidden");
+  $("sell-frame").src = "about:blank";
+  $("sell-send-helper").classList.add("hidden");
+  $("sell-deposit-address").value = "";
+  $("sell-deposit-amount").value = "";
+  // Coinbase Offramp -- see lib/coinbase-onramp-config.js's header comment
+  // for the two-step flow (open Coinbase in a tab, then come back and
+  // fetch the deposit details). Same network-support gating as Buy.
+  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
+  $("btn-sell-coinbase").classList.toggle("hidden", !coinbaseSupported);
+  $("sell-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
+  $("btn-sell-coinbase-check").classList.add("hidden");
+  $("btn-sell-coinbase").disabled = false;
+  $("btn-sell-coinbase-check").disabled = false;
+  // Onramper -- see lib/onramper-config.js's header comment. Muted until
+  // an ONRAMPER_API_KEY is filled in there.
+  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
+  $("btn-sell-onramper").classList.toggle("hidden", !onramperLive);
+  $("sell-onramper-note").classList.toggle("hidden", !onramperLive);
+  $("btn-sell-onramper").disabled = false;
+  // Neither provider configured/supported -- say so plainly.
+  $("sell-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
+}
+
+$("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
+
+$("btn-sell-onramper").addEventListener("click", () => {
+  hideError("sell-error");
+  try {
+    const url = TM_ONRAMPER_CONFIG.buildOnramperSellUrl(sellFiat || currentCurrency);
+    $("sell-frame").src = url;
+    $("sell-frame-wrap").classList.remove("hidden");
+    $("btn-sell-onramper").classList.add("hidden");
+    $("btn-sell-coinbase").classList.add("hidden");
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  }
+});
+
+$("btn-sell-coinbase").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-coinbase");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOfframpUrl(currentNetwork.key, address);
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Now that a sell session exists, reveal the "I've finished -- get my
+    // deposit details" step. Coinbase's own page is where the person
+    // actually picks an asset/amount and completes the sell; this wallet
+    // only fetches what to send afterwards (see the click handler below).
+    $("btn-sell-coinbase-check").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-sell-coinbase-check").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-coinbase-check");
+  btn.disabled = true;
+  try {
+    const tx = await TM_COINBASE_ONRAMP_CONFIG.checkCoinbaseOfframpStatus();
+    if (!tx) {
+      showError("sell-error", TM_I18N.t("sell.coinbaseNotReady"));
+      return;
+    }
+    // Same "paste deposit details -> Review in Send" UI as MoonPay's Sell
+    // flow uses, just filled in for us instead of pasted by hand -- the
+    // Send screen's own review/confirm step still runs either way.
+    $("sell-deposit-address").value = tx.toAddress || "";
+    $("sell-deposit-amount").value = tx.amount || "";
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-sell-to-send").addEventListener("click", () => {
+  hideError("sell-deposit-error");
+  const addr = $("sell-deposit-address").value.trim();
+  const amt = $("sell-deposit-amount").value.trim();
+  if (!ethers.utils.isAddress(addr)) {
+    showError("sell-deposit-error", TM_I18N.t("sell.invalidAddress"));
+    return;
+  }
+  if (amt && !(Number(amt) > 0)) {
+    showError("sell-deposit-error", TM_I18N.t("sell.invalidAmount"));
+    return;
+  }
+  // Prefill only. The Send screen's own review/confirm step (and the
+  // sanctions check) still run, so nothing leaves the wallet unreviewed.
+  $("send-to").value = addr;
+  $("send-to").dispatchEvent(new Event("input"));
+  $("send-amount").value = amt;
+  showScreen("screen-send");
 });
 
 // ---------------------------------------------------------------- SETTINGS
@@ -766,13 +1643,14 @@ $("btn-send-submit").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- SWAP
-function setupSwapScreen() {
+function setupSwapScreen(pre) {
   hideError("swap-error");
   $("swap-status").classList.add("hidden");
   $("swap-quote-display").classList.add("hidden");
   const unsupported = !currentNetwork.swapRouter;
   $("swap-unsupported").classList.toggle("hidden", !unsupported);
   $("swap-form").classList.toggle("hidden", unsupported);
+  if (!unsupported) populateSwapSelects(pre || {}).catch(() => {});
 }
 
 $("btn-swap-quote").addEventListener("click", async () => {
@@ -883,6 +1761,14 @@ async function initApprovalFlow(requestId) {
       } catch (e) {
         showError("approve-unlock-error", e.message);
       }
+    });
+    // Previously there was no way out of this screen at all -- unlock or be
+    // stuck, even if the site you didn't recognize just popped this dialog
+    // unprompted. This properly rejects the pending request (same as every
+    // other approve screen's reject button) rather than leaving the dapp's
+    // request hanging.
+    $("btn-approve-unlock-cancel").addEventListener("click", () => {
+      respondApproval(requestId, false, null, "User rejected -- wallet was locked.");
     });
     return;
   }
@@ -1022,113 +1908,48 @@ $("support-input").addEventListener("keydown", (e) => {
 // not a claim that the language belongs to only that place (there's no
 // single flag for Arabic or English) -- this is the same convention almost
 // every app's language picker uses, just to make the list scannable.
-//
-// This used to be a plain <select> with a Unicode flag-emoji character
-// (Regional Indicator Symbol pairs) prepended to each option's text. That
-// works fine in the app's own rendered text, but a native <select>'s
-// dropdown popup is drawn by the OS/browser, not by us -- and a lot of
-// Android devices ship without the color-emoji flag glyphs installed, so
-// the popup falls back to showing the two raw letters ("US", "ES", ...)
-// instead of a flag picture, which is exactly the confusing thing a flag
-// was supposed to avoid. Real <img> flags fix that everywhere, but a
-// native <option> can't contain an <img> in any browser -- so each
-// ".language-select" element is progressively enhanced here into a small
-// custom dropdown (a button showing the current flag+name, and a listbox
-// of flag+name rows) while the original <select> stays in the DOM, hidden,
-// purely as the value-holder every other bit of code already reads/writes.
+const TM_LANGUAGE_FLAGS = {
+  en: "\u{1F1FA}\u{1F1F8}", // English -> US
+  ar: "\u{1F1F8}\u{1F1E6}", // Arabic -> Saudi Arabia
+  zh: "\u{1F1E8}\u{1F1F3}", // Chinese (Simplified) -> China
+  es: "\u{1F1EA}\u{1F1F8}", // Spanish -> Spain
+  fr: "\u{1F1EB}\u{1F1F7}", // French -> France
+  hi: "\u{1F1EE}\u{1F1F3}", // Hindi -> India
+  pt: "\u{1F1F5}\u{1F1F9}", // Portuguese -> Portugal
+  ja: "\u{1F1EF}\u{1F1F5}", // Japanese -> Japan
+  ru: "\u{1F1F7}\u{1F1FA}", // Russian -> Russia
+};
+
 function populateLanguageSelects() {
   document.querySelectorAll(".language-select").forEach((sel) => {
-    let wrap = sel.parentNode.classList && sel.parentNode.classList.contains("lang-picker") ? sel.parentNode : null;
-    let trigger, list;
-
-    if (!wrap) {
-      wrap = document.createElement("span");
-      wrap.className = "lang-picker";
-      sel.parentNode.insertBefore(wrap, sel);
-      wrap.appendChild(sel);
-
-      // Move the select's id (e.g. "language-select-header") onto the
-      // trigger so any CSS or labeling keyed off that id keeps applying to
-      // the thing that's actually visible now.
-      trigger = document.createElement("button");
-      trigger.type = "button";
-      if (sel.id) { trigger.id = sel.id; sel.removeAttribute("id"); }
-      if (sel.title) trigger.title = sel.title;
-      if (sel.getAttribute("aria-label")) trigger.setAttribute("aria-label", sel.getAttribute("aria-label"));
-      trigger.className = "lang-picker-trigger";
-      trigger.innerHTML = '<img class="lang-flag" alt="" /><span class="lang-name"></span><span class="lang-caret" aria-hidden="true">▾</span>';
-      wrap.appendChild(trigger);
-
-      sel.classList.add("lang-picker-native-hidden");
-      sel.setAttribute("tabindex", "-1");
-      sel.setAttribute("aria-hidden", "true");
-
-      list = document.createElement("ul");
-      list.className = "lang-picker-list hidden";
-      list.setAttribute("role", "listbox");
-      wrap.appendChild(list);
-
-      trigger.addEventListener("click", () => {
-        const willOpen = list.classList.contains("hidden");
-        document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
-        if (willOpen) list.classList.remove("hidden");
-      });
-      if (!document.body.dataset.langPickerOutsideClick) {
-        document.body.dataset.langPickerOutsideClick = "1";
-        document.addEventListener("click", (e) => {
-          if (!e.target.closest(".lang-picker")) {
-            document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
-          }
-        });
-      }
-    } else {
-      trigger = wrap.querySelector(".lang-picker-trigger");
-      list = wrap.querySelector(".lang-picker-list");
-    }
-
-    const updateTrigger = (code) => {
-      const lang = TM_I18N.LANGS.find((l) => l.code === code) || TM_I18N.LANGS[0];
-      trigger.querySelector(".lang-flag").src = `img/flag-${lang.code}.svg`;
-      trigger.querySelector(".lang-name").textContent = lang.name;
-      list.querySelectorAll(".lang-picker-item").forEach((it) => it.classList.toggle("active", it.dataset.code === lang.code));
-    };
-
     sel.innerHTML = "";
-    list.innerHTML = "";
     TM_I18N.LANGS.forEach((lang) => {
       const opt = document.createElement("option");
       opt.value = lang.code;
-      opt.textContent = lang.name;
+      const flag = TM_LANGUAGE_FLAGS[lang.code];
+      opt.textContent = flag ? `${flag} ${lang.name}` : lang.name;
       sel.appendChild(opt);
-
-      const item = document.createElement("li");
-      item.className = "lang-picker-item";
-      item.setAttribute("role", "option");
-      item.dataset.code = lang.code;
-      item.innerHTML = `<img class="lang-flag" src="img/flag-${lang.code}.svg" alt="" /><span>${lang.name}</span>`;
-      item.addEventListener("click", () => {
-        sel.value = lang.code;
-        TM_I18N.setLanguage(lang.code);
-        updateTrigger(lang.code);
-        list.classList.add("hidden");
-      });
-      list.appendChild(item);
     });
-
     sel.value = TM_I18N.getLanguage();
-    updateTrigger(sel.value);
+    sel.addEventListener("change", (e) => TM_I18N.setLanguage(e.target.value));
   });
 }
 
 function populateCurrencySelect() {
   const sel = $("currency-select-settings");
   sel.innerHTML = "";
+  const groups = { fiat: document.createElement("optgroup"), crypto: document.createElement("optgroup") };
+  groups.fiat.label = "Currencies";
+  groups.crypto.label = "Crypto";
   Object.keys(TM_PRICES.SUPPORTED_CURRENCIES).forEach((code) => {
+    const info = TM_PRICES.SUPPORTED_CURRENCIES[code];
     const opt = document.createElement("option");
     opt.value = code;
-    opt.textContent = `${TM_PRICES.SUPPORTED_CURRENCIES[code].symbol} ${TM_PRICES.SUPPORTED_CURRENCIES[code].label}`;
-    sel.appendChild(opt);
+    opt.textContent = `${info.label} - ${info.name} (${info.symbol})`;
+    (groups[info.type] || groups.fiat).appendChild(opt);
   });
+  sel.appendChild(groups.fiat);
+  sel.appendChild(groups.crypto);
   sel.value = currentCurrency;
   sel.addEventListener("change", async (e) => {
     currentCurrency = e.target.value;
@@ -1154,7 +1975,13 @@ document.addEventListener("tm-language-changed", () => {
     const netSel = $("network-select");
     Array.from(netSel.options).forEach((opt) => {
       const n = currentNetworks.find((net) => String(net.chainId) === opt.value);
-      if (n) opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
+      if (n) {
+        const coinbaseCashOut = TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(n.key);
+        opt.textContent =
+          n.name +
+          (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix")) +
+          (coinbaseCashOut ? TM_I18N.t("network.coinbaseCashOutSuffix") : "");
+      }
     });
   }
   if ($("support-chips") && $("support-chips").children.length) renderSupportChips();
@@ -1218,6 +2045,28 @@ function activateSplashHome() {
     hideSplash();
     showScreen("screen-send");
   });
+}
+
+// Onboarding/unlock: no wallet exists yet (or it's locked), so the splash
+// shouldn't auto-fade on a timer -- the user needs a deliberate moment to
+// land on before moving forward. Distinct from activateSplashHome(): the
+// Home/Assets/Activity/Send bar doesn't apply here (nothing to navigate to
+// yet), so instead this shows a language picker (populateLanguageSelects(),
+// called once during init(), already wires up any .language-select it
+// finds -- including this one, since it's in the static DOM from the
+// start) plus an explicit Continue button. Deliberately NOT a whole-screen
+// tap target anymore: that would swallow clicks meant for the language
+// <select> sitting on top of it.
+let splashLandingActivated = false;
+function activateSplashLanding() {
+  if (splashHomeActivated || splashLandingActivated) return;
+  splashLandingActivated = true;
+  clearSplashAutoTimers();
+  const el = $("splash-screen");
+  if (!el) return;
+  el.classList.add("splash-landing");
+  const continueBtn = $("splash-continue-btn");
+  if (continueBtn) continueBtn.addEventListener("click", () => hideSplash());
 }
 
 // ---------------------------------------------------------------- ACTIVITY
@@ -1488,13 +2337,22 @@ function renderActivity() {
   }
 
   showScreen("screen-loading");
-  const status = await sendMsg("TM_GET_STATUS");
+  let status;
+  try {
+    status = await withTimeout(sendMsg("TM_GET_STATUS"), 8000);
+  } catch (e) {
+    $("loading-text").classList.add("hidden");
+    $("loading-spinner").classList.add("hidden");
+    $("loading-stuck").classList.remove("hidden");
+    $("btn-loading-retry").addEventListener("click", () => location.reload());
+    return;
+  }
   if (!status.hasVault) {
     showScreen("screen-onboarding");
-    splashAutoTimers.push(setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStartedAt))));
+    activateSplashLanding();
   } else if (!status.unlocked) {
     showScreen("screen-unlock");
-    splashAutoTimers.push(setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStartedAt))));
+    activateSplashLanding();
   } else {
     await refreshMain();
     showScreen("screen-main");
