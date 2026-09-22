@@ -1134,16 +1134,6 @@ function setPricesTab(tab) {
   document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
   $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
   $("prices-stablecoin-note").classList.toggle("hidden", tab !== "currencies");
-  // Re-render immediately with whatever's already in memory for this tab
-  // (pricesBoardData for crypto, pricesRatesData for currencies) BEFORE the
-  // fresh fetch below resolves. Without this, switching tabs left the OLD
-  // tab's rows sitting in #prices-list until the new fetch finished -- and
-  // if that fetch failed (e.g. the "Couldn't reach CoinGecko for currency
-  // rates" error), it never finished at all, so tapping "Currencies" could
-  // permanently strand the previous tab's crypto rows on screen under the
-  // Currencies tab. Calling this here means a tab switch always shows the
-  // right TYPE of row (even if stale/empty) and never the other tab's data.
-  renderPricesList();
   refreshPrices();
 }
 
@@ -1278,43 +1268,6 @@ async function populateSwapSelects(pre) {
 
 ["from", "to"].forEach((side) => {
   $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
-});
-
-// Flip button between the From/To cards. Only swaps when it's actually
-// safe to: both selects have the OTHER side's current value as one of
-// their own options (From only lists held assets, To lists all known
-// assets, so those option lists don't always match -- e.g. flipping while
-// "buying" a coin not held yet would leave From pointing at an option that
-// doesn't exist). A custom pasted address on either side is the same
-// story -- nothing to safely swap it into on the other side -- so this
-// just clears the stale quote and lets the person repick instead of
-// guessing.
-$("btn-swap-flip").addEventListener("click", () => {
-  const fromSel = $("swap-from-select");
-  const toSel = $("swap-to-select");
-  const fromVal = fromSel.value;
-  const toVal = toSel.value;
-  const fromHasToOption = Array.from(fromSel.options).some((o) => o.value === toVal);
-  const toHasFromOption = Array.from(toSel.options).some((o) => o.value === fromVal);
-  if (fromVal !== "custom" && toVal !== "custom" && fromHasToOption && toHasFromOption) {
-    fromSel.value = toVal;
-    toSel.value = fromVal;
-    syncSwapAsset("from");
-    syncSwapAsset("to");
-  } else {
-    $("swap-quote-display").classList.add("hidden");
-  }
-});
-
-// Slippage pills are a nicer-looking stand-in for the real #swap-slippage
-// select below them -- that select is what btn-swap-execute's handler
-// actually reads, so these just keep it in sync rather than replacing it.
-document.querySelectorAll(".swap-slippage-pill").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".swap-slippage-pill").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    $("swap-slippage").value = btn.dataset.slippage;
-  });
 });
 
 // ---- Coin screen
@@ -1882,37 +1835,6 @@ async function loadCoinSwapState(gen) {
       const addBtn = $("btn-coin-add-token");
       addBtn.textContent = TM_I18N.t("coin.addKnownTokenBtn", { tokenSymbol: knownToken.symbol });
       addBtn.classList.remove("hidden");
-      return;
-    }
-    // No verified address for this coin on the CURRENT network -- but one
-    // might still exist on some OTHER network this wallet supports (e.g.
-    // XRP has no safe Ethereum address, per the comment on XRP's entry
-    // above, but does have a Binance-Peg one on BNB Smart Chain). Rather
-    // than send someone to "+ Add token" with nothing safe to actually add,
-    // point them at the network where a verified version already exists --
-    // same "switch there" pattern as the native-coin case above. BNB Smart
-    // Chain is checked first when it's an option: this table's own coverage
-    // (checked 2026-09-21) shows the wallet has more verified entries there
-    // than on any other single chain, so it's the most likely to have this
-    // coin if any chain does.
-    const tokenEntries = KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {};
-    const elsewhereChainIds = Object.keys(tokenEntries)
-      .map(Number)
-      .filter((id) => id !== currentNetwork.chainId);
-    elsewhereChainIds.sort((a, b) => (a === 56 ? -1 : b === 56 ? 1 : 0));
-    const tokenElsewhereChainId = elsewhereChainIds.find((id) => currentNetworks.some((n) => n.chainId === id));
-    const tokenElsewhereNet = tokenElsewhereChainId
-      ? currentNetworks.find((n) => n.chainId === tokenElsewhereChainId)
-      : null;
-    if (tokenElsewhereNet) {
-      coinDetail.switchNetworkTarget = tokenElsewhereNet;
-      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetworkToken", { symbol: c.symbol, network: tokenElsewhereNet.name }));
-      const switchBtn = $("btn-coin-switch-network");
-      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: tokenElsewhereNet.name });
-      switchBtn.classList.remove("hidden");
-      // Still offered too, in case a different address on THIS network is
-      // actually what's meant.
-      $("btn-coin-add-token").classList.remove("hidden");
       return;
     }
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
