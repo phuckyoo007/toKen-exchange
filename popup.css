@@ -366,19 +366,20 @@ body {
 }
 
 /* ---------------- header ----------------
-   The header no longer draws its own logo art: the full-bleed
-   #bg-scene behind it already shows the "TOKEN EXCHANGE" slot-machine
-   cabinet at the very top of every screen (it's the top of the same
-   reference image), so #brand-logo/#app-header just reserve the
-   matching amount of vertical space and let the network badge sit
-   just under the cabinet, over the scene. */
+   The header no longer draws its own logo art -- the old inline SVG
+   "slot machine cabinet" logo (and the reserved space assuming the
+   #bg-scene backdrop would show a matching cabinet baked into the top
+   of it) is gone. #bg-scene now shows the plain blue Ethereum/global
+   exchange scene (see app.css's bg-scene.jpg), which doesn't crop into
+   anything legible at this popup's narrow width -- so, matching the
+   website build's own #app-header, this just reserves space for the
+   network pill; the circular badge logo lives down in the footer
+   instead (see #app-footer #brand-logo below). */
 #app-header {
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
-  min-height: 246px;
-  padding: 9px 12px 10px;
+  padding: 12px 12px 10px;
   flex-shrink: 0;
 }
-#brand-logo { display: none; }
 /* Global language switcher: reachable from every screen because the header
    sits above all of them (mirrors the website build's #app-header). Just a
    normal .language-select, so populateLanguageSelects() fills it and
@@ -480,6 +481,13 @@ html[dir="rtl"] .global-lang-select { padding: 4px 10px 4px 22px; }
   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
   flex-shrink: 0;
+}
+/* The circular "TOKEN EXCHANGE" badge (the same image used as the app
+   icon), matching the website build's #app-footer #brand-logo. */
+#app-footer #brand-logo {
+  display: block; width: 56px; height: 56px;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(221, 172, 77, 0.25);
 }
 #app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
