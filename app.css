@@ -541,6 +541,10 @@ a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
 #app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
 #app-footer .footer-copyright { font-size: 9.5px; color: var(--text-faint); opacity: 0.8; letter-spacing: 0.03em; }
+#app-footer .footer-links { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 10px; }
+#app-footer .footer-links a { color: var(--text-faint); text-decoration: none; }
+#app-footer .footer-links a:hover { color: var(--gold); text-decoration: underline; }
+#app-footer .footer-links span { color: var(--text-faint); opacity: 0.6; }
 
 h2 {
   margin: 0 0 6px 0;

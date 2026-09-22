@@ -105,6 +105,18 @@
       <div id="mnemonic-display" class="mnemonic-box"></div>
       <label class="checkbox-row"><input type="checkbox" id="backup-confirm-check" /> <span data-i18n="create.backupCheckbox">I've saved my recovery phrase</span></label>
       <button id="btn-backup-done" class="primary" disabled data-i18n="create.finishBtn">Finish</button>
+      <!-- This step previously had no way out at all: the wallet is already
+           created and stored by this point (see btn-create-submit in app.js),
+           so "back" can't mean "re-enter password" -- there's nothing left to
+           re-enter. Routing to screen-reset instead gives a real way out
+           (delete this not-yet-backed-up wallet) while Cancel there returns
+           to screen-main, where the phrase can still be viewed anytime via
+           Settings -> View recovery phrase -- so canceling out of THIS
+           screen never loses anything. -->
+      <button type="button" class="back-btn top-back-btn" data-back="screen-reset" aria-label="Cancel">
+        <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+        <span data-i18n="common.cancel">Cancel</span>
+      </button>
     </div>
   </section>
 
@@ -804,7 +816,10 @@
     <h2 data-i18n="approve.unlockTitle">Unlock to continue</h2>
     <p class="muted" id="approve-origin-locked"></p>
     <input type="password" id="approve-unlock-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
-    <button id="btn-approve-unlock" class="primary" data-i18n="unlock.submitBtn">Unlock</button>
+    <div class="actions-row">
+      <button id="btn-approve-unlock-cancel" class="secondary" data-i18n="common.reject">Reject</button>
+      <button id="btn-approve-unlock" class="primary" data-i18n="unlock.submitBtn">Unlock</button>
+    </div>
     <p id="approve-unlock-error" class="error hidden"></p>
   </section>
 
@@ -858,7 +873,16 @@
 
   <section id="screen-loading" class="screen loading-screen hidden">
     <img id="loading-spinner" src="img/spinner-coin.png" alt="" />
-    <p class="muted" data-i18n="loading.text">Loading...</p>
+    <p class="muted" id="loading-text" data-i18n="loading.text">Loading...</p>
+    <!-- This screen used to have no fallback at all: if the very first
+         status check on startup ever hung (background/service-worker
+         unresponsive, a dropped message, etc.) there was nothing on screen
+         but a spinner forever, with no error, no retry, not even a hint to
+         reload -- see the timeout wrapping TM_GET_STATUS in app.js's init(). -->
+    <div id="loading-stuck" class="hidden">
+      <p class="error" data-i18n="loading.stuckText">This is taking longer than expected.</p>
+      <button type="button" id="btn-loading-retry" class="primary" data-i18n="loading.retryBtn">Reload</button>
+    </div>
   </section>
 
   <footer id="app-footer">
@@ -866,6 +890,11 @@
     <div class="footer-tagline">
       <span class="footer-lock">&#128274;</span>
       <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
+    </div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="terms.html">Terms of Service</a>
     </div>
     <span class="footer-copyright">&copy; 2026 Sanders</span>
   </footer>

@@ -87,14 +87,13 @@ body {
 
 /* ---------------- full-bleed arcade-cabinet scene ----------------
    A fixed backdrop -- the user's own AI-generated "jackpot" reference
-   art -- sitting behind the whole popup on every screen, standing in
-   for the header-only SVG logo's cabinet. A dark scrim gradient is
-   baked into the same layer: strong enough near the top to reveal the
-   art's own slot-machine assembly, then quickly opaque enough that
-   real screen content (headings, inputs, buttons) stays fully
-   readable over it lower down. #app itself is transparent so this
-   shows through; individual cards/inputs keep their own solid
-   dark fills for contrast. */
+   art -- sitting behind the whole popup, visible only in the narrow
+   strip above #app (a brief brand moment on the onboarding/unlock
+   screens before #app's own opaque background takes over). #app is
+   fully opaque so this backdrop can never show through gaps between
+   real screen content (headings, inputs, buttons); individual
+   cards/inputs additionally keep their own solid dark fills for
+   contrast. */
 #bg-scene {
   position: fixed;
   inset: 0;
@@ -116,7 +115,32 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 480px;
-  background: transparent;
+  /* Fully opaque -- nothing behind this card shows through. A faint
+     copy of the splash artwork sits on the card's own face instead --
+     see #app::before below -- a self-contained watermark baked onto
+     this opaque card, not a window onto anything behind it. */
+  background: var(--bg);
+}
+/* A very faint copy of the splash art's coin/globe centerpiece,
+   printed directly onto the card's own face so it reads as more than
+   flat black. Static image living on #app itself, at z-index -1
+   (behind every real child of #app, including #app-header) -- never a
+   see-through hole onto anything behind it. Uses the cropped
+   card-watermark(-light).jpg rather than splash.jpg directly -- the
+   splash art has a fake bottom nav bar baked into the image itself,
+   which needs to stay out of a watermark sitting behind real content
+   everywhere in the app. Fully non-interactive. */
+#app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url(img/card-watermark.jpg) center / cover no-repeat;
+  opacity: 0.14;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: light) {
+  #app::before { background-image: url(img/card-watermark-light.jpg); }
 }
 
 /* ---------------- splash screen ----------------
@@ -221,6 +245,52 @@ body {
     transparent 100%);
 }
 #splash-screen.splash-home #splash-tabbar { display: flex; }
+/* Landing mode for onboarding/unlock: no wallet exists yet (or it's
+   locked), so the Home/Assets/Activity/Send bar doesn't apply here --
+   the whole splash becomes one big "tap to continue" target instead,
+   with a plain hint replacing the tab bar (see activateSplashLanding()
+   in popup.js). This is what makes the splash a deliberate stop the
+   user has to tap through, instead of auto-fading into onboarding or
+   unlock on its own. */
+#splash-screen.splash-landing #splash-spinner { display: none; }
+#splash-screen.splash-landing #splash-tabbar { display: none; }
+/* Language picker + Continue button live inside this footer now (see
+   below) -- no longer a whole-screen tap target, since that would swallow
+   clicks meant for the <select> sitting on top of it. */
+#splash-continue-hint {
+  display: none;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  /* Same 132px min-height and gradient shape as #splash-tabbar above --
+     this still has to fully cover the artwork's own baked-in tab-bar
+     ghost even though no real buttons render here in landing mode. Grows
+     taller than 132px to fit the language row + Continue button, which
+     only helps that coverage. */
+  min-height: 132px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top,
+    rgba(9, 11, 17, 0.99) 0%,
+    rgba(9, 11, 17, 0.99) 68%,
+    rgba(9, 11, 17, 0.9) 82%,
+    rgba(9, 11, 17, 0.4) 94%,
+    transparent 100%);
+}
+#splash-screen.splash-landing #splash-continue-hint { display: flex; }
+#splash-continue-hint .language-picker { margin: 0; }
+#splash-continue-hint .language-picker label {
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#splash-continue-btn { width: 100%; }
 .splash-tab {
   flex: 1;
   display: flex;
@@ -309,6 +379,24 @@ body {
   flex-shrink: 0;
 }
 #brand-logo { display: none; }
+/* Global language switcher: reachable from every screen because the header
+   sits above all of them (mirrors the website build's #app-header). Just a
+   normal .language-select, so populateLanguageSelects() fills it and
+   lib/i18n.js keeps it in sync with the onboarding/Settings pickers. */
+.global-lang-select {
+  align-self: flex-end;
+  width: auto; max-width: 128px; min-width: 0; margin: 0 0 2px;
+  font-size: 12px; line-height: 1.2;
+  padding: 4px 22px 4px 10px;
+  border-radius: 999px;
+  background-color: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  box-shadow: none;
+  cursor: pointer;
+}
+html[dir="rtl"] .global-lang-select { padding: 4px 10px 4px 22px; }
+.global-lang-select:focus { outline: none; box-shadow: 0 0 0 3px rgba(221, 172, 77, 0.15); }
 #network-badge {
   font-family: var(--font-body);
   font-weight: 600;
@@ -339,15 +427,67 @@ body {
 }
 .hidden { display: none !important; }
 
+/* ---------------- cube nav (Home / Activity / Send) ----------------
+   These three screens live inside a rotating 3D cube (cube-nav.js) instead
+   of swapping with a hard cut. #cube-shell takes over the same flex:1 slot
+   .screen normally holds; #cube-stage is where CubeNav.mount() builds its
+   own .cn-stage/.cn-cube/.cn-face structure, sized via --cn-stage-h since
+   the cube needs a real, bounded viewport -- each face scrolls internally
+   instead (see .cn-face in cube-nav.js). The popup itself is small and
+   fixed-width, so this stays shorter than the website's version. */
+#cube-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#cube-stage {
+  --cn-stage-h: min(58vh, 360px);
+}
+#cube-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 5px 5px calc(5px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+.cube-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 4px 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.cube-tab:hover, .cube-tab:focus-visible { background: var(--bg-hover); color: var(--text); }
+.cube-tab.active { color: var(--gold-bright); }
+.cube-tab-icon { font-size: 16px; line-height: 1; }
+.cube-tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.01em; }
+
 /* ---------------- footer ---------------- */
 #app-footer {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   padding: 7px 16px; border-top: 1px solid var(--line);
   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
   flex-shrink: 0;
 }
+#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
+#app-footer .footer-copyright { font-size: 9.5px; color: var(--text-faint); opacity: 0.8; letter-spacing: 0.03em; }
+#app-footer .footer-links { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 10px; }
+#app-footer .footer-links a { color: var(--text-faint); text-decoration: none; }
+#app-footer .footer-links a:hover { color: var(--gold); text-decoration: underline; }
+#app-footer .footer-links span { color: var(--text-faint); opacity: 0.6; }
 
 h2 {
   margin: 0 0 6px 0;
@@ -561,6 +701,27 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .balance-native-row.balance-lead-fallback #balance-symbol { font-size: 13px; }
 
 .address-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+/* Buy screen: MoonPay's widget embedded right here instead of opening a
+   new tab (see lib/buy-config.js). Fixed height since the iframe's own
+   content can't influence its parent's size across origins -- smaller
+   than the website's version to fit the popup's compact viewport. */
+.widget-frame-wrap {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+}
+.widget-frame { display: block; width: 100%; height: 380px; border: none; }
+/* Buy screen: points at Swap as the fully non-custodial, no-signup
+   alternative to MoonPay for anyone who already holds some crypto. */
+.no-third-party-callout {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold-deep);
+  padding: 10px 12px; border-radius: 7px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
 /* QR codes need real light/dark contrast to stay scannable, so this stays
    a plain white card regardless of the app's own dark theme -- the same
    compromise every dark-themed wallet's QR view makes. */
@@ -574,6 +735,65 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .actions-row { display: flex; gap: 8px; }
 .actions-row button { flex: 1; }
 .swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+
+/* Swap screen redesign: the From/To pickers and the amount field used to
+   be bare labels + selects stacked straight down the screen -- functional,
+   but reading as a plain form rather than an actual swap interface. This
+   groups From and To into their own cards (matching .coin-swap-card's look
+   elsewhere), adds a circular flip button between them like every
+   mainstream swap UI has, and turns the quote result into its own card
+   with the estimated-out amount as the headline rather than one paragraph
+   among several. None of this changes what any #id popup.js reads/writes
+   is untouched -- only how it's grouped and styled. */
+.swap-card {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.swap-card .swap-row { margin-bottom: 0; }
+.swap-card-label {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--text-muted); margin: 0; display: block;
+}
+.swap-amount-input {
+  font-size: 22px; font-weight: 700; font-family: var(--font-body);
+  background: transparent; border: none; padding: 4px 0 0; color: var(--gold-bright);
+}
+.swap-amount-input:focus { outline: none; box-shadow: none; }
+.swap-amount-input::placeholder { color: var(--text-faint); }
+
+.swap-flip-wrap { display: flex; justify-content: center; margin: -13px 0; z-index: 1; position: relative; }
+.swap-flip-btn {
+  width: 38px; height: 38px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #3a3018 0%, #241d10 100%);
+  border: 3px solid var(--bg); color: var(--gold-bright);
+  font-size: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.swap-flip-btn:hover { border-color: var(--bg); filter: brightness(1.25); color: var(--gold-bright); }
+.swap-flip-btn:active { transform: translateY(1px) scale(0.96); }
+
+.swap-quote-btn { margin-top: 2px; }
+
+.swap-quote-card {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; display: flex; flex-direction: column; gap: 4px; text-align: center;
+}
+.swap-quote-subline { margin: 0; }
+.swap-quote-headline {
+  margin: 2px 0 6px; font-size: 21px; font-weight: 800; color: var(--gold-bright);
+}
+.swap-slippage-block { margin-top: 10px; text-align: left; }
+.swap-slippage-pills {
+  display: flex; gap: 6px; margin-top: 6px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+}
+.swap-slippage-pill {
+  flex: 1; background: transparent; border: 0; border-radius: 7px;
+  color: var(--text-muted); font: inherit; font-weight: 600; font-size: 12px; padding: 7px 4px;
+}
+.swap-slippage-pill.active { background: var(--gold); color: var(--gold-ink); }
+.swap-slippage-pill:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
+#swap-quote-display .primary, #swap-quote-display .secondary { margin-top: 10px; }
 
 .tokens-section {
   margin-top: 4px; background: var(--bg-inset); border: 1px solid var(--line);
@@ -683,6 +903,44 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 }
 
 .back-btn { align-self: flex-start; }
+
+/* A fixed "pill" back button that anchors to the viewport corner instead of
+   sitting inline at the bottom of a long, scrollable screen -- so it's
+   always reachable without scrolling all the way down. Same gold
+   coin-gradient as .primary so it reads as part of the same "jackpot pill"
+   button family, plus a slow glow pulse so it doesn't just blend into the
+   list. */
+.top-back-btn {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 50;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px 8px 12px;
+  background: linear-gradient(180deg, #fff6df 0%, var(--gold-bright) 32%, var(--gold) 68%, var(--gold-deep) 100%);
+  color: var(--gold-ink);
+  border: 1.5px solid #8a6a10;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.55);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.01em;
+  animation: topBackBtnGlow 2.6s ease-in-out infinite;
+}
+.top-back-btn:hover { filter: brightness(1.08); }
+.top-back-btn-coin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--gold-ink); color: var(--gold-bright);
+  font-size: 12px; font-weight: 900; line-height: 1;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+}
+@keyframes topBackBtnGlow {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.55), 0 0 0 rgba(243,212,136,0); }
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.55), 0 0 13px rgba(243,212,136,0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .top-back-btn { animation: none; }
+}
+html[dir="rtl"] .top-back-btn { left: auto; right: 10px; }
+
 pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(--font-mono); }
 
 /* ---------------- support chat ---------------- */
@@ -722,44 +980,15 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
 /* ---------------- language picker ---------------- */
 .language-picker { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
 .language-picker label { margin: 0; flex-shrink: 0; }
-.language-picker .lang-picker { flex: 1; max-width: 62%; }
-#screen-onboarding .language-picker { margin-bottom: 10px; }
-
-/* Custom flag dropdown -- see the big comment on populateLanguageSelects()
-   in popup.js for why this replaces a plain <select>. The real <select> is
-   still in the DOM (see .lang-picker-native-hidden below); this is just
-   the visible stand-in for it, built at runtime. */
-.lang-picker { position: relative; display: inline-block; width: auto; min-width: 0; }
-.lang-picker-native-hidden {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-}
-.lang-picker-trigger {
-  width: 100%; display: flex; align-items: center; gap: 8px;
+.language-picker select {
+  width: auto; min-width: 0; flex: 1; max-width: 62%;
   border-radius: 999px; padding: 9px 16px;
-  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+  border: 1px solid var(--line-strong);
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
-  color: var(--text); font: inherit; cursor: pointer; text-align: left;
 }
-.lang-picker-trigger:focus-visible {
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 3px rgba(221, 172, 77, 0.15);
-}
-.lang-picker-trigger .lang-flag { width: 20px; height: 15px; flex-shrink: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
-.lang-picker-trigger .lang-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lang-picker-trigger .lang-caret { flex-shrink: 0; opacity: 0.6; font-size: 10px; }
-.lang-picker-list {
-  position: absolute; z-index: 40; top: 100%; left: 0; right: 0; margin-top: 4px;
-  max-height: 240px; overflow-y: auto; list-style: none; padding: 4px;
-  background: var(--bg-raised); border: 1px solid var(--line-strong);
-  border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-}
-.lang-picker-list.hidden { display: none; }
-.lang-picker-item {
-  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-  border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text);
-}
-.lang-picker-item:hover, .lang-picker-item.active { background: var(--bg-inset); }
-.lang-picker-item .lang-flag { width: 20px; height: 15px; flex-shrink: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,0.15); }
+.language-picker select:focus { box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 3px rgba(221, 172, 77, 0.15); }
+#screen-onboarding .language-picker { margin-bottom: 10px; }
 
 /* ---------------- RTL (Arabic) ----------------
    Applied via dir="rtl" on <html>, set by lib/i18n.js whenever Arabic is
@@ -789,3 +1018,112 @@ html[dir="rtl"] input[type="text"],
 html[dir="rtl"] input[type="password"],
 html[dir="rtl"] textarea { text-align: right; }
 html[dir="rtl"] .mono { direction: ltr; unicode-bidi: embed; text-align: right; } /* addresses/hex stay LTR internally */
+
+/* Prices screen: Crypto / Currencies tabs + search */
+.prices-tabs {
+  display: flex; gap: 6px; margin: 10px 0 8px;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 10px; padding: 4px;
+}
+.prices-tab {
+  flex: 1; background: transparent; border: 0; border-radius: 7px;
+  color: var(--text-muted); font: inherit; font-weight: 600; font-size: 13px;
+  padding: 7px 10px; cursor: pointer;
+}
+.prices-tab:hover { color: var(--text); }
+.prices-tab.active { background: var(--gold); color: var(--gold-ink); }
+.prices-tab:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
+.prices-search {
+  width: 100%; box-sizing: border-box; margin: 0 0 8px;
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font: inherit; font-size: 13px; padding: 9px 12px;
+}
+.prices-search:focus { outline: none; border-color: var(--gold); }
+#prices-tab-note { margin: 0 0 8px; font-size: 12px; }
+
+/* Prices screen polish: symbol stacked under the name, price with a 24h
+   change pill stacked on the right, star in its own fixed column so every
+   row lines up regardless of how long the price text is. */
+.price-left { flex: 1; min-width: 0; }
+.price-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.price-id .price-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-row .price-id .price-symbol,
+html[dir="rtl"] .price-row .price-id .price-symbol { margin: 0; font-size: 11px; letter-spacing: 0.02em; }
+.price-right { flex-shrink: 0; gap: 6px; }
+.price-quote { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.price-quote .price-change,
+html[dir="rtl"] .price-quote .price-change {
+  margin: 0; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; line-height: 1.5;
+}
+.price-quote .price-change.up { background: rgba(127, 201, 154, 0.14); }
+.price-quote .price-change.down { background: rgba(226, 104, 90, 0.14); }
+.price-right .star-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 32px; padding: 0; font-size: 16px;
+}
+.prices-search {
+  padding-inline-start: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23766c56' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 11px center; background-size: 15px;
+}
+html[dir="rtl"] .prices-search { background-position: right 11px center; }
+.prices-tab.active { box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+/* Keep numbers and +/- signs reading correctly inside right-to-left layouts. */
+.price-quote .price-change, .price-quote .price-usd { direction: ltr; unicode-bidi: isolate; }
+
+/* Coin rows are links to the coin's CoinGecko page (star stays a button). */
+.price-link {
+  display: flex; align-items: center; justify-content: space-between;
+  flex: 1; min-width: 0; gap: 10px; color: inherit; text-decoration: none;
+  cursor: pointer;
+}
+.price-link:hover .price-name { text-decoration: underline; text-underline-offset: 2px; }
+.price-link:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; border-radius: 8px; }
+.price-link { margin-inline-end: 6px; }
+
+/* ---- Coin detail screen ---- */
+.coin-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.coin-head .coin-icon .token-icon, .coin-head .coin-icon img { width: 40px; height: 40px; }
+.coin-title { flex: 1; min-width: 0; }
+.coin-title h2 { margin: 0; line-height: 1.15; }
+.coin-rank {
+  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-inset); border: 1px solid var(--line); color: var(--text-muted);
+}
+.coin-price-block { display: flex; align-items: center; gap: 10px; margin: 6px 0 4px; }
+.coin-price { font-size: 28px; font-weight: 700; color: var(--gold-bright); direction: ltr; unicode-bidi: isolate; }
+.coin-price-block .price-change { font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.coin-price-block .price-change.up { background: rgba(127, 201, 154, 0.14); }
+.coin-price-block .price-change.down { background: rgba(226, 104, 90, 0.14); }
+.coin-chart { height: 130px; margin: 6px 0 2px; color: var(--text-muted); touch-action: pan-y; cursor: crosshair; }
+.coin-chart.up { color: #7fc99a; }
+.coin-chart.down { color: #e2685a; }
+.coin-chart svg { width: 100%; height: 100%; display: block; }
+.coin-chart-msg { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 12px; color: var(--text-muted); }
+.coin-chart-readout { min-height: 18px; margin: 2px 0 8px; direction: ltr; unicode-bidi: isolate; }
+.coin-ranges {
+  display: flex; gap: 6px; margin: 0 0 14px;
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+}
+.coin-range {
+  flex: 1; background: transparent; border: 0; border-radius: 7px; color: var(--text-muted);
+  font: inherit; font-weight: 600; font-size: 12px; padding: 6px 4px; cursor: pointer;
+}
+.coin-range.active { background: var(--gold); color: var(--gold-ink); }
+.coin-swap-card {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; margin: 0 0 16px;
+}
+.coin-swap-card p { margin: 0 0 8px; }
+.coin-swap-card button { width: 100%; }
+.coin-swap-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+.coin-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.coin-stat {
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; min-width: 0;
+}
+.coin-stat .k { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+.coin-stat .v { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; unicode-bidi: isolate; text-align: start; }
+/* Price rows now open the coin screen, so they are buttons, not anchors. */
+button.price-link { background: none; border: 0; padding: 0; font: inherit; text-align: start; width: auto; }
