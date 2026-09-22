@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Token Exchange</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<div id="bg-scene"></div>
+<div id="splash-screen">
+  <img src="img/splash.jpg" alt="Token Exchange" />
+  <div id="splash-brand">TOKEN EXCHANGE</div>
+  <div id="splash-spinner"><img src="img/spinner-coin.png" alt="" /></div>
+  <div id="splash-tabbar">
+    <button id="splash-tab-home" class="splash-tab" data-i18n-title="home.tabHome" title="Home">
+      <span class="splash-tab-icon" aria-hidden="true">&#8962;</span>
+      <span class="splash-tab-label" data-i18n="home.tabHome">Home</span>
+    </button>
+    <button id="splash-tab-assets" class="splash-tab" data-i18n-title="home.tabAssets" title="Assets">
+      <span class="splash-tab-icon" aria-hidden="true">&#9679;</span>
+      <span class="splash-tab-label" data-i18n="home.tabAssets">Assets</span>
+    </button>
+    <button id="splash-tab-activity" class="splash-tab" data-i18n-title="home.tabActivity" title="Activity">
+      <span class="splash-tab-icon" aria-hidden="true">&#128202;</span>
+      <span class="splash-tab-label" data-i18n="home.tabActivity">Activity</span>
+    </button>
+    <button id="splash-tab-send" class="splash-tab" data-i18n-title="home.tabSend" title="Send">
+      <span class="splash-tab-icon" aria-hidden="true">&#10148;</span>
+      <span class="splash-tab-label" data-i18n="home.tabSend">Send</span>
+    </button>
+  </div>
+</div>
+<div id="app">
+
+  <header id="app-header">
+    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange">
+      <defs>
+        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fff3c4"/>
+          <stop offset="30%" stop-color="#f4c430"/>
+          <stop offset="65%" stop-color="#caa02a"/>
+          <stop offset="100%" stop-color="#8a6a10"/>
+        </linearGradient>
+        <linearGradient id="gGoldEdge" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fffbe6"/>
+          <stop offset="100%" stop-color="#6b4e08"/>
+        </linearGradient>
+        <radialGradient id="gCoinB" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#ffb74d"/>
+          <stop offset="100%" stop-color="#d9770a"/>
+        </radialGradient>
+        <radialGradient id="gCoinE" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#c7d3ee"/>
+          <stop offset="100%" stop-color="#5f6ea3"/>
+        </radialGradient>
+        <radialGradient id="gCoinT" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#7fe0b8"/>
+          <stop offset="100%" stop-color="#1a9c74"/>
+        </radialGradient>
+        <radialGradient id="gLeverPink" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#ffc2e2"/>
+          <stop offset="50%" stop-color="#ff4fa3"/>
+          <stop offset="100%" stop-color="#c2136b"/>
+        </radialGradient>
+        <linearGradient id="gLeverStem" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ff9bcb"/>
+          <stop offset="100%" stop-color="#a30f5e"/>
+        </linearGradient>
+        <clipPath id="reelClip1"><rect x="70" y="46" width="52" height="40" rx="3"/></clipPath>
+        <clipPath id="reelClip2"><rect x="134" y="46" width="52" height="40" rx="3"/></clipPath>
+        <clipPath id="reelClip3"><rect x="198" y="46" width="52" height="40" rx="3"/></clipPath>
+        <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
+          <stop offset="36%" stop-color="#ffffff" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+        </linearGradient>
+        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3.2"/>
+        </filter>
+      </defs>
+
+      <!-- outer cabinet -->
+      <rect x="2" y="2" width="316" height="104" rx="16" fill="url(#gGold)" stroke="url(#gGoldEdge)" stroke-width="3"/>
+      <rect x="9" y="9" width="302" height="90" rx="12" fill="none" stroke="#7a5a10" stroke-width="1.5" opacity="0.6"/>
+
+      <!-- corner flourishes, evoking cast-iron scrollwork -->
+      <g stroke="#7a5a10" stroke-width="1.5" fill="none" opacity="0.55">
+        <path d="M14 22 Q22 14 30 22"/>
+        <path d="M290 22 Q298 14 306 22"/>
+      </g>
+
+      <!-- marquee title -->
+      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
+      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
+
+      <!-- glass display housing -->
+      <rect x="64" y="40" width="192" height="52" rx="6" fill="#0c0f16" stroke="#3a2c05" stroke-width="2"/>
+
+      <!-- reel 1: Bitcoin symbol -->
+      <g clip-path="url(#reelClip1)">
+        <rect x="70" y="46" width="52" height="40" fill="#12141c"/>
+        <circle cx="96" cy="30" r="15" fill="url(#gCoinB)" opacity="0.55"/>
+        <circle cx="96" cy="66" r="21" fill="#ffb74d" opacity="0.5" filter="url(#softGlow)"/>
+        <circle cx="96" cy="66" r="17" fill="url(#gCoinB)"/>
+        <text x="96" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#3a1d00">&#8383;</text>
+        <circle cx="96" cy="102" r="15" fill="url(#gCoinB)" opacity="0.55"/>
+      </g>
+
+      <!-- reel 2: Ethereum symbol -->
+      <g clip-path="url(#reelClip2)">
+        <rect x="134" y="46" width="52" height="40" fill="#12141c"/>
+        <circle cx="160" cy="30" r="15" fill="url(#gCoinE)" opacity="0.55"/>
+        <circle cx="160" cy="66" r="21" fill="#8fa3e0" opacity="0.45" filter="url(#softGlow)"/>
+        <circle cx="160" cy="66" r="17" fill="url(#gCoinE)"/>
+        <text x="160" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#1c2340">&#926;</text>
+        <circle cx="160" cy="102" r="15" fill="url(#gCoinE)" opacity="0.55"/>
+      </g>
+
+      <!-- reel 3: Tether symbol -->
+      <g clip-path="url(#reelClip3)">
+        <rect x="198" y="46" width="52" height="40" fill="#12141c"/>
+        <circle cx="224" cy="30" r="15" fill="url(#gCoinT)" opacity="0.55"/>
+        <circle cx="224" cy="66" r="21" fill="#4fe0ad" opacity="0.45" filter="url(#softGlow)"/>
+        <circle cx="224" cy="66" r="17" fill="url(#gCoinT)"/>
+        <text x="224" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#063d2b">&#8366;</text>
+        <circle cx="224" cy="102" r="15" fill="url(#gCoinT)" opacity="0.55"/>
+      </g>
+
+      <!-- reel divider lines -->
+      <line x1="122" y1="40" x2="122" y2="92" stroke="#3a2c05" stroke-width="2"/>
+      <line x1="186" y1="40" x2="186" y2="92" stroke="#3a2c05" stroke-width="2"/>
+
+      <!-- glass pane shine, sells "clear plastic screen" -->
+      <rect x="64" y="40" width="192" height="52" rx="6" fill="url(#glassShine)"/>
+      <rect x="64" y="40" width="192" height="52" rx="6" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="1"/>
+
+      <!-- side lever -->
+      <rect x="298" y="30" width="6" height="34" rx="3" fill="url(#gLeverStem)"/>
+      <circle cx="301" cy="26" r="9" fill="url(#gLeverPink)" stroke="#8a0f52" stroke-width="1.5"/>
+
+      <!-- base plate -->
+      <text x="160" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#5c4208" letter-spacing="3" opacity="0.85">EST. VAULT NO. 0500</text>
+    </svg>
+    <div id="network-badge" class="hidden"></div>
+  </header>
+
+  <!-- ONBOARDING -->
+  <section id="screen-onboarding" class="screen hidden">
+    <div class="language-picker">
+      <label data-i18n="common.languageLabel">Language</label>
+      <select id="language-select-onboarding" class="language-select"></select>
+    </div>
+    <h2 data-i18n="onboarding.title">Welcome</h2>
+    <p class="muted" data-i18n="onboarding.subtitle">Set up your wallet to get started.</p>
+    <button id="btn-goto-create" class="primary" data-i18n="onboarding.createBtn">Create a new wallet</button>
+    <button id="btn-goto-import" class="secondary" data-i18n="onboarding.importBtn">Import an existing wallet</button>
+    <button id="btn-goto-support-onboarding" class="link" data-i18n="common.needHelp">Need help?</button>
+  </section>
+
+  <!-- CREATE -->
+  <section id="screen-create" class="screen hidden">
+    <h2 data-i18n="create.title">Create wallet</h2>
+    <div id="create-step-password">
+      <label data-i18n="create.passwordLabel">New password (min 8 characters)</label>
+      <input type="password" id="create-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
+      <input type="password" id="create-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
+      <p class="warn" data-i18n="create.passwordWarning">This password unlocks your wallet on this device. There is no recovery for it -- only your seed phrase can restore your funds.</p>
+      <button id="btn-create-submit" class="primary" data-i18n="create.continueBtn">Continue</button>
+      <button class="link back-btn" data-back="screen-onboarding" data-i18n="common.back">Back</button>
+    </div>
+    <div id="create-step-backup" class="hidden">
+      <p class="warn" data-i18n="create.backupWarning">Write down this recovery phrase and store it somewhere safe. Anyone with it can take everything in this wallet. Token Exchange cannot recover it for you.</p>
+      <div id="mnemonic-display" class="mnemonic-box"></div>
+      <label class="checkbox-row"><input type="checkbox" id="backup-confirm-check" /> <span data-i18n="create.backupCheckbox">I've saved my recovery phrase</span></label>
+      <button id="btn-backup-done" class="primary" disabled data-i18n="create.finishBtn">Finish</button>
+    </div>
+  </section>
+
+  <!-- IMPORT -->
+  <section id="screen-import" class="screen hidden">
+    <h2 data-i18n="import.title">Import wallet</h2>
+    <label data-i18n="import.mnemonicLabel">Recovery phrase (12 or 24 words)</label>
+    <textarea id="import-mnemonic" rows="3" data-i18n-placeholder="import.mnemonicPlaceholder" placeholder="word1 word2 word3 ..."></textarea>
+    <label data-i18n="common.newPasswordLabel">New password (min 8 characters)</label>
+    <input type="password" id="import-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
+    <input type="password" id="import-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
+    <button id="btn-import-submit" class="primary" data-i18n="import.submitBtn">Import</button>
+    <button class="link back-btn" data-back="screen-onboarding" data-i18n="common.back">Back</button>
+    <p id="import-error" class="error hidden"></p>
+  </section>
+
+  <!-- UNLOCK -->
+  <section id="screen-unlock" class="screen hidden">
+    <h2 data-i18n="unlock.title">Unlock</h2>
+    <input type="password" id="unlock-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
+    <button id="btn-unlock-submit" class="primary" data-i18n="unlock.submitBtn">Unlock</button>
+    <p id="unlock-error" class="error hidden"></p>
+    <button class="link" id="btn-goto-reset" data-i18n="unlock.resetInsteadBtn">Reset wallet instead</button>
+    <button class="link" id="btn-goto-support-unlock" data-i18n="common.needHelp">Need help?</button>
+  </section>
+
+  <!-- MAIN -->
+  <section id="screen-main" class="screen hidden">
+    <div class="account-row">
+      <div class="account-picker">
+        <span id="account-identicon" class="account-identicon" aria-hidden="true"></span>
+        <select id="account-select"></select>
+      </div>
+      <button id="btn-settings" class="icon-btn" data-i18n-title="main.settingsTitle" title="Settings">&#9881;</button>
+    </div>
+    <div class="balance-box">
+      <div id="balance-usd" class="hidden"></div>
+      <div class="balance-native-row">
+        <span id="balance-amount">0</span>
+        <span id="balance-symbol" class="muted"></span>
+      </div>
+    </div>
+    <div class="address-row">
+      <span id="address-display" class="mono"></span>
+      <button id="btn-copy-address" class="link" data-i18n="common.copy">Copy</button>
+      <button id="btn-toggle-qr" class="link" data-i18n="main.showQrBtn">Show QR</button>
+    </div>
+    <div id="address-qr-box" class="qr-box hidden"></div>
+    <div class="actions-row">
+      <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
+      <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
+      <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
+    </div>
+    <div class="prices-card">
+      <div class="prices-card-header">
+        <span class="prices-card-title" data-i18n="main.livePricesTitle">Live Prices</span>
+        <button id="btn-goto-prices" class="link" data-i18n="common.seeAll">See all</button>
+      </div>
+      <div id="prices-card-list" class="prices-card-list"></div>
+    </div>
+
+    <div class="prices-card">
+      <div class="prices-card-header">
+        <span class="prices-card-title" data-i18n="main.predictionsTitle">Trending Markets</span>
+        <button id="btn-goto-predictions" class="link" data-i18n="common.seeAll">See all</button>
+      </div>
+      <div id="predictions-card-list" class="prices-card-list"></div>
+    </div>
+
+    <div class="tokens-section">
+      <div class="tokens-header">
+        <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
+        <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
+      </div>
+      <div id="tokens-list" class="tokens-list"></div>
+      <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
+    </div>
+
+    <div class="network-picker">
+      <label data-i18n="main.networkLabel">Network</label>
+      <div class="network-select-row">
+        <span id="network-select-dot" class="network-dot"></span>
+        <select id="network-select"></select>
+      </div>
+    </div>
+    <p id="main-error" class="error hidden"></p>
+  </section>
+
+  <!-- ADD TOKEN -->
+  <section id="screen-add-token" class="screen hidden">
+    <h2 data-i18n="addToken.title">Add token</h2>
+    <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
+    <label data-i18n="addToken.addressLabel">Token contract address</label>
+    <input type="text" id="add-token-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
+    <button id="btn-token-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
+    <div id="add-token-preview" class="hidden">
+      <p class="muted"><span data-i18n="addToken.nameLabel">Name:</span> <span id="add-token-name" class="mono"></span></p>
+      <p class="muted"><span data-i18n="addToken.symbolLabel">Symbol:</span> <span id="add-token-symbol" class="mono"></span></p>
+      <p class="muted"><span data-i18n="addToken.decimalsLabel">Decimals:</span> <span id="add-token-decimals" class="mono"></span></p>
+      <button id="btn-token-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
+    </div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="add-token-error" class="error hidden"></p>
+  </section>
+
+  <!-- PRICES -->
+  <section id="screen-prices" class="screen hidden">
+    <h2 data-i18n="common.livePrices">Live prices</h2>
+    <p class="muted" data-i18n="prices.description">USD prices from CoinGecko's public API. Purely informational -- nothing about your wallet is sent to look these up.</p>
+    <div id="prices-list" class="prices-list"></div>
+    <p id="prices-error" class="error hidden"></p>
+    <p id="prices-status" class="hint hidden"></p>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- PREDICTIONS (read-only) -->
+  <section id="screen-predictions" class="screen hidden">
+    <h2 data-i18n="predictions.title">Trending Markets</h2>
+    <p class="muted" data-i18n="predictions.description">Public odds from Polymarket's prediction markets -- informational only. Token Exchange does not place bets or hold positions on your behalf; nothing about your wallet is sent to look these up.</p>
+    <div id="predictions-list" class="prices-list"></div>
+    <p id="predictions-error" class="error hidden"></p>
+    <p id="predictions-status" class="hint hidden"></p>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- BUY -->
+  <section id="screen-buy" class="screen hidden">
+    <h2 data-i18n="buy.title">Buy crypto</h2>
+    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
+    <p class="muted" data-i18n-html="buy.description2Html">MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:</p>
+    <div class="address-row">
+      <span id="buy-address-display" class="mono"></span>
+      <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
+    </div>
+    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="buy-error" class="error hidden"></p>
+  </section>
+
+  <!-- SUPPORT -->
+  <section id="screen-support" class="screen hidden">
+    <h2 data-i18n="support.title">Help &amp; support</h2>
+    <p class="muted" data-i18n="support.description">Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.</p>
+    <div id="support-log" class="support-log"></div>
+    <div id="support-chips" class="support-chips"></div>
+    <div class="support-input-row">
+      <input type="text" id="support-input" data-i18n-placeholder="support.inputPlaceholder" placeholder="Type a question..." />
+      <button id="btn-support-send" class="primary" data-i18n="common.send">Send</button>
+    </div>
+    <button class="link" id="btn-support-back" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- SEND -->
+  <section id="screen-send" class="screen hidden">
+    <h2 data-i18n="common.send">Send</h2>
+    <label data-i18n="send.assetLabel">Asset</label>
+    <select id="send-asset-select">
+      <option value="native" data-i18n="common.nativeCoinOption">Native coin</option>
+      <option value="token" data-i18n="send.assetToken">Token (enter contract address)</option>
+    </select>
+    <input type="text" id="send-token-address" class="hidden" data-i18n-placeholder="send.tokenAddressPlaceholder" placeholder="Token contract address (0x...)" />
+    <div class="send-to-label-row">
+      <label data-i18n="send.toLabel">To address</label>
+      <button type="button" id="btn-open-contacts" class="link" data-i18n="send.contactsBtn">Contacts</button>
+    </div>
+    <div class="send-to-row">
+      <span id="send-to-identicon" class="account-identicon hidden" aria-hidden="true"></span>
+      <input type="text" id="send-to" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
+    </div>
+    <label data-i18n="send.amountLabel">Amount</label>
+    <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+    <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="send-status" class="hint hidden"></p>
+    <p id="send-error" class="error hidden"></p>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section id="screen-activity" class="screen hidden">
+    <h2 data-i18n="activity.title">Activity</h2>
+    <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
+    <div id="activity-list"></div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <!-- SWAP -->
+  <section id="screen-swap" class="screen hidden">
+    <h2 data-i18n="common.swap">Swap</h2>
+    <p id="swap-unsupported" class="warn hidden" data-i18n="swap.unsupportedWarning">Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings &rarr; Networks first.</p>
+    <div id="swap-form">
+      <div class="swap-field">
+        <div class="swap-field-top">
+          <label data-i18n="swap.fromLabel">From</label>
+          <button type="button" id="swap-from-max" class="max-btn hidden" data-i18n="swap.maxBtn">Max</button>
+        </div>
+        <div class="swap-field-row">
+          <input type="text" id="swap-amount-in" inputmode="decimal" autocomplete="off" class="swap-amount-input" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+          <button type="button" id="swap-from-token-btn" class="token-pill-btn" data-side="from">
+            <span id="swap-from-icon" class="token-icon"></span>
+            <span id="swap-from-symbol" class="token-pill-symbol" data-i18n="common.nativeCoinOption">Native coin</span>
+            <span class="token-pill-caret">&#9662;</span>
+          </button>
+        </div>
+        <div class="swap-field-sub">
+          <span id="swap-from-usd" class="swap-usd-value"></span>
+          <span id="swap-from-balance" class="swap-balance-value muted small"></span>
+        </div>
+      </div>
+
+      <button type="button" id="btn-swap-flip" class="swap-flip-btn" data-i18n-title="swap.flipTitle" title="Flip">&#8645;</button>
+
+      <div class="swap-field">
+        <label data-i18n="swap.toLabel">To</label>
+        <div class="swap-field-row">
+          <input type="text" id="swap-amount-out" class="swap-amount-input" readonly placeholder="0.0" />
+          <button type="button" id="swap-to-token-btn" class="token-pill-btn" data-side="to">
+            <span id="swap-to-icon" class="token-icon"></span>
+            <span id="swap-to-symbol" class="token-pill-symbol" data-i18n="common.nativeCoinOption">Native coin</span>
+            <span class="token-pill-caret">&#9662;</span>
+          </button>
+        </div>
+        <div class="swap-field-sub">
+          <span id="swap-to-usd" class="swap-usd-value"></span>
+        </div>
+      </div>
+
+      <p id="swap-quote-loading" class="hint hidden" data-i18n="swap.quoting">Getting quote&hellip;</p>
+
+      <div id="swap-quote-display" class="hidden">
+        <div class="swap-breakdown">
+          <div class="swap-breakdown-row"><span data-i18n="swap.rateLabel">Rate</span><span id="swap-rate-line"></span></div>
+          <div class="swap-breakdown-row"><span data-i18n="swap.appFeeLabel">App fee</span><span id="swap-fee-line"></span></div>
+          <div class="swap-breakdown-row">
+            <label for="swap-slippage" data-i18n="swap.slippageLabel">Slippage tolerance</label>
+            <select id="swap-slippage">
+              <option value="50">0.5%</option>
+              <option value="100" selected>1%</option>
+              <option value="300">3%</option>
+            </select>
+          </div>
+          <div class="swap-breakdown-row swap-breakdown-row-min"><span data-i18n="swap.minReceivedLabel">Minimum received</span><span id="swap-min-received-line"></span></div>
+        </div>
+        <button id="btn-swap-approve" class="secondary hidden" data-i18n="swap.approveBtn">Approve token first</button>
+        <button id="btn-swap-execute" class="primary" data-i18n="common.swap">Swap</button>
+      </div>
+    </div>
+
+    <!-- Shared token picker popover for the From/To pills -->
+    <div id="swap-token-picker" class="token-picker hidden">
+      <div class="token-picker-sheet">
+        <div class="token-picker-header">
+          <span data-i18n="swap.selectTokenTitle">Select a token</span>
+          <button type="button" id="swap-token-picker-close" class="link">&#10005;</button>
+        </div>
+        <input type="text" id="swap-token-picker-custom" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
+        <div id="swap-token-picker-list" class="token-picker-list"></div>
+      </div>
+    </div>
+
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="swap-status" class="hint hidden"></p>
+    <p id="swap-error" class="error hidden"></p>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="screen-settings" class="screen hidden">
+    <h2 data-i18n="settings.title">Settings</h2>
+    <button id="btn-add-account" class="secondary" data-i18n="settings.addAccountBtn">Add account</button>
+    <button id="btn-goto-import-key" class="secondary" data-i18n="settings.importKeyBtn">Import private key</button>
+    <button id="btn-goto-add-network" class="secondary" data-i18n="settings.addNetworkBtn">Add network</button>
+    <button id="btn-goto-walletconnect" class="secondary" data-i18n="settings.walletConnectBtn">WalletConnect</button>
+    <button id="btn-goto-contacts" class="secondary" data-i18n="settings.contactsBtn">Address book</button>
+    <button id="btn-view-seed" class="secondary" data-i18n="settings.viewSeedBtn">View recovery phrase</button>
+    <button id="btn-goto-support-settings" class="secondary" data-i18n="settings.helpBtn">Help &amp; support</button>
+    <div class="language-picker">
+      <label data-i18n="common.languageLabel">Language</label>
+      <select id="language-select-settings" class="language-select"></select>
+    </div>
+    <div class="language-picker">
+      <label data-i18n="settings.currencyLabel">Display currency</label>
+      <select id="currency-select-settings" class="currency-select"></select>
+    </div>
+    <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
+    <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+  </section>
+
+  <section id="screen-contacts" class="screen hidden">
+    <h2 data-i18n="contacts.title">Address book</h2>
+    <p id="contacts-picker-hint" class="muted hidden" data-i18n="contacts.pickerHint">Tap a contact to fill it in as the recipient.</p>
+    <input type="text" id="contact-name-input" data-i18n-placeholder="contacts.namePlaceholder" placeholder="Name" />
+    <input type="text" id="contact-address-input" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
+    <button id="btn-contact-add" class="primary" data-i18n="contacts.addBtn">Save contact</button>
+    <p id="contacts-error" class="error hidden"></p>
+    <div id="contacts-list"></div>
+    <p id="contacts-empty" class="muted" data-i18n="contacts.empty">No saved contacts yet.</p>
+    <button type="button" id="btn-contacts-back" class="link" data-i18n="common.back">Back</button>
+  </section>
+
+  <section id="screen-walletconnect" class="screen hidden">
+    <h2 data-i18n="wc.title">WalletConnect</h2>
+    <p class="muted" data-i18n="wc.subtitle">Connect to any dapp that offers a "WalletConnect" option -- paste the wc:... URI from its connect-wallet QR code below.</p>
+    <input type="text" id="wc-uri-input" data-i18n-placeholder="wc.uriPlaceholder" placeholder="wc:..." />
+    <button id="btn-wc-connect" class="primary" data-i18n="wc.connectBtn">Connect</button>
+    <p id="wc-error" class="error hidden"></p>
+    <p id="wc-status" class="muted hidden"></p>
+    <p id="wc-not-configured" class="warn hidden" data-i18n="wc.notConfigured">WalletConnect needs a free Project ID before it can connect to anything -- see lib/walletconnect-config.js.</p>
+    <div class="tokens-header"><span class="tokens-title" data-i18n="wc.sessionsTitle">CONNECTED DAPPS</span></div>
+    <div id="wc-sessions-list"></div>
+    <p id="wc-sessions-empty" class="muted" data-i18n="wc.sessionsEmpty">No dapps connected yet.</p>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+  </section>
+
+  <section id="screen-import-key" class="screen hidden">
+    <h2 data-i18n="importKey.title">Import private key</h2>
+    <input type="text" id="import-key-input" data-i18n-placeholder="importKey.placeholder" placeholder="0x private key" />
+    <button id="btn-import-key-submit" class="primary" data-i18n="import.submitBtn">Import</button>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <p id="import-key-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-add-network" class="screen hidden">
+    <h2 data-i18n="addNetwork.title">Add network</h2>
+    <input type="text" id="net-name" data-i18n-placeholder="addNetwork.namePlaceholder" placeholder="Network name" />
+    <input type="text" id="net-chainid" data-i18n-placeholder="addNetwork.chainIdPlaceholder" placeholder="Chain ID (number)" />
+    <input type="text" id="net-rpc" data-i18n-placeholder="addNetwork.rpcPlaceholder" placeholder="RPC URL" />
+    <input type="text" id="net-symbol" data-i18n-placeholder="addNetwork.symbolPlaceholder" placeholder="Native currency symbol" />
+    <input type="text" id="net-explorer" data-i18n-placeholder="addNetwork.explorerPlaceholder" placeholder="Block explorer URL (optional)" />
+    <input type="text" id="net-router" data-i18n-placeholder="addNetwork.routerPlaceholder" placeholder="Verified swap router address (optional)" />
+    <p class="warn" data-i18n="addNetwork.routerWarning">Only fill in the router address if you've personally verified it against the project's official docs or the chain's block explorer. Leave blank if unsure -- swapping will simply be disabled for this network until you add one.</p>
+    <button id="btn-add-network-submit" class="primary" data-i18n="addNetwork.addBtn">Add</button>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <p id="add-network-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-view-seed" class="screen hidden">
+    <h2 data-i18n="viewSeed.title">Recovery phrase</h2>
+    <input type="password" id="view-seed-password" data-i18n-placeholder="viewSeed.passwordPlaceholder" placeholder="Enter password to reveal" />
+    <button id="btn-view-seed-submit" class="primary" data-i18n="viewSeed.revealBtn">Reveal</button>
+    <div id="view-seed-display" class="mnemonic-box hidden"></div>
+    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <p id="view-seed-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-reset" class="screen hidden">
+    <h2 data-i18n="reset.title">Reset wallet</h2>
+    <p class="warn" data-i18n="reset.warning">This deletes the encrypted wallet from this browser. Make sure you have your recovery phrase backed up -- this cannot be undone.</p>
+    <button id="btn-reset-confirm" class="danger" data-i18n="reset.confirmBtn">Yes, delete everything</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.cancel">Cancel</button>
+  </section>
+
+  <!-- APPROVAL SCREENS (opened as separate popup window for dapp requests) -->
+  <section id="screen-approve-locked" class="screen hidden">
+    <h2 data-i18n="approve.unlockTitle">Unlock to continue</h2>
+    <p class="muted" id="approve-origin-locked"></p>
+    <input type="password" id="approve-unlock-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
+    <button id="btn-approve-unlock" class="primary" data-i18n="unlock.submitBtn">Unlock</button>
+    <p id="approve-unlock-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-approve-connect" class="screen hidden">
+    <h2 data-i18n="approve.connectTitle">Connection request</h2>
+    <p id="approve-connect-wants"></p>
+    <p class="muted"><span data-i18n="approve.accountLabel">Account: </span><span id="approve-connect-address" class="mono"></span></p>
+    <div class="actions-row">
+      <button id="btn-approve-connect-reject" class="secondary" data-i18n="common.reject">Reject</button>
+      <button id="btn-approve-connect-accept" class="primary" data-i18n="approve.acceptConnectBtn">Connect</button>
+    </div>
+  </section>
+
+  <section id="screen-approve-tx" class="screen hidden">
+    <h2 data-i18n="approve.txTitle">Transaction request</h2>
+    <p class="muted" id="approve-tx-origin"></p>
+    <div class="tx-details">
+      <div><span class="muted" data-i18n="approve.toLabel">To:</span> <span id="approve-tx-to" class="mono"></span></div>
+      <div><span class="muted" data-i18n="approve.valueLabel">Value:</span> <span id="approve-tx-value"></span></div>
+      <div><span class="muted" data-i18n="approve.dataLabel">Data:</span> <span id="approve-tx-data" class="mono small"></span></div>
+    </div>
+    <p class="warn" data-i18n="approve.txWarning">Only approve this if you trust the site and understand what it's asking you to sign.</p>
+    <div class="actions-row">
+      <button id="btn-approve-tx-reject" class="secondary" data-i18n="common.reject">Reject</button>
+      <button id="btn-approve-tx-accept" class="primary" data-i18n="approve.confirmBtn">Confirm</button>
+    </div>
+    <p id="approve-tx-error" class="error hidden"></p>
+  </section>
+
+  <section id="screen-approve-sign" class="screen hidden">
+    <h2 data-i18n="approve.signTitle">Signature request</h2>
+    <p class="muted" id="approve-sign-origin"></p>
+    <div class="tx-details"><pre id="approve-sign-message" class="small"></pre></div>
+    <div class="actions-row">
+      <button id="btn-approve-sign-reject" class="secondary" data-i18n="common.reject">Reject</button>
+      <button id="btn-approve-sign-accept" class="primary" data-i18n="approve.signBtn">Sign</button>
+    </div>
+  </section>
+
+  <section id="screen-approve-addnetwork" class="screen hidden">
+    <h2 data-i18n="approve.addNetTitle">Add network request</h2>
+    <p class="muted" id="approve-addnet-origin"></p>
+    <div class="tx-details" id="approve-addnet-details"></div>
+    <p class="warn" data-i18n="approve.addNetWarning">This site's suggested network has no verified swap router. Swapping will stay disabled on it until you add one yourself in Settings.</p>
+    <div class="actions-row">
+      <button id="btn-approve-addnet-reject" class="secondary" data-i18n="common.reject">Reject</button>
+      <button id="btn-approve-addnet-accept" class="primary" data-i18n="approve.addNetBtn">Add network</button>
+    </div>
+  </section>
+
+  <section id="screen-loading" class="screen loading-screen hidden">
+    <img id="loading-spinner" src="img/spinner-coin.png" alt="" />
+    <p class="muted" data-i18n="loading.text">Loading...</p>
+  </section>
+
+  <footer id="app-footer">
+    <span class="footer-lock">&#128274;</span>
+    <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
+  </footer>
+
+</div>
+<script src="../vendor/ethers.umd.min.js"></script>
+<script src="../lib/identicon.js"></script>
+<script src="../vendor/qrcode-generator.js"></script>
+<script src="../lib/prices.js"></script>
+<script src="../lib/polymarket.js"></script>
+<script src="../lib/buy-config.js"></script>
+<script src="../lib/i18n/en.js"></script>
+<script src="../lib/i18n/ar.js"></script>
+<script src="../lib/i18n/zh.js"></script>
+<script src="../lib/i18n/es.js"></script>
+<script src="../lib/i18n/fr.js"></script>
+<script src="../lib/i18n/hi.js"></script>
+<script src="../lib/i18n/pt.js"></script>
+<script src="../lib/i18n/ja.js"></script>
+<script src="../lib/i18n/ru.js"></script>
+<script src="../lib/i18n.js"></script>
+<script src="../lib/support-config.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
