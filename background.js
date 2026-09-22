@@ -780,6 +780,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           break;
         }
 
+        // Used only by the popup's "Max" button when the From side is the
+        // native coin, so filling Max doesn't leave the account with
+        // nothing to actually pay for the swap's transaction(s). Rough and
+        // deliberately generous: covers the app-fee transfer (a plain
+        // native-coin transfer, ~21k gas) plus a Uniswap-V2-style router
+        // swap (typically 120k-180k gas) at the current network gas price.
+        // This is an estimate, not a simulation -- unusually congested
+        // network conditions between this call and the actual swap could
+        // still leave the reserve short.
+        case "TM_SWAP_NATIVE_GAS_RESERVE": {
+          const network = await getActiveNetwork();
+          const provider = await getProviderFor(network);
+          const ESTIMATED_GAS_UNITS = ethers.BigNumber.from(241000); // 21k fee transfer + ~220k router swap
+          let gasPrice;
+          try {
+            const feeData = await provider.getFeeData();
+            gasPrice = feeData.maxFeePerGas || feeData.gasPrice || (await provider.getGasPrice());
+          } catch (e) {
+            gasPrice = await provider.getGasPrice();
+          }
+          const reserveWei = ethers.BigNumber.from(gasPrice).mul(ESTIMATED_GAS_UNITS);
+          sendResponse({ ok: true, reserveWei: reserveWei.toString() });
+          break;
+        }
+
         case "TM_SWAP_APPROVE": {
           requireUnlocked();
           const network = await getActiveNetwork();
