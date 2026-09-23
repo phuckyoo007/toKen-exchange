@@ -33,115 +33,6 @@
 <div id="app">
 
   <header id="app-header">
-    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange">
-      <defs>
-        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#fff3c4"/>
-          <stop offset="30%" stop-color="#f4c430"/>
-          <stop offset="65%" stop-color="#caa02a"/>
-          <stop offset="100%" stop-color="#8a6a10"/>
-        </linearGradient>
-        <linearGradient id="gGoldEdge" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#fffbe6"/>
-          <stop offset="100%" stop-color="#6b4e08"/>
-        </linearGradient>
-        <radialGradient id="gCoinB" cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stop-color="#ffb74d"/>
-          <stop offset="100%" stop-color="#d9770a"/>
-        </radialGradient>
-        <radialGradient id="gCoinE" cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stop-color="#c7d3ee"/>
-          <stop offset="100%" stop-color="#5f6ea3"/>
-        </radialGradient>
-        <radialGradient id="gCoinT" cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stop-color="#7fe0b8"/>
-          <stop offset="100%" stop-color="#1a9c74"/>
-        </radialGradient>
-        <radialGradient id="gLeverPink" cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stop-color="#ffc2e2"/>
-          <stop offset="50%" stop-color="#ff4fa3"/>
-          <stop offset="100%" stop-color="#c2136b"/>
-        </radialGradient>
-        <linearGradient id="gLeverStem" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#ff9bcb"/>
-          <stop offset="100%" stop-color="#a30f5e"/>
-        </linearGradient>
-        <clipPath id="reelClip1"><rect x="70" y="46" width="52" height="40" rx="3"/></clipPath>
-        <clipPath id="reelClip2"><rect x="134" y="46" width="52" height="40" rx="3"/></clipPath>
-        <clipPath id="reelClip3"><rect x="198" y="46" width="52" height="40" rx="3"/></clipPath>
-        <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
-          <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
-          <stop offset="36%" stop-color="#ffffff" stop-opacity="0"/>
-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-        </linearGradient>
-        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="3.2"/>
-        </filter>
-      </defs>
-
-      <!-- outer cabinet -->
-      <rect x="2" y="2" width="316" height="104" rx="16" fill="url(#gGold)" stroke="url(#gGoldEdge)" stroke-width="3"/>
-      <rect x="9" y="9" width="302" height="90" rx="12" fill="none" stroke="#7a5a10" stroke-width="1.5" opacity="0.6"/>
-
-      <!-- corner flourishes, evoking cast-iron scrollwork -->
-      <g stroke="#7a5a10" stroke-width="1.5" fill="none" opacity="0.55">
-        <path d="M14 22 Q22 14 30 22"/>
-        <path d="M290 22 Q298 14 306 22"/>
-      </g>
-
-      <!-- marquee title -->
-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
-
-      <!-- glass display housing -->
-      <rect x="64" y="40" width="192" height="52" rx="6" fill="#0c0f16" stroke="#3a2c05" stroke-width="2"/>
-
-      <!-- reel 1: Bitcoin symbol -->
-      <g clip-path="url(#reelClip1)">
-        <rect x="70" y="46" width="52" height="40" fill="#12141c"/>
-        <circle cx="96" cy="30" r="15" fill="url(#gCoinB)" opacity="0.55"/>
-        <circle cx="96" cy="66" r="21" fill="#ffb74d" opacity="0.5" filter="url(#softGlow)"/>
-        <circle cx="96" cy="66" r="17" fill="url(#gCoinB)"/>
-        <text x="96" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#3a1d00">&#8383;</text>
-        <circle cx="96" cy="102" r="15" fill="url(#gCoinB)" opacity="0.55"/>
-      </g>
-
-      <!-- reel 2: Ethereum symbol -->
-      <g clip-path="url(#reelClip2)">
-        <rect x="134" y="46" width="52" height="40" fill="#12141c"/>
-        <circle cx="160" cy="30" r="15" fill="url(#gCoinE)" opacity="0.55"/>
-        <circle cx="160" cy="66" r="21" fill="#8fa3e0" opacity="0.45" filter="url(#softGlow)"/>
-        <circle cx="160" cy="66" r="17" fill="url(#gCoinE)"/>
-        <text x="160" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#1c2340">&#926;</text>
-        <circle cx="160" cy="102" r="15" fill="url(#gCoinE)" opacity="0.55"/>
-      </g>
-
-      <!-- reel 3: Tether symbol -->
-      <g clip-path="url(#reelClip3)">
-        <rect x="198" y="46" width="52" height="40" fill="#12141c"/>
-        <circle cx="224" cy="30" r="15" fill="url(#gCoinT)" opacity="0.55"/>
-        <circle cx="224" cy="66" r="21" fill="#4fe0ad" opacity="0.45" filter="url(#softGlow)"/>
-        <circle cx="224" cy="66" r="17" fill="url(#gCoinT)"/>
-        <text x="224" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#063d2b">&#8366;</text>
-        <circle cx="224" cy="102" r="15" fill="url(#gCoinT)" opacity="0.55"/>
-      </g>
-
-      <!-- reel divider lines -->
-      <line x1="122" y1="40" x2="122" y2="92" stroke="#3a2c05" stroke-width="2"/>
-      <line x1="186" y1="40" x2="186" y2="92" stroke="#3a2c05" stroke-width="2"/>
-
-      <!-- glass pane shine, sells "clear plastic screen" -->
-      <rect x="64" y="40" width="192" height="52" rx="6" fill="url(#glassShine)"/>
-      <rect x="64" y="40" width="192" height="52" rx="6" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="1"/>
-
-      <!-- side lever -->
-      <rect x="298" y="30" width="6" height="34" rx="3" fill="url(#gLeverStem)"/>
-      <circle cx="301" cy="26" r="9" fill="url(#gLeverPink)" stroke="#8a0f52" stroke-width="1.5"/>
-
-      <!-- base plate -->
-      <text x="160" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#5c4208" letter-spacing="3" opacity="0.85">EST. VAULT NO. 0500</text>
-    </svg>
     <div id="network-badge" class="hidden"></div>
   </header>
 
@@ -226,6 +117,7 @@
       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
+      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
     </div>
     <div class="prices-card">
       <div class="prices-card-header">
@@ -302,15 +194,47 @@
   <!-- BUY -->
   <section id="screen-buy" class="screen hidden">
     <h2 data-i18n="buy.title">Buy crypto</h2>
-    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
-    <p class="muted" data-i18n-html="buy.description2Html">MoonPay will open in a new tab. Since this wallet never sends your address to MoonPay for you (that would require signing requests with a secret key, which must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once the MoonPay tab opens:</p>
-    <div class="address-row">
-      <span id="buy-address-display" class="mono"></span>
-      <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
+    <p class="muted" data-i18n="buy.description1">Buy crypto with cash through a third-party payment provider below -- Token Exchange never touches your payment details.</p>
+    <div class="no-third-party-callout">
+      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip the on-ramp entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+      <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
     </div>
-    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
+    <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="buy-frame" class="widget-frame" title="Buy crypto" allow="payment"></iframe>
+    </div>
+    <p class="muted small hidden" id="buy-none-note" data-i18n="buy.noneConfiguredNote">Buy isn't set up yet -- this wallet's developer needs to add a payment provider first.</p>
+    <button type="button" id="btn-buy-coinbase" class="secondary hidden" data-i18n="buy.coinbaseBtn">Buy with Coinbase</button>
+    <p class="muted small hidden" id="buy-coinbase-note" data-i18n="buy.coinbaseNote">Opens Coinbase in a new tab, with this address already filled in.</p>
+    <button type="button" id="btn-buy-onramper" class="secondary hidden" data-i18n="buy.onramperBtn">Buy with Onramper</button>
+    <p class="muted small hidden" id="buy-onramper-note" data-i18n="buy.onramperNote">Opens right here, below, with a choice of over a dozen payment providers.</p>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="buy-error" class="error hidden"></p>
+  </section>
+
+  <!-- SELL -->
+  <section id="screen-sell" class="screen hidden">
+    <h2 data-i18n="sell.title">Sell for cash</h2>
+    <p class="muted" data-i18n="sell.description1">Sell crypto for cash through a third-party payout provider below -- Token Exchange never touches your payout details.</p>
+    <div id="sell-frame-wrap" class="widget-frame-wrap hidden">
+      <iframe id="sell-frame" class="widget-frame" title="Sell crypto" allow="payment"></iframe>
+    </div>
+    <p class="muted small hidden" id="sell-none-note" data-i18n="sell.noneConfiguredNote">Sell isn't set up yet -- this wallet's developer needs to add a payout provider first.</p>
+    <button type="button" id="btn-sell-coinbase" class="secondary hidden" data-i18n="sell.coinbaseBtn">Sell with Coinbase</button>
+    <p class="muted small hidden" id="sell-coinbase-note" data-i18n="sell.coinbaseNote">Opens Coinbase in a new tab.</p>
+    <button type="button" id="btn-sell-coinbase-check" class="link hidden" data-i18n="sell.coinbaseCheckBtn">I've finished on Coinbase -- get my deposit details</button>
+    <button type="button" id="btn-sell-onramper" class="secondary hidden" data-i18n="sell.onramperBtn">Sell with Onramper</button>
+    <p class="muted small hidden" id="sell-onramper-note" data-i18n="sell.onramperNote">Opens right here, below, with a choice of off-ramp providers.</p>
+    <div id="sell-send-helper" class="sell-send-helper hidden">
+      <h3 data-i18n="sell.step2Title">Step 2: send your crypto</h3>
+      <p class="muted" data-i18n="sell.step2Desc">Paste the deposit address and amount you were given below. This opens Send with them filled in, and you review and confirm the send yourself.</p>
+      <p id="sell-network-hint" class="hint"></p>
+      <input type="text" id="sell-deposit-address" data-i18n-placeholder="sell.depositPlaceholder" placeholder="Deposit address (0x...)" />
+      <input type="text" id="sell-deposit-amount" data-i18n-placeholder="sell.amountPlaceholder" placeholder="Amount quoted" />
+      <button type="button" id="btn-sell-to-send" class="primary" data-i18n="sell.reviewInSendBtn">Review in Send</button>
+      <p id="sell-deposit-error" class="error hidden"></p>
+    </div>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="sell-error" class="error hidden"></p>
   </section>
 
   <!-- SUPPORT -->
@@ -587,8 +511,11 @@
   </section>
 
   <footer id="app-footer">
-    <span class="footer-lock">&#128274;</span>
-    <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
+    <img id="brand-logo" src="img/icon-512.png" alt="Token Exchange" />
+    <div class="footer-tagline">
+      <span class="footer-lock">&#128274;</span>
+      <span data-i18n="footer.nonCustodial">Non-custodial &mdash; your keys never leave this device</span>
+    </div>
   </footer>
 
 </div>
@@ -597,7 +524,8 @@
 <script src="../vendor/qrcode-generator.js"></script>
 <script src="../lib/prices.js"></script>
 <script src="../lib/polymarket.js"></script>
-<script src="../lib/buy-config.js"></script>
+<script src="../lib/coinbase-onramp-config.js"></script>
+<script src="../lib/onramper-config.js"></script>
 <script src="../lib/i18n/en.js"></script>
 <script src="../lib/i18n/ar.js"></script>
 <script src="../lib/i18n/zh.js"></script>

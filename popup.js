@@ -334,6 +334,7 @@ $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScre
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
 $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
+$("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
 
 // ---------------------------------------------------------------- TOKENS
@@ -646,23 +647,159 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-function setupBuyScreen() {
+// MoonPay was removed from this screen (MoonPay declined Token Exchange's
+// business application -- there is no account to embed here anymore).
+// Coinbase Onramp and Onramper are the two remaining, independent Buy
+// providers; either, both, or neither may show depending on what's
+// configured/supported, and Onramper shares this screen's iframe (below)
+// since Coinbase always opens in its own tab instead.
+let buyFiat = null;
+function setupBuyScreen(fiatCode) {
+  buyFiat = fiatCode || currentCurrency;
   hideError("buy-error");
-  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+  $("buy-frame-wrap").classList.add("hidden");
+  $("buy-frame").src = "about:blank";
+  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
+  $("btn-buy-coinbase").classList.toggle("hidden", !coinbaseSupported);
+  $("buy-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
+  $("btn-buy-coinbase").disabled = false;
+  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
+  $("btn-buy-onramper").classList.toggle("hidden", !onramperLive);
+  $("buy-onramper-note").classList.toggle("hidden", !onramperLive);
+  $("btn-buy-onramper").disabled = false;
+  $("buy-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
 }
 
-$("btn-buy-copy-address").addEventListener("click", () => {
-  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
-});
-
-$("btn-buy-open").addEventListener("click", () => {
+$("btn-buy-coinbase").addEventListener("click", async () => {
   hideError("buy-error");
+  const btn = $("btn-buy-coinbase");
+  btn.disabled = true;
   try {
-    const url = TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOnrampUrl(currentNetwork.key, address);
     chrome.tabs.create({ url });
   } catch (e) {
     showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
+});
+
+$("btn-buy-onramper").addEventListener("click", () => {
+  hideError("buy-error");
+  const btn = $("btn-buy-onramper");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = TM_ONRAMPER_CONFIG.buildOnramperBuyUrl(currentNetwork.key, address, buyFiat);
+    $("buy-frame").src = url;
+    $("buy-frame-wrap").classList.remove("hidden");
+    $("btn-buy-onramper").classList.add("hidden");
+    $("btn-buy-coinbase").classList.add("hidden");
+  } catch (e) {
+    showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+
+// ---------------------------------------------------------------- SELL
+// Coinbase Offramp and Onramper are the two remaining, independent Sell
+// providers, for the same reason as Buy above.
+let sellFiat = null;
+function setupSellScreen(fiatCode) {
+  sellFiat = fiatCode || currentCurrency;
+  hideError("sell-error");
+  hideError("sell-deposit-error");
+  $("sell-frame-wrap").classList.add("hidden");
+  $("sell-frame").src = "about:blank";
+  $("sell-send-helper").classList.add("hidden");
+  $("sell-deposit-address").value = "";
+  $("sell-deposit-amount").value = "";
+  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
+  $("btn-sell-coinbase").classList.toggle("hidden", !coinbaseSupported);
+  $("sell-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
+  $("btn-sell-coinbase-check").classList.add("hidden");
+  $("btn-sell-coinbase").disabled = false;
+  $("btn-sell-coinbase-check").disabled = false;
+  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
+  $("btn-sell-onramper").classList.toggle("hidden", !onramperLive);
+  $("sell-onramper-note").classList.toggle("hidden", !onramperLive);
+  $("btn-sell-onramper").disabled = false;
+  $("sell-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
+}
+
+$("btn-sell-onramper").addEventListener("click", () => {
+  hideError("sell-error");
+  try {
+    const url = TM_ONRAMPER_CONFIG.buildOnramperSellUrl(sellFiat || currentCurrency);
+    $("sell-frame").src = url;
+    $("sell-frame-wrap").classList.remove("hidden");
+    $("btn-sell-onramper").classList.add("hidden");
+    $("btn-sell-coinbase").classList.add("hidden");
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  }
+});
+
+$("btn-sell-coinbase").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-coinbase");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOfframpUrl(currentNetwork.key, address);
+    chrome.tabs.create({ url });
+    $("btn-sell-coinbase-check").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-sell-coinbase-check").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-coinbase-check");
+  btn.disabled = true;
+  try {
+    const tx = await TM_COINBASE_ONRAMP_CONFIG.checkCoinbaseOfframpStatus();
+    if (!tx) {
+      showError("sell-error", TM_I18N.t("sell.coinbaseNotReady"));
+      return;
+    }
+    $("sell-deposit-address").value = tx.toAddress || "";
+    $("sell-deposit-amount").value = tx.amount || "";
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-sell-to-send").addEventListener("click", () => {
+  hideError("sell-deposit-error");
+  const addr = $("sell-deposit-address").value.trim();
+  const amt = $("sell-deposit-amount").value.trim();
+  if (!ethers.utils.isAddress(addr)) {
+    showError("sell-deposit-error", TM_I18N.t("sell.invalidAddress"));
+    return;
+  }
+  if (amt && !(Number(amt) > 0)) {
+    showError("sell-deposit-error", TM_I18N.t("sell.invalidAmount"));
+    return;
+  }
+  $("send-to").value = addr;
+  $("send-to").dispatchEvent(new Event("input"));
+  $("send-amount").value = amt;
+  $("send-amount").dispatchEvent(new Event("input"));
+  showScreen("screen-send");
 });
 
 // ---------------------------------------------------------------- SETTINGS
@@ -915,7 +1052,7 @@ async function refreshSwapFromBalance() {
     swapFromBalanceWei = balanceWei;
     swapFromDecimals = decimals;
     const formatted = Number(ethers.utils.formatUnits(balanceWei, decimals));
-    $("swap-from-balance").textContent = TM_I18N.t("swap.balanceLabel", { amount: formatted.toFixed(4) });
+    $("swap-from-balance").textContent = TM_I18N.t("swap.balanceLabel", { amount: formatted.toFixed(4), symbol: swapSym("from") });
     $("swap-from-max").classList.toggle("hidden", formatted <= 0);
   } catch (e) { /* best-effort -- balance/Max just stay blank/hidden */ }
 }
@@ -1002,9 +1139,10 @@ async function requestSwapQuote() {
     $("swap-amount-out").value = ethers.utils.formatUnits(quote.amountOutWei, decimalsOut);
     refreshSwapUsd("to");
 
-    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
+    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeValueLine", {
       percent: quote.feePercentLabel,
-      amount: `${ethers.utils.formatUnits(quote.feeWei, decimalsIn)} ${swapSym("from")}`,
+      amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
+      symbol: swapSym("from"),
     });
 
     $("swap-quote-display").dataset.tokenIn = tokenIn;
@@ -1053,7 +1191,10 @@ function renderSwapBreakdownDerived() {
 
   const slippageBps = Number($("swap-slippage").value);
   const minWei = TM_SWAP_APPLY_SLIPPAGE(ds.amountOutWei, slippageBps);
-  $("swap-min-received-line").textContent = `${ethers.utils.formatUnits(minWei, decimalsOut)} ${swapSym("to")}`;
+  $("swap-min-received-line").textContent = TM_I18N.t("swap.minReceivedValueLine", {
+    amount: ethers.utils.formatUnits(minWei, decimalsOut),
+    symbol: swapSym("to"),
+  });
 }
 // Same math as lib/swap.js's applySlippage() (that copy runs in the
 // background worker, not the popup) -- kept tiny and local here so the

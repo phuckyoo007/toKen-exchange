@@ -872,96 +872,106 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .qr-box svg { width: 100%; height: 100%; display: block; }
 .actions-row { display: flex; gap: 8px; }
 .actions-row button { flex: 1; }
-.swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 /* #swap-form/#swap-quote-display are plain divs, not direct flex children
-   of .screen, so their buttons (Get quote / Approve token first / Swap)
-   were falling back to the browser's shrink-to-fit button sizing instead
-   of the full-width "chunky pill" every other screen's buttons get from
-   .screen's own flex column. Mirroring that same flex layout here fixes
-   it -- and stacking Approve/Swap top-to-bottom (rather than a Reject/
-   Confirm-style side-by-side split) matches how they're actually used:
-   sequential steps, not a pick-one choice, since both stay visible at
-   once when a token needs approval before it can swap. */
-#swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 11px; }
+   of .screen, so their buttons (Approve token first / Swap) were falling
+   back to the browser's shrink-to-fit button sizing instead of the
+   full-width "chunky pill" every other screen's buttons get from .screen's
+   own flex column. Mirroring that same flex layout here fixes it -- and
+   stacking Approve/Swap top-to-bottom (rather than a Reject/Confirm-style
+   side-by-side split) matches how they're actually used: sequential steps,
+   not a pick-one choice, since both stay visible at once when a token
+   needs approval before it can swap. */
+#swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 6px; }
 
-/* Swap screen redesign: the From/To pickers and the amount field used to
-   be bare labels + selects stacked straight down the screen -- functional,
-   but reading as a plain form rather than an actual swap interface. This
-   groups From and To into their own cards (matching .coin-swap-card's look
-   elsewhere), adds a circular flip button between them like every
-   mainstream swap UI has, and turns the quote result into its own card
-   with the estimated-out amount as the headline rather than one paragraph
-   among several. None of this changes what any element IS (every #id
-   app.js reads/writes is untouched) -- only how it's grouped and styled. */
-.swap-card {
-  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
-  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+/* Swap screen redesign: icon token-picker pills (matching MetaMask/Coinbase
+   Wallet) replace the old plain <select> dropdowns, with a big amount field
+   right in the same card, a live USD estimate + balance underneath, and
+   auto-quoting as you type instead of a manual "Get quote" tap. */
+.swap-field {
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px 10px;
 }
-.swap-card .swap-row { margin-bottom: 0; }
-.swap-card-label {
+.swap-field-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+.swap-field-top label, .swap-field > label {
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em;
-  text-transform: uppercase; color: var(--text-muted); margin: 0; display: block;
+  text-transform: uppercase; color: var(--text-muted);
 }
+.max-btn {
+  background: transparent; border: 1px solid var(--line-strong); color: var(--gold-bright);
+  border-radius: 999px; padding: 2px 10px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; box-shadow: none;
+}
+.max-btn:hover { background: var(--bg-hover); border-color: var(--gold-deep); }
+.swap-field-row { display: flex; align-items: center; gap: 8px; }
 .swap-amount-input {
-  font-size: 22px; font-weight: 700; font-family: var(--font-body);
-  background: transparent; border: none; padding: 4px 0 0; color: var(--gold-bright);
+  flex: 1; min-width: 0; border: none; background: transparent; box-shadow: none;
+  padding: 4px 0; font-size: 24px; font-weight: 700; font-family: var(--font-body);
+  color: var(--gold-bright); text-align: right; font-variant-numeric: tabular-nums;
 }
 .swap-amount-input:focus { outline: none; box-shadow: none; }
 .swap-amount-input::placeholder { color: var(--text-faint); }
-
-/* Balance + Max under the From amount field, matching mainstream swap
-   UIs (MetaMask, Coinbase Wallet) that show what you hold right where
-   you're typing how much to spend, with a one-tap way to spend all of it. */
-.swap-balance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.swap-balance-row .small { font-size: 12px; }
-#btn-swap-max {
-  background: none; border: 0; padding: 0; font: inherit; font-size: 12px; font-weight: 700;
-  color: var(--gold-bright);
+.swap-amount-input[readonly] { color: var(--text-muted); }
+.token-pill-btn {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 6px 10px 6px 6px; cursor: pointer; color: var(--text);
 }
-#btn-swap-max:hover { filter: brightness(1.2); }
+.token-pill-btn:hover { border-color: var(--gold-deep); filter: brightness(1.1); }
+.token-pill-symbol { font-weight: 700; font-size: 13px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.token-pill-caret { font-size: 9px; opacity: 0.6; }
+.swap-field-sub { display: flex; align-items: center; justify-content: space-between; min-height: 15px; margin-top: 2px; }
+.swap-usd-value { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.swap-balance-value { font-size: 12px; }
 
-.swap-flip-wrap { display: flex; justify-content: center; margin: -13px 0; z-index: 1; position: relative; }
 .swap-flip-btn {
-  width: 38px; height: 38px; padding: 0; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
+  align-self: center; width: 34px; height: 34px; margin: -12px 0; z-index: 1; position: relative;
+  padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(180deg, #3a3018 0%, #241d10 100%);
   border: 3px solid var(--bg); color: var(--gold-bright);
-  font-size: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  font-size: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: pointer;
 }
 .swap-flip-btn:hover { border-color: var(--bg); filter: brightness(1.25); color: var(--gold-bright); }
 .swap-flip-btn:active { transform: translateY(1px) scale(0.96); }
 
-.swap-quote-btn { margin-top: 2px; }
-
-.swap-quote-card {
-  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
-  padding: 14px; display: flex; flex-direction: column; gap: 4px; text-align: center;
-}
-.swap-quote-subline { margin: 0; }
-.swap-quote-headline {
-  margin: 2px 0 6px; font-size: 21px; font-weight: 800; color: var(--gold-bright);
-}
-
 /* Rate / App fee / Minimum received -- the same label-left, value-right
-   breakdown rows every mainstream swap UI shows under the headline amount,
-   so the cost and worst-case outcome are visible before confirming. */
-.swap-quote-rows { display: flex; flex-direction: column; gap: 6px; text-align: left; }
-.swap-quote-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; }
-.swap-quote-row-label { color: var(--text-muted); }
-.swap-quote-row-value { color: var(--text); font-weight: 600; text-align: right; }
+   breakdown rows every mainstream swap UI shows under the amount fields, so
+   the cost and worst-case outcome are visible before confirming. */
+.swap-breakdown {
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 14px; margin: 2px 0 4px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.swap-breakdown-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-muted); gap: 10px; }
+.swap-breakdown-row > span:last-child, .swap-breakdown-row-min > span:last-child { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.swap-breakdown-row select { width: auto; padding: 3px 8px; font-size: 12px; }
+.swap-breakdown-row-min { border-top: 1px dashed var(--line); padding-top: 7px; }
+.swap-breakdown-row-min > span:first-child { color: var(--text-muted); }
+#swap-quote-display .primary, #swap-quote-display .secondary { margin-top: 4px; }
 
-.swap-slippage-block { margin-top: 10px; text-align: left; }
-.swap-slippage-pills {
-  display: flex; gap: 6px; margin-top: 6px;
-  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+/* Shared From/To token picker popover */
+.token-picker {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(8, 7, 5, 0.72);
+  display: flex; align-items: flex-end; justify-content: center;
 }
-.swap-slippage-pill {
-  flex: 1; background: transparent; border: 0; border-radius: 7px;
-  color: var(--text-muted); font: inherit; font-weight: 600; font-size: 12px; padding: 7px 4px;
+.token-picker.hidden { display: none; }
+.token-picker-sheet {
+  width: 100%; max-width: 420px; max-height: 78vh; display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  border-top-left-radius: 16px; border-top-right-radius: 16px;
+  padding: 14px 16px 16px; box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
 }
-.swap-slippage-pill.active { background: var(--gold); color: var(--gold-ink); }
-.swap-slippage-pill:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
-#swap-quote-display .primary, #swap-quote-display .secondary { margin-top: 10px; }
+.token-picker-header { display: flex; align-items: center; justify-content: space-between; font-weight: 700; color: var(--text); font-size: 14px; }
+.token-picker-header .link { font-size: 13px; padding: 2px 4px; }
+.token-picker-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.token-picker-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--text); text-align: left;
+}
+.token-picker-item:hover, .token-picker-item.active { border-color: var(--gold-deep); background: var(--bg-hover); }
+.token-picker-item .token-main { flex: 1; min-width: 0; }
+.token-picker-item .token-balance { font-size: 12px; }
 
 /* A soft gold glow across the top of a card, fading into the card's own
    solid fill by 44px down -- a small decorative accent, without making

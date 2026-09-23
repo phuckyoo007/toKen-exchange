@@ -296,19 +296,15 @@ body {
 }
 
 /* ---------------- header ----------------
-   The header no longer draws its own logo art: the full-bleed
-   #bg-scene behind it already shows the "TOKEN EXCHANGE" slot-machine
-   cabinet at the very top of every screen (it's the top of the same
-   reference image), so #brand-logo/#app-header just reserve the
-   matching amount of vertical space and let the network badge sit
-   just under the cabinet, over the scene. */
+   #app is fully opaque -- nothing behind it shows through here. This no
+   longer reserves space for a backdrop's baked-in title, so it's sized to
+   just its own content (the network pill); the circular badge logo lives
+   down in the footer instead (see below), matching the website version. */
 #app-header {
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
-  min-height: 246px;
   padding: 9px 12px 10px;
   flex-shrink: 0;
 }
-#brand-logo { display: none; }
 #network-badge {
   font-family: var(--font-body);
   font-weight: 600;
@@ -341,12 +337,18 @@ body {
 
 /* ---------------- footer ---------------- */
 #app-footer {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   padding: 7px 16px; border-top: 1px solid var(--line);
   background: linear-gradient(0deg, #17130c 0%, transparent 100%);
   color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.02em;
   flex-shrink: 0;
 }
+#app-footer #brand-logo {
+  display: block; width: 44px; height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1px rgba(221, 172, 77, 0.25);
+}
+#app-footer .footer-tagline { display: flex; align-items: center; justify-content: center; gap: 6px; }
 #app-footer .footer-lock { color: var(--gold-deep); font-size: 11px; }
 
 h2 {
@@ -561,6 +563,28 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .balance-native-row.balance-lead-fallback #balance-symbol { font-size: 13px; }
 
 .address-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+/* Buy/Sell screens: an on-ramp/off-ramp provider's widget embedded right
+   here instead of opening a new tab. Fixed height since the iframe's own
+   content can't influence its parent's size across origins. */
+.widget-frame-wrap {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-inset);
+}
+.widget-frame { display: block; width: 100%; height: 420px; border: none; }
+/* Buy screen: points at Swap as the fully non-custodial, no-signup
+   alternative to a cash on-ramp for anyone who already holds some crypto. */
+.no-third-party-callout {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold-deep);
+  padding: 10px 12px; border-radius: 7px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
+.sell-send-helper { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.sell-send-helper h3, .sell-send-helper p { margin: 0; }
 /* QR codes need real light/dark contrast to stay scannable, so this stays
    a plain white card regardless of the app's own dark theme -- the same
    compromise every dark-themed wallet's QR view makes. */
