@@ -672,6 +672,9 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
     linear-gradient(to bottom, rgba(0,0,0,0) 0%, #2a2110 64px, #2a2110 100%),
     url(img/card-banner.jpg) center top / 100% auto no-repeat;
   padding-top: 64px;
+  /* Long safety notice: a touch more size and leading so it reads comfortably on a phone. */
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 .hint {
   color: var(--success); font-size: 12px; line-height: 1.5;
