@@ -1655,7 +1655,7 @@ function fiatLabel(code) {
 
 // Buy / Sell buttons shown under the swap card on every coin screen and every
 // currency screen. `fiatCode` is the currency the person is looking at (or,
-// for a coin, their display currency); it is carried into the MoonPay Buy and
+// for a coin, their display currency); it is carried into the Transak Buy and
 // Sell screens so the bank leg is in the right currency.
 function showCoinCashActions(fiatCode) {
   coinDetail.fiat = fiatCode;
@@ -2298,12 +2298,11 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// MoonPay was removed from this screen (MoonPay declined Token Exchange's
-// business application -- there is no account to embed here anymore).
-// Coinbase Onramp and Onramper are the two remaining, independent Buy
-// providers; either, both, or neither may show depending on what's
-// configured/supported, and Onramper shares this screen's iframe (below)
-// since Coinbase always opens in a new tab instead.
+// Transak is the primary Buy provider (it replaced MoonPay, which declined
+// Token Exchange's business application). Coinbase Onramp and Onramper are
+// independent alternatives; each shows depending on what's
+// configured/supported. Transak and Coinbase open in a new tab; Onramper
+// shares this screen's iframe (below). See lib/transak-config.js.
 // The fiat currency a Buy widget should open in: whatever the person was
 // looking at (a currency or coin screen), else their display currency.
 let buyFiat = null;
@@ -2328,10 +2327,30 @@ function setupBuyScreen(fiatCode) {
   $("btn-buy-onramper").classList.toggle("hidden", !onramperLive);
   $("buy-onramper-note").classList.toggle("hidden", !onramperLive);
   $("btn-buy-onramper").disabled = false;
-  // Neither provider configured/supported -- say so plainly instead of
-  // leaving an empty screen with no explanation.
-  $("buy-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
+  // Transak works on every network (its own screen handles network/asset
+  // choice), so it is always offered and the "nothing configured" note
+  // below never applies.
+  $("btn-buy-transak").classList.remove("hidden");
+  $("buy-transak-note").classList.remove("hidden");
+  $("btn-buy-transak").disabled = false;
+  $("buy-none-note").classList.add("hidden");
 }
+
+$("btn-buy-transak").addEventListener("click", async () => {
+  hideError("buy-error");
+  const btn = $("btn-buy-transak");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    // Single-use link -- fetched fresh on every click, opened in a new tab.
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, buyFiat);
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch (e) {
+    showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 $("btn-buy-coinbase").addEventListener("click", async () => {
   hideError("buy-error");
@@ -2356,13 +2375,15 @@ $("btn-buy-onramper").addEventListener("click", () => {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
     // Onramper's widget loads fine with the address in the URL directly --
     // no signing backend needed (see lib/onramper-config.js) -- so this
-    // embeds straight into the same shared iframe MoonPay's Buy uses,
+    // embeds straight into the same shared iframe,
     // rather than opening a new tab like Coinbase.
     const url = TM_ONRAMPER_CONFIG.buildOnramperBuyUrl(currentNetwork.key, address, buyFiat);
     $("buy-frame").src = url;
     $("buy-frame-wrap").classList.remove("hidden");
     $("btn-buy-onramper").classList.add("hidden");
     $("btn-buy-coinbase").classList.add("hidden");
+    $("btn-buy-transak").classList.add("hidden");
+    $("buy-transak-note").classList.add("hidden");
   } catch (e) {
     showError("buy-error", e.message);
   } finally {
@@ -2373,9 +2394,8 @@ $("btn-buy-onramper").addEventListener("click", () => {
 $("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 
 // ---------------------------------------------------------------- SELL
-// MoonPay was removed from this screen for the same reason as Buy above.
-// Coinbase Offramp and Onramper are the two remaining, independent Sell
-// providers.
+// Transak is the primary Sell provider, same as Buy above; Coinbase Offramp
+// and Onramper are independent alternatives.
 // The fiat currency a Sell widget should pay out in: whatever the person
 // was looking at (a currency or coin screen), else their display currency.
 let sellFiat = null;
@@ -2397,14 +2417,37 @@ function setupSellScreen(fiatCode) {
   $("btn-sell-coinbase-check").classList.add("hidden");
   $("btn-sell-coinbase").disabled = false;
   $("btn-sell-coinbase-check").disabled = false;
+  // Transak Sell -- always offered (see Buy above); the person pastes the
+  // deposit address Transak gives them into the step-2 helper below.
+  $("btn-sell-transak").classList.remove("hidden");
+  $("sell-transak-note").classList.remove("hidden");
+  $("btn-sell-transak").disabled = false;
   // Onramper Sell -- same muting-until-configured pattern as Buy above.
   const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
   $("btn-sell-onramper").classList.toggle("hidden", !onramperLive);
   $("sell-onramper-note").classList.toggle("hidden", !onramperLive);
   $("btn-sell-onramper").disabled = false;
-  // Neither provider configured/supported -- say so plainly.
-  $("sell-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
+  $("sell-none-note").classList.add("hidden");
 }
+
+$("btn-sell-transak").addEventListener("click", async () => {
+  hideError("sell-error");
+  const btn = $("btn-sell-transak");
+  btn.disabled = true;
+  try {
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, sellFiat || currentCurrency);
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Same "paste the deposit address -> Review in Send" step Onramper's
+    // Sell uses: Transak shows the deposit address on its own page.
+    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
+    $("sell-send-helper").classList.remove("hidden");
+  } catch (e) {
+    showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 $("btn-sell-onramper").addEventListener("click", () => {
   hideError("sell-error");
@@ -2414,8 +2457,10 @@ $("btn-sell-onramper").addEventListener("click", () => {
     $("sell-frame-wrap").classList.remove("hidden");
     $("btn-sell-onramper").classList.add("hidden");
     $("btn-sell-coinbase").classList.add("hidden");
+    $("btn-sell-transak").classList.add("hidden");
+    $("sell-transak-note").classList.add("hidden");
     // Same "paste the deposit address Onramper gives you -> Review in
-    // Send" step as MoonPay's Sell flow -- see lib/onramper-config.js's
+    // Send" step as Transak's Sell flow -- see lib/onramper-config.js's
     // buildOnramperSellUrl() comment for why there's nothing to
     // auto-fill here.
     $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
@@ -2455,7 +2500,7 @@ $("btn-sell-coinbase-check").addEventListener("click", async () => {
       showError("sell-error", TM_I18N.t("sell.coinbaseNotReady"));
       return;
     }
-    // Same "paste deposit details -> Review in Send" UI as MoonPay's Sell
+    // Same "paste deposit details -> Review in Send" UI as Transak's Sell
     // flow uses, just filled in for us instead of pasted by hand -- the
     // Send screen's own review/confirm step still runs either way.
     $("sell-deposit-address").value = tx.toAddress || "";

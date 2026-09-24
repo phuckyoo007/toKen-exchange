@@ -647,36 +647,25 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// MoonPay was removed from this screen (MoonPay declined Token Exchange's
-// business application -- there is no account to embed here anymore).
-// Coinbase Onramp and Onramper are the two remaining, independent Buy
-// providers; either, both, or neither may show depending on what's
-// configured/supported, and Onramper shares this screen's iframe (below)
-// since Coinbase always opens in its own tab instead.
-let buyFiat = null;
-function setupBuyScreen(fiatCode) {
-  buyFiat = fiatCode || currentCurrency;
+function setupBuyScreen() {
   hideError("buy-error");
-  $("buy-frame-wrap").classList.add("hidden");
-  $("buy-frame").src = "about:blank";
-  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
-  $("btn-buy-coinbase").classList.toggle("hidden", !coinbaseSupported);
-  $("buy-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
-  $("btn-buy-coinbase").disabled = false;
-  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
-  $("btn-buy-onramper").classList.toggle("hidden", !onramperLive);
-  $("buy-onramper-note").classList.toggle("hidden", !onramperLive);
-  $("btn-buy-onramper").disabled = false;
-  $("buy-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
+  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
 }
 
-$("btn-buy-coinbase").addEventListener("click", async () => {
+$("btn-buy-copy-address").addEventListener("click", () => {
+  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
+});
+
+$("btn-buy-open").addEventListener("click", async () => {
   hideError("buy-error");
-  const btn = $("btn-buy-coinbase");
+  const btn = $("btn-buy-open");
   btn.disabled = true;
   try {
+    // Asks our own backend (see lib/transak-config.js and
+    // transak-widget-api.js) for a single-use Transak link with this
+    // address already filled in. Fetched fresh on every click.
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOnrampUrl(currentNetwork.key, address);
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address);
     chrome.tabs.create({ url });
   } catch (e) {
     showError("buy-error", e.message);
@@ -685,95 +674,29 @@ $("btn-buy-coinbase").addEventListener("click", async () => {
   }
 });
 
-$("btn-buy-onramper").addEventListener("click", () => {
-  hideError("buy-error");
-  const btn = $("btn-buy-onramper");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = TM_ONRAMPER_CONFIG.buildOnramperBuyUrl(currentNetwork.key, address, buyFiat);
-    $("buy-frame").src = url;
-    $("buy-frame-wrap").classList.remove("hidden");
-    $("btn-buy-onramper").classList.add("hidden");
-    $("btn-buy-coinbase").classList.add("hidden");
-  } catch (e) {
-    showError("buy-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
-
 // ---------------------------------------------------------------- SELL
-// Coinbase Offramp and Onramper are the two remaining, independent Sell
-// providers, for the same reason as Buy above.
-let sellFiat = null;
-function setupSellScreen(fiatCode) {
-  sellFiat = fiatCode || currentCurrency;
+// Sell through Transak (see lib/transak-config.js). Transak shows its own
+// deposit address on its page, so this is a two-step flow: open Transak in
+// a tab, then paste the deposit address/amount here and jump to Send with
+// them filled in. Nothing is sent automatically -- the Send screen's own
+// review/confirm step (and sanctions check) still runs.
+function setupSellScreen() {
   hideError("sell-error");
   hideError("sell-deposit-error");
-  $("sell-frame-wrap").classList.add("hidden");
-  $("sell-frame").src = "about:blank";
   $("sell-send-helper").classList.add("hidden");
   $("sell-deposit-address").value = "";
   $("sell-deposit-amount").value = "";
-  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
-  $("btn-sell-coinbase").classList.toggle("hidden", !coinbaseSupported);
-  $("sell-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
-  $("btn-sell-coinbase-check").classList.add("hidden");
-  $("btn-sell-coinbase").disabled = false;
-  $("btn-sell-coinbase-check").disabled = false;
-  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
-  $("btn-sell-onramper").classList.toggle("hidden", !onramperLive);
-  $("sell-onramper-note").classList.toggle("hidden", !onramperLive);
-  $("btn-sell-onramper").disabled = false;
-  $("sell-none-note").classList.toggle("hidden", coinbaseSupported || onramperLive);
+  $("btn-sell-open").disabled = false;
 }
 
-$("btn-sell-onramper").addEventListener("click", () => {
+$("btn-sell-open").addEventListener("click", async () => {
   hideError("sell-error");
-  try {
-    const url = TM_ONRAMPER_CONFIG.buildOnramperSellUrl(sellFiat || currentCurrency);
-    $("sell-frame").src = url;
-    $("sell-frame-wrap").classList.remove("hidden");
-    $("btn-sell-onramper").classList.add("hidden");
-    $("btn-sell-coinbase").classList.add("hidden");
-    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
-    $("sell-send-helper").classList.remove("hidden");
-  } catch (e) {
-    showError("sell-error", e.message);
-  }
-});
-
-$("btn-sell-coinbase").addEventListener("click", async () => {
-  hideError("sell-error");
-  const btn = $("btn-sell-coinbase");
+  const btn = $("btn-sell-open");
   btn.disabled = true;
   try {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOfframpUrl(currentNetwork.key, address);
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, currentCurrency);
     chrome.tabs.create({ url });
-    $("btn-sell-coinbase-check").classList.remove("hidden");
-  } catch (e) {
-    showError("sell-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-sell-coinbase-check").addEventListener("click", async () => {
-  hideError("sell-error");
-  const btn = $("btn-sell-coinbase-check");
-  btn.disabled = true;
-  try {
-    const tx = await TM_COINBASE_ONRAMP_CONFIG.checkCoinbaseOfframpStatus();
-    if (!tx) {
-      showError("sell-error", TM_I18N.t("sell.coinbaseNotReady"));
-      return;
-    }
-    $("sell-deposit-address").value = tx.toAddress || "";
-    $("sell-deposit-amount").value = tx.amount || "";
     $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
     $("sell-send-helper").classList.remove("hidden");
   } catch (e) {
@@ -795,6 +718,7 @@ $("btn-sell-to-send").addEventListener("click", () => {
     showError("sell-deposit-error", TM_I18N.t("sell.invalidAmount"));
     return;
   }
+  // Prefill only.
   $("send-to").value = addr;
   $("send-to").dispatchEvent(new Event("input"));
   $("send-amount").value = amt;
@@ -903,338 +827,65 @@ $("btn-send-submit").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- SWAP
-// UPGRADE 1/4: token pills -- a picker popover (native coin + tracked
-// tokens, or a typed-in contract address) replaces the old plain <select>,
-// and each side shows a colored icon + symbol "pill" instead of raw text.
-let swapToken = { from: null, to: null }; // null = network's native coin; else { address, symbol, decimals, name }
-let swapPickerSide = null;
-
-function swapNativeSymbol() {
-  return (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
-}
-function swapAddr(side) {
-  const tok = swapToken[side];
-  return tok ? tok.address : TM_NATIVE();
-}
-function swapSym(side) {
-  const tok = swapToken[side];
-  return tok ? tok.symbol : swapNativeSymbol();
-}
-function swapDecimals(side) {
-  const tok = swapToken[side];
-  return tok ? tok.decimals : ((currentNetwork && currentNetwork.nativeCurrency.decimals) || 18);
-}
-
-// Fills a .token-icon element the same way tokenIconHtml() does, without
-// throwing away the element's id (these spans are looked up by id elsewhere).
-function setTokenIconEl(el, symbol) {
-  const s = String(symbol || "?").trim();
-  el.textContent = (s.slice(0, 2) || "?").toUpperCase();
-  el.style.background = tokenIconColor(s);
-}
-function renderSwapPill(side) {
-  const sym = swapSym(side);
-  setTokenIconEl($(`swap-${side}-icon`), sym);
-  $(`swap-${side}-symbol`).textContent = sym || "?";
-}
-
 function setupSwapScreen() {
   hideError("swap-error");
   $("swap-status").classList.add("hidden");
   $("swap-quote-display").classList.add("hidden");
-  $("swap-quote-loading").classList.add("hidden");
   const unsupported = !currentNetwork.swapRouter;
   $("swap-unsupported").classList.toggle("hidden", !unsupported);
   $("swap-form").classList.toggle("hidden", unsupported);
-  if (unsupported) return;
-
-  swapToken = { from: null, to: null };
-  $("swap-amount-in").value = "";
-  $("swap-amount-out").value = "";
-  $("swap-from-usd").textContent = "";
-  $("swap-to-usd").textContent = "";
-  $("swap-from-balance").textContent = "";
-  renderSwapPill("from");
-  renderSwapPill("to");
-  refreshSwapFromBalance();
 }
 
-// ---- Token picker popover (shared by the From and To pills) ----
-async function openSwapPicker(side) {
-  swapPickerSide = side;
-  $("swap-token-picker-custom").value = "";
-  $("swap-token-picker").classList.remove("hidden");
-  await renderSwapPickerList();
-}
-function closeSwapPicker() {
-  $("swap-token-picker").classList.add("hidden");
-  swapPickerSide = null;
-}
-function swapPickerRow(tok, symbol, name, balText, isActive) {
-  const row = document.createElement("button");
-  row.type = "button";
-  row.className = "token-picker-item" + (isActive ? " active" : "");
-  const icon = document.createElement("span");
-  icon.className = "token-icon";
-  setTokenIconEl(icon, symbol);
-  const main = document.createElement("span");
-  main.className = "token-main";
-  main.innerHTML = `<span class="token-symbol"></span><span class="token-name muted small"></span>`;
-  main.querySelector(".token-symbol").textContent = symbol || "?";
-  main.querySelector(".token-name").textContent = name || "";
-  row.appendChild(icon);
-  row.appendChild(main);
-  if (balText) {
-    const bal = document.createElement("span");
-    bal.className = "token-balance";
-    bal.textContent = balText;
-    row.appendChild(bal);
-  }
-  row.addEventListener("click", () => selectSwapToken(swapPickerSide, tok));
-  return row;
-}
-async function renderSwapPickerList() {
-  const list = $("swap-token-picker-list");
-  list.innerHTML = "";
-  const side = swapPickerSide;
-  const activeAddr = (swapToken[side] && swapToken[side].address) || TM_NATIVE();
-
-  let nativeBal = "";
-  try {
-    if (currentStatus && currentStatus.selectedAddress) {
-      const bal = await sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress });
-      nativeBal = Number(ethers.utils.formatUnits(bal.balanceWei, bal.decimals)).toFixed(4);
-    }
-  } catch (e) { /* best-effort -- picker still works without a balance shown */ }
-  list.appendChild(swapPickerRow(null, swapNativeSymbol(), currentNetwork ? currentNetwork.name : "", nativeBal, activeAddr === TM_NATIVE()));
-
-  try {
-    const res = await sendMsg("TM_GET_TRACKED_TOKEN_BALANCES");
-    (res.tokens || []).forEach((t) => {
-      const balText = t.error ? "" : Number(ethers.utils.formatUnits(t.balanceWei, t.decimals)).toFixed(4);
-      const tok = { address: t.address, symbol: t.symbol, decimals: t.decimals, name: t.name };
-      list.appendChild(swapPickerRow(tok, t.symbol, t.name, balText, activeAddr.toLowerCase() === t.address.toLowerCase()));
-    });
-  } catch (e) { /* best-effort -- picker still shows the native coin */ }
-}
-function selectSwapToken(side, tok) {
-  swapToken[side] = tok;
-  renderSwapPill(side);
-  closeSwapPicker();
-  if (side === "from") {
-    refreshSwapFromBalance();
-    refreshSwapUsd("from");
-  } else {
-    refreshSwapUsd("to");
-  }
-  requestSwapQuote();
-}
-
-// UPGRADE 2/4: a live USD estimate under each amount, and a "Max"
-// quick-fill for the From side, driven off whichever token is selected.
-let swapFromBalanceWei = null;
-let swapFromDecimals = 18;
-
-async function refreshSwapFromBalance() {
-  $("swap-from-balance").textContent = "";
-  $("swap-from-max").classList.add("hidden");
-  swapFromBalanceWei = null;
-  if (!currentStatus || !currentStatus.selectedAddress) return;
-  try {
-    let balanceWei, decimals;
-    if (swapToken.from) {
-      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: swapToken.from.address });
-      balanceWei = info.balanceWei; decimals = info.decimals;
-    } else {
-      const info = await sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress });
-      balanceWei = info.balanceWei; decimals = info.decimals;
-    }
-    swapFromBalanceWei = balanceWei;
-    swapFromDecimals = decimals;
-    const formatted = Number(ethers.utils.formatUnits(balanceWei, decimals));
-    $("swap-from-balance").textContent = TM_I18N.t("swap.balanceLabel", { amount: formatted.toFixed(4), symbol: swapSym("from") });
-    $("swap-from-max").classList.toggle("hidden", formatted <= 0);
-  } catch (e) { /* best-effort -- balance/Max just stay blank/hidden */ }
-}
-
-// Native coin uses the same CoinGecko id lookup the main balance card
-// uses; an ERC-20 is priced by contract address. Either way, a missing
-// price (rate-limited or unlisted token) just means the $ line stays
-// blank -- never an error the user has to deal with.
-async function tokenUsdPrice(side) {
-  if (!currentNetwork) return null;
-  const tok = swapToken[side];
-  try {
-    if (!tok) return await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
-    const prices = await TM_PRICES.getTokenPricesByContract(currentNetwork.key, [tok.address], currentCurrency);
-    const entry = prices[tok.address.toLowerCase()];
-    return entry && typeof entry.price === "number" ? entry.price : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-async function refreshSwapUsd(side) {
-  const usdEl = $(`swap-${side}-usd`);
-  const amount = Number($(`swap-amount-${side === "from" ? "in" : "out"}`).value.trim());
-  if (!amount || !isFinite(amount)) { usdEl.textContent = ""; return; }
-  const price = await tokenUsdPrice(side);
-  usdEl.textContent = typeof price === "number" ? "≈ " + formatCurrency(amount * price) : "";
-}
-
-$("swap-from-max").addEventListener("click", async () => {
-  if (!swapFromBalanceWei) return;
-  let maxWei = ethers.BigNumber.from(swapFromBalanceWei);
-  if (!swapToken.from) {
-    // Native coin: leave room for gas -- filling the *entire* balance
-    // would leave nothing to actually pay for the swap's transaction(s).
-    try {
-      const res = await sendMsg("TM_SWAP_NATIVE_GAS_RESERVE");
-      const reserve = ethers.BigNumber.from(res.reserveWei);
-      maxWei = maxWei.gt(reserve) ? maxWei.sub(reserve) : ethers.BigNumber.from(0);
-    } catch (e) {
-      // best-effort -- if a fresh gas price can't be fetched, fall back to
-      // a conservative flat reserve rather than filling the full balance.
-      const fallbackReserve = ethers.utils.parseUnits("0.002", swapFromDecimals);
-      maxWei = maxWei.gt(fallbackReserve) ? maxWei.sub(fallbackReserve) : ethers.BigNumber.from(0);
-    }
-  }
-  $("swap-amount-in").value = ethers.utils.formatUnits(maxWei, swapFromDecimals);
-  refreshSwapUsd("from");
-  requestSwapQuote();
-});
-$("swap-amount-in").addEventListener("input", () => refreshSwapUsd("from"));
-
-// UPGRADE 3/4: auto-quoting -- debounced on every keystroke in the amount
-// field, and immediately whenever a token or the swap direction changes.
-let swapQuoteTimer = null;
-let swapQuoteSeq = 0; // guards a slow, now-stale request from landing after a newer one
-
-function scheduleSwapQuote() {
-  clearTimeout(swapQuoteTimer);
-  swapQuoteTimer = setTimeout(requestSwapQuote, 450);
-}
-
-async function requestSwapQuote() {
+$("btn-swap-quote").addEventListener("click", async () => {
   hideError("swap-error");
-  const amountStr = $("swap-amount-in").value.trim();
-  if (!amountStr || Number(amountStr) <= 0) {
-    $("swap-amount-out").value = "";
-    $("swap-to-usd").textContent = "";
-    $("swap-quote-display").classList.add("hidden");
-    $("swap-quote-loading").classList.add("hidden");
-    return;
-  }
-  const seq = ++swapQuoteSeq;
-  $("swap-quote-loading").classList.remove("hidden");
   try {
-    const tokenIn = swapAddr("from");
-    const tokenOut = swapAddr("to");
-    const decimalsIn = swapDecimals("from");
-    const decimalsOut = swapDecimals("to");
-    const totalAmountInWei = ethers.utils.parseUnits(amountStr, decimalsIn);
+    const tokenIn = $("swap-from-custom").value.trim() || TM_NATIVE();
+    const tokenOut = $("swap-to-custom").value.trim() || TM_NATIVE();
+    const amountStr = $("swap-amount-in").value.trim();
+    let decimalsIn = 18;
+    if (tokenIn !== TM_NATIVE()) {
+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenIn });
+      decimalsIn = info.decimals;
+    }
+    // This is the TOTAL amount the user is putting in -- the app fee comes
+    // off the top of this before anything is swapped (see TM_SWAP_QUOTE in
+    // background.js / lib/fee-config.js).
+    const totalAmountInWei = ethers.utils.parseUnits(amountStr || "0", decimalsIn);
     const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
-    if (seq !== swapQuoteSeq) return; // a newer keystroke already superseded this request
 
-    $("swap-amount-out").value = ethers.utils.formatUnits(quote.amountOutWei, decimalsOut);
-    refreshSwapUsd("to");
-
-    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeValueLine", {
+    let decimalsOut = 18;
+    if (tokenOut !== TM_NATIVE()) {
+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenOut });
+      decimalsOut = info.decimals;
+    }
+    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
       percent: quote.feePercentLabel,
       amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
-      symbol: swapSym("from"),
     });
-
+    $("swap-net-line").textContent = TM_I18N.t("swap.netAmountLine", {
+      amount: ethers.utils.formatUnits(quote.netAmountInWei, decimalsIn),
+    });
+    $("swap-quote-line").textContent = TM_I18N.t("swap.estimatedOutLine", {
+      amount: ethers.utils.formatUnits(quote.amountOutWei, decimalsOut),
+    });
     $("swap-quote-display").dataset.tokenIn = tokenIn;
     $("swap-quote-display").dataset.tokenOut = tokenOut;
     $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
     $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
-    $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei;
-    $("swap-quote-display").dataset.decimalsIn = String(decimalsIn);
-    $("swap-quote-display").dataset.decimalsOut = String(decimalsOut);
-    renderSwapBreakdownDerived();
 
+    // Router allowance only ever needs to cover the NET amount -- the fee
+    // portion moves as a separate plain transfer, never through the router.
     $("btn-swap-approve").classList.add("hidden");
     if (tokenIn !== TM_NATIVE()) {
       const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
-      if (seq !== swapQuoteSeq) return;
       if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
         $("btn-swap-approve").classList.remove("hidden");
       }
     }
     $("swap-quote-display").classList.remove("hidden");
   } catch (e) {
-    if (seq !== swapQuoteSeq) return;
-    $("swap-amount-out").value = "";
-    $("swap-quote-display").classList.add("hidden");
     showError("swap-error", e.message);
-  } finally {
-    if (seq === swapQuoteSeq) $("swap-quote-loading").classList.add("hidden");
   }
-}
-
-$("swap-amount-in").addEventListener("input", scheduleSwapQuote);
-
-// UPGRADE 4/4: a clean rate/fee/slippage/minimum-received breakdown. Rate
-// and minimum-received are DERIVED from the last quote (never re-fetched),
-// so dragging the slippage dropdown updates the minimum instantly.
-function renderSwapBreakdownDerived() {
-  const ds = $("swap-quote-display").dataset;
-  if (!ds.amountOutWei) return;
-  const decimalsIn = Number(ds.decimalsIn);
-  const decimalsOut = Number(ds.decimalsOut);
-  const netIn = Number(ethers.utils.formatUnits(ds.netAmountInWei, decimalsIn));
-  const out = Number(ethers.utils.formatUnits(ds.amountOutWei, decimalsOut));
-  const rate = netIn > 0 ? out / netIn : 0;
-  const rateText = rate ? Number(rate.toPrecision(6)).toString() : "0";
-  $("swap-rate-line").textContent = TM_I18N.t("swap.rateLine", { symIn: swapSym("from"), rate: rateText, symOut: swapSym("to") });
-
-  const slippageBps = Number($("swap-slippage").value);
-  const minWei = TM_SWAP_APPLY_SLIPPAGE(ds.amountOutWei, slippageBps);
-  $("swap-min-received-line").textContent = TM_I18N.t("swap.minReceivedValueLine", {
-    amount: ethers.utils.formatUnits(minWei, decimalsOut),
-    symbol: swapSym("to"),
-  });
-}
-// Same math as lib/swap.js's applySlippage() (that copy runs in the
-// background worker, not the popup) -- kept tiny and local here so the
-// breakdown can recompute on every slippage change with no extra message
-// round-trip to the background worker.
-function TM_SWAP_APPLY_SLIPPAGE(amountOutWei, slippageBps) {
-  return ethers.BigNumber.from(amountOutWei).mul(10000 - slippageBps).div(10000);
-}
-$("swap-slippage").addEventListener("change", renderSwapBreakdownDerived);
-
-$("swap-from-token-btn").addEventListener("click", () => openSwapPicker("from"));
-$("swap-to-token-btn").addEventListener("click", () => openSwapPicker("to"));
-$("swap-token-picker-close").addEventListener("click", closeSwapPicker);
-$("swap-token-picker").addEventListener("click", (e) => { if (e.target.id === "swap-token-picker") closeSwapPicker(); });
-$("swap-token-picker-custom").addEventListener("keydown", async (e) => {
-  if (e.key !== "Enter") return;
-  const addr = $("swap-token-picker-custom").value.trim();
-  if (!ethers.utils.isAddress(addr)) { showError("swap-error", "That doesn't look like a valid contract address."); return; }
-  hideError("swap-error");
-  try {
-    const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: addr });
-    selectSwapToken(swapPickerSide, { address: ethers.utils.getAddress(addr), symbol: info.symbol, decimals: info.decimals, name: info.name });
-  } catch (err) {
-    showError("swap-error", err.message);
-  }
-});
-
-$("btn-swap-flip").addEventListener("click", () => {
-  const from = swapToken.from, to = swapToken.to;
-  swapToken.from = to;
-  swapToken.to = from;
-  renderSwapPill("from");
-  renderSwapPill("to");
-  const inVal = $("swap-amount-in").value;
-  $("swap-amount-in").value = $("swap-amount-out").value;
-  $("swap-amount-out").value = inVal;
-  refreshSwapFromBalance();
-  refreshSwapUsd("from");
-  refreshSwapUsd("to");
-  requestSwapQuote();
 });
 
 $("btn-swap-approve").addEventListener("click", async () => {

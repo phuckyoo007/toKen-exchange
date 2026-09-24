@@ -6,6 +6,7 @@ const { handleFeatureRequestsApi } = require("./feature-requests-api");
 const { handleSwapQuoteApi } = require("./swap-quote-api");
 const { handleAuthApi } = require("./auth-api");
 const { handleCoinbaseOnrampApi } = require("./coinbase-onramp-api");
+const { handleTransakApi } = require("./transak-widget-api");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -20,7 +21,7 @@ const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-e
 const LIB_FILES = [
 "account.js", "coinbase-onramp-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
 "identicon.js", "networks.js", "onramper-config.js", "polymarket.js", "prices.js",
-"sanctions-list.js", "support-config.js", "swap.js", "wallet.js",
+"sanctions-list.js", "support-config.js", "swap.js", "transak-config.js", "wallet.js",
 "walletconnect-config.js",
 ];
 const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];
@@ -81,6 +82,7 @@ if (handleFeatureRequestsApi(req, res)) return;
 if (handleSwapQuoteApi(req, res)) return;
 if (handleAuthApi(req, res)) return;
 if (handleCoinbaseOnrampApi(req, res)) return;
+if (handleTransakApi(req, res)) return;
 handler(req, res, { public: PUBLIC_DIR });
 });
 server.listen(PORT, () => console.log("Serving on port " + PORT));

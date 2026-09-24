@@ -1,0 +1,5 @@
+Delete from your repo:
+  moonpay-sign-api.js
+  buy-config.js
+  sell-config.js
+  extension-updated-icons/lib/buy-config.js
