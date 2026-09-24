@@ -857,17 +857,131 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .qr-box svg { width: 100%; height: 100%; display: block; }
 .actions-row { display: flex; gap: 8px; }
 .actions-row button { flex: 1; }
-.swap-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 /* #swap-form/#swap-quote-display are plain divs, not direct flex children
-   of .screen, so their buttons (Get quote / Approve token first / Swap)
-   were falling back to the browser's shrink-to-fit button sizing instead
-   of the full-width "chunky pill" every other screen's buttons get from
+   of .screen, so their buttons (Approve token first / Swap) were falling
+   back to the browser's shrink-to-fit button sizing instead of the
+   full-width "chunky pill" every other screen's buttons get from
    .screen's own flex column. Mirroring that same flex layout here fixes
    it -- and stacking Approve/Swap top-to-bottom (rather than a Reject/
    Confirm-style side-by-side split) matches how they're actually used:
    sequential steps, not a pick-one choice, since both stay visible at
    once when a token needs approval before it can swap. */
-#swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 11px; }
+#swap-form, #swap-quote-display { display: flex; flex-direction: column; gap: 9px; }
+
+/* ---- Swap: From/To panels ----
+   Each panel is a card: a small label/balance header row, then the asset
+   pill + big right-aligned amount, then a footer row for the live USD
+   estimate (and Max, on the From side only). Modeled on how Uniswap's and
+   most aggregators' swap cards read -- the amount is the thing your eye
+   goes to first, so it gets the largest type on the screen. */
+.swap-panel {
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 12px 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.swap-panel-head { display: flex; align-items: center; justify-content: space-between; }
+.swap-panel-label {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.swap-panel-balance { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.swap-panel-row { display: flex; align-items: center; gap: 8px; }
+.swap-asset-btn {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 10px 5px 6px;
+  color: var(--text); font-weight: 600; font-size: 13px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.swap-asset-btn:hover, .swap-asset-btn:focus-visible { border-color: var(--gold-deep); background: var(--bg-hover); }
+.swap-asset-icon-slot:empty {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg-inset); border: 1px dashed var(--line);
+  display: inline-block;
+}
+.swap-asset-icon-slot .token-icon { width: 22px; height: 22px; font-size: 8.5px; }
+.swap-asset-chevron { font-size: 10px; color: var(--text-faint); }
+/* Right-aligned, large -- the single biggest number on the screen, same
+   treatment the balance hero gets on the main screen. The output side
+   reuses the identical class on a <span> (not an <input>) since it is
+   never directly typed into, only ever auto-filled from a quote. */
+.swap-amount-input {
+  flex: 1; min-width: 0; text-align: right;
+  background: transparent; border: none; outline: none;
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 22px; letter-spacing: 0.01em; color: var(--text);
+  padding: 0;
+}
+.swap-amount-input::placeholder { color: var(--text-faint); opacity: 1; }
+.swap-amount-output {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-muted);
+}
+.swap-amount-output.has-value { color: var(--gold-bright); }
+.swap-panel-foot { display: flex; align-items: center; justify-content: space-between; min-height: 16px; }
+.swap-usd-value { font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.swap-max-btn { font-size: 11px; padding: 0; }
+.swap-divider { display: flex; justify-content: center; margin: -4px 0; }
+.swap-divider-icon {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--text-muted);
+}
+
+/* ---- Swap: rate/fee/slippage/min-received breakdown ---- */
+#swap-quote-display {
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px;
+}
+.swap-detail-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--text-muted);
+  padding: 4px 0;
+}
+.swap-detail-row + .swap-detail-row { border-top: 1px solid var(--line); }
+.swap-detail-value { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.swap-detail-select {
+  background: var(--bg-inset); border: 1px solid var(--line); color: var(--text);
+  border-radius: 6px; padding: 3px 6px; font-size: 12px;
+}
+#swap-quote-display .primary, #swap-quote-display .secondary { margin-top: 9px; }
+#swap-quote-display .primary:first-of-type { margin-top: 9px; }
+
+/* ---- Swap: asset picker overlay ----
+   The popup itself is a fixed 360x600 box (see #splash-screen), so this
+   is positioned absolute within it, not fixed to the viewport. */
+.asset-picker {
+  position: absolute; inset: 0; z-index: 60;
+  background: rgba(5, 8, 16, 0.72); backdrop-filter: blur(2px);
+  display: flex; align-items: flex-end;
+}
+.asset-picker-panel {
+  width: 100%; max-height: 78%; display: flex; flex-direction: column;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-bottom: none; border-radius: 16px 16px 0 0;
+  padding: 14px 14px 12px;
+}
+.asset-picker-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 700; color: var(--text); margin-bottom: 8px;
+}
+.asset-picker-close {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 14px; cursor: pointer; padding: 2px 4px;
+}
+.asset-picker-close:hover { color: var(--text); }
+.asset-picker-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; padding-bottom: 4px; }
+.asset-picker-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; border: 1px solid transparent; border-radius: 10px;
+  padding: 8px 8px; cursor: pointer; text-align: left; color: var(--text);
+}
+.asset-picker-row:hover, .asset-picker-row:focus-visible { background: var(--bg-hover); border-color: var(--line); }
+.asset-picker-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.asset-picker-row-symbol { font-weight: 600; font-size: 13px; }
+.asset-picker-row-balance { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.asset-picker-custom-btn { margin-top: 6px; font-size: 12.5px; }
 
 /* A soft gold glow across the top of a card, fading into the card's own
    solid fill by 44px down -- a small decorative accent, without making

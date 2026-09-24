@@ -436,39 +436,78 @@
     <h2 data-i18n="common.swap">Swap</h2>
     <p id="swap-unsupported" class="warn hidden" data-i18n="swap.unsupportedWarning">Swapping isn't enabled on this network yet -- no verified router configured. Add one in Settings &rarr; Networks first.</p>
     <div id="swap-form">
-      <label data-i18n="swap.fromLabel">From</label>
-      <div class="swap-row">
-        <select id="swap-from-select">
-          <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
-        </select>
+      <div class="swap-panel" data-side="from">
+        <div class="swap-panel-head">
+          <span class="swap-panel-label" data-i18n="swap.fromLabel">From</span>
+          <span class="swap-panel-balance hidden" id="swap-from-balance"></span>
+        </div>
+        <div class="swap-panel-row">
+          <button type="button" class="swap-asset-btn" id="swap-from-asset-btn" data-side="from">
+            <span id="swap-from-icon" class="swap-asset-icon-slot"></span>
+            <span id="swap-from-symbol" class="swap-asset-symbol" data-i18n="swap.selectBtn">Select</span>
+            <span class="swap-asset-chevron" aria-hidden="true">&#9662;</span>
+          </button>
+          <input type="text" id="swap-amount-in" class="swap-amount-input" inputmode="decimal" autocomplete="off" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
+        </div>
+        <div class="swap-panel-foot">
+          <span id="swap-from-usd" class="swap-usd-value"></span>
+          <button type="button" class="link swap-max-btn hidden" id="swap-max-btn" data-i18n="swap.maxBtn">Max</button>
+        </div>
         <input type="text" id="swap-from-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
-        <input type="text" id="swap-amount-in" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
       </div>
-      <label data-i18n="swap.toLabel">To</label>
-      <div class="swap-row">
-        <select id="swap-to-select">
-          <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
-        </select>
+
+      <div class="swap-divider" aria-hidden="true"><span class="swap-divider-icon">&#8595;</span></div>
+
+      <div class="swap-panel" data-side="to">
+        <div class="swap-panel-head">
+          <span class="swap-panel-label" data-i18n="swap.toLabel">To</span>
+        </div>
+        <div class="swap-panel-row">
+          <button type="button" class="swap-asset-btn" id="swap-to-asset-btn" data-side="to">
+            <span id="swap-to-icon" class="swap-asset-icon-slot"></span>
+            <span id="swap-to-symbol" class="swap-asset-symbol" data-i18n="swap.selectBtn">Select</span>
+            <span class="swap-asset-chevron" aria-hidden="true">&#9662;</span>
+          </button>
+          <span class="swap-amount-input swap-amount-output" id="swap-amount-out">0.0</span>
+        </div>
+        <div class="swap-panel-foot">
+          <span id="swap-to-usd" class="swap-usd-value"></span>
+        </div>
         <input type="text" id="swap-to-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
       </div>
-      <button id="btn-swap-quote" class="secondary" data-i18n="swap.getQuoteBtn">Get quote</button>
+
+      <p id="swap-quoting-hint" class="hint hidden" data-i18n="swap.quotingHint">Getting quote&hellip;</p>
+
       <div id="swap-quote-display" class="hidden">
-        <p id="swap-fee-line" class="muted"></p>
-        <p id="swap-net-line" class="muted"></p>
-        <p id="swap-quote-line"></p>
-        <label data-i18n="swap.slippageLabel">Slippage tolerance</label>
-        <select id="swap-slippage">
-          <option value="50">0.5%</option>
-          <option value="100" selected>1%</option>
-          <option value="300">3%</option>
-        </select>
+        <div class="swap-detail-row"><span data-i18n="swap.rateLabel">Rate</span><span id="swap-rate-line" class="swap-detail-value"></span></div>
+        <div class="swap-detail-row"><span data-i18n="swap.appFeeShortLabel">App fee</span><span id="swap-fee-line" class="swap-detail-value"></span></div>
+        <div class="swap-detail-row">
+          <span data-i18n="swap.slippageLabel">Slippage tolerance</span>
+          <select id="swap-slippage" class="swap-detail-select">
+            <option value="50">0.5%</option>
+            <option value="100" selected>1%</option>
+            <option value="300">3%</option>
+          </select>
+        </div>
+        <div class="swap-detail-row"><span data-i18n="swap.minReceivedLabel">Minimum received</span><span id="swap-min-received-line" class="swap-detail-value"></span></div>
         <button id="btn-swap-approve" class="secondary hidden" data-i18n="swap.approveBtn">Approve token first</button>
-        <button id="btn-swap-execute" class="primary" data-i18n="common.swap">Swap</button>
+        <button id="btn-swap-execute" class="primary" disabled data-i18n="common.swap">Swap</button>
       </div>
     </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="swap-status" class="hint hidden"></p>
     <p id="swap-error" class="error hidden"></p>
+
+    <div id="swap-asset-picker" class="asset-picker hidden">
+      <div class="asset-picker-panel">
+        <div class="asset-picker-head">
+          <span id="swap-picker-title" data-i18n="swap.selectAssetTitle">Select asset</span>
+          <button type="button" class="asset-picker-close" id="swap-picker-close" aria-label="Close">&#10005;</button>
+        </div>
+        <div class="asset-picker-list" id="swap-picker-list"></div>
+        <button type="button" class="link asset-picker-custom-btn" id="swap-picker-custom-btn" data-i18n="swap.customAddressOption">Other token (paste address)...</button>
+      </div>
+    </div>
   </section>
 
   <!-- SETTINGS -->
