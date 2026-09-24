@@ -1576,3 +1576,17 @@ button.price-link { background: none; border: 0; padding: 0; font: inherit; text
 .coin-cash-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sell-send-helper { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .sell-send-helper h3, .sell-send-helper p { margin: 0; }
+
+
+/* Buy / Sell provider list: Transak is the main (gold) option; Coinbase and
+   Onramper stay secondary. Each button sits close to its own note, with
+   clear space before the next provider. */
+#screen-buy > button.primary, #screen-buy > button.secondary,
+#screen-sell > button.primary, #screen-sell > button.secondary { margin-top: 4px; }
+#screen-buy > button + p.muted.small, #screen-sell > button + p.muted.small {
+  margin: 8px 6px 22px;
+  line-height: 1.4;
+  text-align: center;
+}
+#screen-buy > p.muted.small + button, #screen-sell > p.muted.small + button { margin-top: 0; }
+#sell-send-helper { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(128,128,128,0.28); }
