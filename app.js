@@ -175,24 +175,6 @@ function sendMsg(type, payload) {
   });
 }
 
-// Races a promise against a timeout. Used for the very first TM_GET_STATUS
-// call on startup (see init() below) -- if the background/service-worker
-// side ever fails to call sendResponse at all (a dropped message, a
-// terminated service worker, etc.), sendMsg()'s promise above just hangs
-// forever with no rejection, since chrome.runtime.lastError is only
-// checked inside a callback that would never fire. Without this, that
-// left the whole app stuck on the loading spinner permanently, with no
-// error and no way out.
-function withTimeout(promise, ms) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Timed out.")), ms);
-    promise.then(
-      (v) => { clearTimeout(timer); resolve(v); },
-      (e) => { clearTimeout(timer); reject(e); }
-    );
-  });
-}
-
 // ---------------------------------------------------------------- CUBE NAV
 // Home, Activity and Send are the app's three "peer" destinations -- the
 // same three the splash screen's own tab bar already treats as equal
@@ -321,30 +303,6 @@ function showError(id, message) {
 }
 function hideError(id) { $(id).classList.add("hidden"); }
 
-// Same as showError, but for a failure the person can actually do something
-// about right where they are (a flaky RPC call, most often) -- adds an
-// inline "Retry" link that re-runs retryFn, instead of just repeating "try
-// again" in the message with no way to act on it short of leaving the
-// screen and coming back (which happened to re-trigger the same fetch
-// anyway, just less obviously).
-function showErrorWithRetry(id, message, retryFn) {
-  const el = $(id);
-  el.textContent = "";
-  const span = document.createElement("span");
-  span.textContent = friendlyErrorMessage(message) + " ";
-  el.appendChild(span);
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "link error-retry-btn";
-  btn.textContent = TM_I18N.t("main.retryBtn");
-  btn.addEventListener("click", () => {
-    hideError(id);
-    retryFn();
-  });
-  el.appendChild(btn);
-  el.classList.remove("hidden");
-}
-
 document.querySelectorAll(".back-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     showScreen(btn.dataset.back);
@@ -382,7 +340,6 @@ $("backup-confirm-check").addEventListener("change", (e) => {
 $("btn-backup-done").addEventListener("click", async () => {
   await refreshMain();
   showScreen("screen-main");
-  window.TM_ACCOUNT_UI?.autoSync(); // new wallet -- nothing to back up yet unless already signed in from a prior account
 });
 
 $("btn-import-submit").addEventListener("click", async () => {
@@ -396,7 +353,6 @@ $("btn-import-submit").addEventListener("click", async () => {
     await sendMsg("TM_IMPORT_MNEMONIC", { mnemonic, password: pw });
     await refreshMain();
     showScreen("screen-main");
-    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) {
     showError("import-error", e.message);
   }
@@ -466,16 +422,7 @@ async function refreshMain() {
   currentNetworks.forEach((n) => {
     const opt = document.createElement("option");
     opt.value = n.chainId;
-    // Marks which networks Coinbase Sell (see lib/coinbase-onramp-config.js)
-    // actually works on, right in the network switcher, so the answer to
-    // "how do I turn this into cash" is visible before switching -- rather
-    // than only surfacing on the Sell screen after picking a network that
-    // turns out not to be supported.
-    const coinbaseCashOut = TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(n.key);
-    opt.textContent =
-      n.name +
-      (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix")) +
-      (coinbaseCashOut ? TM_I18N.t("network.coinbaseCashOutSuffix") : "");
+    opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
     if (n.chainId === currentNetwork.chainId) opt.selected = true;
     netSel.appendChild(opt);
   });
@@ -537,15 +484,7 @@ async function refreshBalance() {
     // as the lead number (via showUsdUnavailable) if nothing is.
     portfolioNativeUsd = null;
     renderPortfolioTotal();
-    // Tokens/NFTs fail silently on their own (see refreshTokens/refreshNfts)
-    // rather than each showing their own banner, so retrying here re-runs
-    // all three -- a person tapping "Retry" after a flaky RPC call almost
-    // certainly wants the whole screen re-fetched, not just the balance line.
-    showErrorWithRetry("main-error", TM_I18N.t("main.balanceFetchErrorPrefix") + e.message, () => {
-      refreshBalance();
-      refreshTokens();
-      refreshNfts();
-    });
+    showError("main-error", TM_I18N.t("main.balanceFetchErrorPrefix") + e.message);
   }
 }
 
@@ -563,7 +502,6 @@ $("account-select").addEventListener("change", async (e) => {
       return showError("main-error", err.message);
     }
     await refreshMain();
-    window.TM_ACCOUNT_UI?.autoSync();
     return;
   }
   await sendMsg("TM_SELECT_ACCOUNT", { address: e.target.value });
@@ -941,14 +879,18 @@ $("btn-nft-confirm-add").addEventListener("click", async () => {
   }
 });
 
-// Pulled out of the lookup button's own click handler so a known-good
-// contract address (see KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN above) can trigger the
-// exact same lookup+preview path automatically, instead of needing its own
-// separate, easier-to-drift-from-the-real-thing copy of this logic.
-async function lookupTokenForAddress(address) {
+function resetAddTokenScreen() {
+  hideError("add-token-error");
+  $("add-token-address").value = "";
+  $("add-token-preview").classList.add("hidden");
+  delete $("add-token-preview").dataset.address;
+}
+
+$("btn-token-lookup").addEventListener("click", async () => {
   hideError("add-token-error");
   $("add-token-preview").classList.add("hidden");
   try {
+    const address = $("add-token-address").value.trim();
     if (!ethers.utils.isAddress(address)) throw new Error(TM_I18N.t("addToken.invalidAddress"));
     const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: address });
     $("add-token-name").textContent = info.name || TM_I18N.t("addToken.noName");
@@ -963,24 +905,6 @@ async function lookupTokenForAddress(address) {
   } catch (e) {
     showError("add-token-error", e.message);
   }
-}
-
-// `prefillAddress` is only ever a contract address this wallet's own code
-// picked (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN), never anything from the coin's own
-// (CoinGecko-sourced) data -- looking it up automatically still shows the
-// normal preview card before anything is added, so the on-chain name/
-// symbol/decimals are always visible for a real look before confirming,
-// exactly as if it had been pasted in by hand.
-async function resetAddTokenScreen(prefillAddress) {
-  hideError("add-token-error");
-  $("add-token-address").value = prefillAddress || "";
-  $("add-token-preview").classList.add("hidden");
-  delete $("add-token-preview").dataset.address;
-  if (prefillAddress) await lookupTokenForAddress(prefillAddress);
-}
-
-$("btn-token-lookup").addEventListener("click", () => {
-  lookupTokenForAddress($("add-token-address").value.trim());
 });
 
 $("btn-token-confirm-add").addEventListener("click", async () => {
@@ -1106,18 +1030,10 @@ let pricesRatesData = [];
 function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
-  const stablecoinTag = r.stablecoin
-    ? `<span class="currency-stablecoin-tag" title="${escapeHtml(TM_I18N.t("prices.stablecoinTagTitle", { stablecoin: r.stablecoin, currency: r.name }))}">${escapeHtml(r.stablecoin)}</span>`
-    : "";
-  // Whole row opens a lightweight currency-detail view, the same way a
-  // crypto row opens the coin screen -- see openCurrencyDetail().
-  const linkLabel = TM_I18N.t("prices.viewCoin", { name: r.name });
   row.innerHTML = `
-    <button type="button" class="price-link" aria-label="${escapeHtml(linkLabel)}" title="${escapeHtml(linkLabel)}"><span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}${stablecoinTag}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></button>
+    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
+    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
   `;
-  row.querySelector(".price-link").addEventListener("click", () => {
-    openCurrencyDetail(r, $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices");
-  });
   return row;
 }
 
@@ -1151,17 +1067,6 @@ function setPricesTab(tab) {
   pricesTab = tab;
   document.querySelectorAll(".prices-tab").forEach((b) => b.classList.toggle("active", b.dataset.pricesTab === tab));
   $("prices-tab-note").classList.toggle("hidden", tab !== "currencies");
-  $("prices-stablecoin-note").classList.toggle("hidden", tab !== "currencies");
-  // Re-render immediately with whatever's already in memory for this tab
-  // (pricesBoardData for crypto, pricesRatesData for currencies) BEFORE the
-  // fresh fetch below resolves. Without this, switching tabs left the OLD
-  // tab's rows sitting in #prices-list until the new fetch finished -- and
-  // if that fetch failed (e.g. the "Couldn't reach CoinGecko for currency
-  // rates" error), it never finished at all, so tapping "Currencies" could
-  // permanently strand the previous tab's crypto rows on screen under the
-  // Currencies tab. Calling this here means a tab switch always shows the
-  // right TYPE of row (even if stale/empty) and never the other tab's data.
-  renderPricesList();
   refreshPrices();
 }
 
@@ -1191,13 +1096,7 @@ async function refreshPrices() {
 // the native coin or as a token the person has added (matched by symbol) --
 // this wallet never guesses a token contract address. The Swap screen then
 // lets them choose which of their own holdings to pay with.
-let coinDetail = {
-  coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null, prefillTokenAddress: null,
-  // Currency-detail-only state (see openCurrencyDetail): the fiat row
-  // currently open, and -- when a verified, liquid stablecoin exists for it
-  // on the current or some other network -- the address to swap into.
-  currency: null, currencySwapAddress: null,
-};
+let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null };
 
 function normalizeCoinSymbol(s) {
   const up = String(s || "").toUpperCase();
@@ -1230,307 +1129,61 @@ async function getHeldAssets() {
   return assets;
 }
 
-// ---- Swap screen: icon token-picker pills (native coin + tracked tokens,
-// or a typed-in contract address) replace the old plain <select>s, each
-// side showing a colored icon + symbol "pill" instead of raw dropdown text.
-// Mirrors the extension's popup.js swap screen (see lib comments there).
-let swapToken = { from: null, to: null }; // null = network's native coin; else { address, symbol, decimals, name }
-let swapPickerSide = null;
-
-function swapNativeSymbol() {
-  return (currentNetwork && currentNetwork.nativeCurrency.symbol) || "";
-}
-function swapAddr(side) {
-  const tok = swapToken[side];
-  return tok ? tok.address : TM_NATIVE();
-}
-function swapSym(side) {
-  const tok = swapToken[side];
-  return tok ? tok.symbol : swapNativeSymbol();
-}
-function swapDecimals(side) {
-  const tok = swapToken[side];
-  return tok ? tok.decimals : ((currentNetwork && currentNetwork.nativeCurrency.decimals) || 18);
+function assetLabel(a) {
+  const n = Number(a.balance);
+  return `${a.symbol} (${isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 5 }) : a.balance})`;
 }
 
-// Fills a .token-icon element the same way tokenIconHtml() does, without
-// throwing away the element's id (these spans are looked up by id elsewhere).
-function setTokenIconEl(el, symbol) {
-  const s = String(symbol || "?").trim();
-  el.textContent = (s.slice(0, 2) || "?").toUpperCase();
-  el.style.background = tokenIconColor(s);
-}
-function renderSwapPill(side) {
-  const sym = swapSym(side);
-  setTokenIconEl($(`swap-${side}-icon`), sym);
-  $(`swap-${side}-symbol`).textContent = sym || "?";
-}
+// ---- Swap screen asset pickers (From = what you hold, To = any of your assets)
+let swapPopulateGen = 0;
 
-// ---- Token picker popover (shared by the From and To pills) ----
-async function openSwapPicker(side) {
-  swapPickerSide = side;
-  $("swap-token-picker-custom").value = "";
-  $("swap-token-picker").classList.remove("hidden");
-  await renderSwapPickerList();
-}
-function closeSwapPicker() {
-  $("swap-token-picker").classList.add("hidden");
-  swapPickerSide = null;
-}
-function swapPickerRow(tok, symbol, name, balText, isActive) {
-  const row = document.createElement("button");
-  row.type = "button";
-  row.className = "token-picker-item" + (isActive ? " active" : "");
-  const icon = document.createElement("span");
-  icon.className = "token-icon";
-  setTokenIconEl(icon, symbol);
-  const main = document.createElement("span");
-  main.className = "token-main";
-  main.innerHTML = `<span class="token-symbol"></span><span class="token-name muted small"></span>`;
-  main.querySelector(".token-symbol").textContent = symbol || "?";
-  main.querySelector(".token-name").textContent = name || "";
-  row.appendChild(icon);
-  row.appendChild(main);
-  if (balText) {
-    const bal = document.createElement("span");
-    bal.className = "token-balance";
-    bal.textContent = balText;
-    row.appendChild(bal);
-  }
-  row.addEventListener("click", () => selectSwapToken(swapPickerSide, tok));
-  return row;
-}
-async function renderSwapPickerList() {
-  const list = $("swap-token-picker-list");
-  list.innerHTML = "";
-  const side = swapPickerSide;
-  const activeAddr = (swapToken[side] && swapToken[side].address) || TM_NATIVE();
-  const held = await getHeldAssets();
-  held.forEach((a) => {
-    const isNative = a.key === "native";
-    const tok = isNative ? null : { address: a.address, symbol: a.symbol, decimals: a.decimals, name: "" };
-    const balText = Number(a.balance) ? Number(a.balance).toLocaleString(undefined, { maximumFractionDigits: 5 }) : "";
-    const isActive = isNative ? activeAddr === TM_NATIVE() : activeAddr.toLowerCase() === a.address.toLowerCase();
-    list.appendChild(swapPickerRow(tok, a.symbol, isNative ? (currentNetwork ? currentNetwork.name : "") : "", balText, isActive));
-  });
-}
-function selectSwapToken(side, tok) {
-  swapToken[side] = tok;
-  renderSwapPill(side);
-  closeSwapPicker();
-  $("swap-quote-display").classList.add("hidden");
-  if (side === "from") {
-    refreshSwapFromBalance();
-    refreshSwapUsd("from");
+function syncSwapAsset(side) {
+  const sel = $(`swap-${side}-select`);
+  const input = $(`swap-${side}-custom`);
+  if (sel.value === "custom") {
+    input.classList.remove("hidden");
+    input.value = "";
   } else {
-    refreshSwapUsd("to");
+    input.classList.add("hidden");
+    input.value = sel.value === "native" ? "" : sel.value; // blank = native coin, as the quote code expects
   }
-  scheduleSwapQuote();
+  $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
 }
 
-$("swap-from-token-btn").addEventListener("click", () => openSwapPicker("from"));
-$("swap-to-token-btn").addEventListener("click", () => openSwapPicker("to"));
-$("swap-token-picker-close").addEventListener("click", closeSwapPicker);
-$("swap-token-picker").addEventListener("click", (e) => { if (e.target.id === "swap-token-picker") closeSwapPicker(); });
-$("swap-token-picker-custom").addEventListener("keydown", async (e) => {
-  if (e.key !== "Enter") return;
-  const addr = $("swap-token-picker-custom").value.trim();
-  if (!ethers.utils.isAddress(addr)) { showError("swap-error", TM_I18N.t("swap.invalidAddress")); return; }
-  hideError("swap-error");
-  try {
-    const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: addr });
-    selectSwapToken(swapPickerSide, { address: ethers.utils.getAddress(addr), symbol: info.symbol, decimals: info.decimals, name: info.name });
-  } catch (err) {
-    showError("swap-error", err.message);
-  }
-});
-
-// A live USD estimate under each amount, and a "Max" quick-fill for the
-// From side, driven off whichever token is selected. Native coin uses the
-// same CoinGecko id lookup the main balance card uses; an ERC-20 is priced
-// by contract address. Either way, a missing price (rate-limited or
-// unlisted token) just means the $ line stays blank -- never an error the
-// user has to deal with, and never a guessed/fabricated id.
-let swapFromBalanceWei = null;
-let swapFromDecimals = 18;
-
-async function refreshSwapFromBalance() {
-  $("swap-from-balance").textContent = "";
-  $("swap-from-max").classList.add("hidden");
-  swapFromBalanceWei = null;
-  if (!currentStatus || !currentStatus.selectedAddress) return;
-  try {
-    let balanceWei, decimals;
-    if (swapToken.from) {
-      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: swapToken.from.address });
-      balanceWei = info.balanceWei; decimals = info.decimals;
-    } else {
-      const info = await sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress });
-      balanceWei = info.balanceWei; decimals = info.decimals;
-    }
-    swapFromBalanceWei = balanceWei;
-    swapFromDecimals = decimals;
-    const formatted = Number(ethers.utils.formatUnits(balanceWei, decimals));
-    $("swap-from-balance").textContent = TM_I18N.t("swap.balanceLabel", {
-      amount: formatted.toLocaleString(undefined, { maximumFractionDigits: 5 }),
-      symbol: swapSym("from"),
+async function populateSwapSelects(pre) {
+  const myGen = ++swapPopulateGen;
+  const held = await getHeldAssets();
+  if (myGen !== swapPopulateGen) return;
+  const fromSel = $("swap-from-select");
+  const toSel = $("swap-to-select");
+  const toKey = pre && pre.toKey;
+  const fill = (sel, items) => {
+    sel.innerHTML = "";
+    items.forEach((a) => {
+      const o = document.createElement("option");
+      o.value = a.key;
+      o.textContent = assetLabel(a);
+      sel.appendChild(o);
     });
-    $("swap-from-max").classList.toggle("hidden", formatted <= 0);
-  } catch (e) { /* best-effort -- balance/Max just stay blank/hidden */ }
+    const custom = document.createElement("option");
+    custom.value = "custom";
+    custom.textContent = TM_I18N.t("swap.customAddressOption");
+    sel.appendChild(custom);
+  };
+  // "From" only offers what the person actually holds (plus a paste-address
+  // escape hatch); the coin being bought is never offered as its own source.
+  let fromItems = held.filter((a) => Number(a.balance) > 0 && a.key !== toKey);
+  if (!fromItems.length) fromItems = held.filter((a) => a.key === "native" && a.key !== toKey);
+  fill(fromSel, fromItems);
+  fill(toSel, held);
+  if (toKey && held.some((a) => a.key === toKey)) toSel.value = toKey;
+  else toSel.value = (held.find((a) => a.key !== fromSel.value) || held[0] || { key: "custom" }).key;
+  syncSwapAsset("from");
+  syncSwapAsset("to");
 }
 
-async function tokenUsdPrice(side) {
-  if (!currentNetwork) return null;
-  const tok = swapToken[side];
-  try {
-    if (!tok) return await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
-    const prices = await TM_PRICES.getTokenPricesByContract(currentNetwork.key, [tok.address], currentCurrency);
-    const entry = prices[tok.address.toLowerCase()];
-    return entry && typeof entry.price === "number" ? entry.price : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-async function refreshSwapUsd(side) {
-  const usdEl = $(`swap-${side}-usd`);
-  const amount = Number($(`swap-amount-${side === "from" ? "in" : "out"}`).value.trim());
-  if (!amount || !isFinite(amount)) { usdEl.textContent = ""; return; }
-  const price = await tokenUsdPrice(side);
-  usdEl.textContent = typeof price === "number" ? "≈ " + formatCurrency(amount * price) : "";
-}
-
-$("swap-from-max").addEventListener("click", async () => {
-  if (!swapFromBalanceWei) return;
-  let maxWei = ethers.BigNumber.from(swapFromBalanceWei);
-  if (!swapToken.from) {
-    // Native coin: leave room for gas -- filling the *entire* balance would
-    // leave nothing to actually pay for the swap's transaction(s).
-    try {
-      const res = await sendMsg("TM_SWAP_NATIVE_GAS_RESERVE");
-      const reserve = ethers.BigNumber.from(res.reserveWei);
-      maxWei = maxWei.gt(reserve) ? maxWei.sub(reserve) : ethers.BigNumber.from(0);
-    } catch (e) {
-      const fallbackReserve = ethers.utils.parseUnits("0.002", swapFromDecimals);
-      maxWei = maxWei.gt(fallbackReserve) ? maxWei.sub(fallbackReserve) : ethers.BigNumber.from(0);
-    }
-  }
-  $("swap-amount-in").value = ethers.utils.formatUnits(maxWei, swapFromDecimals);
-  refreshSwapUsd("from");
-  scheduleSwapQuote();
-});
-$("swap-amount-in").addEventListener("input", () => refreshSwapUsd("from"));
-
-// Auto-quoting -- debounced on every keystroke in the amount field, and
-// immediately whenever a token or the swap direction changes -- replacing
-// the old manual "Get quote" tap.
-let swapQuoteTimer = null;
-let swapQuoteSeq = 0; // guards a slow, now-stale request from landing after a newer one
-
-function scheduleSwapQuote() {
-  clearTimeout(swapQuoteTimer);
-  swapQuoteTimer = setTimeout(requestSwapQuote, 450);
-}
-
-async function requestSwapQuote() {
-  hideError("swap-error");
-  const amountStr = $("swap-amount-in").value.trim();
-  if (!amountStr || Number(amountStr) <= 0) {
-    $("swap-amount-out").value = "";
-    $("swap-to-usd").textContent = "";
-    $("swap-quote-display").classList.add("hidden");
-    $("swap-quote-loading").classList.add("hidden");
-    return;
-  }
-  const seq = ++swapQuoteSeq;
-  $("swap-quote-loading").classList.remove("hidden");
-  try {
-    const tokenIn = swapAddr("from");
-    const tokenOut = swapAddr("to");
-    const decimalsIn = swapDecimals("from");
-    const decimalsOut = swapDecimals("to");
-    const totalAmountInWei = ethers.utils.parseUnits(amountStr, decimalsIn);
-    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
-    if (seq !== swapQuoteSeq) return; // a newer keystroke already superseded this request
-
-    $("swap-amount-out").value = ethers.utils.formatUnits(quote.amountOutWei, decimalsOut);
-    refreshSwapUsd("to");
-
-    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeValueLine", {
-      percent: quote.feePercentLabel,
-      amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
-      symbol: swapSym("from"),
-    });
-
-    $("swap-quote-display").dataset.tokenIn = tokenIn;
-    $("swap-quote-display").dataset.tokenOut = tokenOut;
-    $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
-    $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
-    $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei;
-    $("swap-quote-display").dataset.decimalsIn = String(decimalsIn);
-    $("swap-quote-display").dataset.decimalsOut = String(decimalsOut);
-    renderSwapBreakdownDerived();
-
-    $("btn-swap-approve").classList.add("hidden");
-    if (tokenIn !== TM_NATIVE()) {
-      const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
-      if (seq !== swapQuoteSeq) return;
-      if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
-        $("btn-swap-approve").classList.remove("hidden");
-      }
-    }
-    $("swap-quote-display").classList.remove("hidden");
-  } catch (e) {
-    if (seq !== swapQuoteSeq) return;
-    $("swap-amount-out").value = "";
-    $("swap-quote-display").classList.add("hidden");
-    showError("swap-error", e.message);
-  } finally {
-    if (seq === swapQuoteSeq) $("swap-quote-loading").classList.add("hidden");
-  }
-}
-
-$("swap-amount-in").addEventListener("input", scheduleSwapQuote);
-
-// A clean rate/fee/slippage/minimum-received breakdown. Rate and
-// minimum-received are DERIVED from the last quote (never re-fetched), so
-// changing the slippage select updates the minimum instantly -- the same
-// basis-point math lib/swap.js's applySlippage uses on the signing side,
-// mirrored here so the number shown before confirming matches what the
-// transaction itself will actually enforce as amountOutMin.
-function renderSwapBreakdownDerived() {
-  const ds = $("swap-quote-display").dataset;
-  if (!ds.amountOutWei) return;
-  const decimalsIn = Number(ds.decimalsIn);
-  const decimalsOut = Number(ds.decimalsOut);
-  const netIn = Number(ethers.utils.formatUnits(ds.netAmountInWei, decimalsIn));
-  const out = Number(ethers.utils.formatUnits(ds.amountOutWei, decimalsOut));
-  const rate = netIn > 0 ? out / netIn : 0;
-  const rateText = rate ? Number(rate.toPrecision(6)).toString() : "0";
-  $("swap-rate-line").textContent = TM_I18N.t("swap.rateLine", { symIn: swapSym("from"), rate: rateText, symOut: swapSym("to") });
-
-  const slippageBps = Number($("swap-slippage").value);
-  const minWei = ethers.BigNumber.from(ds.amountOutWei).mul(10000 - slippageBps).div(10000);
-  $("swap-min-received-line").textContent = TM_I18N.t("swap.minReceivedValueLine", {
-    amount: ethers.utils.formatUnits(minWei, decimalsOut),
-    symbol: swapSym("to"),
-  });
-}
-$("swap-slippage").addEventListener("change", renderSwapBreakdownDerived);
-
-$("btn-swap-flip").addEventListener("click", () => {
-  const from = swapToken.from, to = swapToken.to;
-  swapToken.from = to;
-  swapToken.to = from;
-  renderSwapPill("from");
-  renderSwapPill("to");
-  const inVal = $("swap-amount-in").value;
-  $("swap-amount-in").value = $("swap-amount-out").value;
-  $("swap-amount-out").value = inVal;
-  refreshSwapFromBalance();
-  refreshSwapUsd("from");
-  refreshSwapUsd("to");
-  scheduleSwapQuote();
+["from", "to"].forEach((side) => {
+  $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
 });
 
 // ---- Coin screen
@@ -1559,28 +1212,10 @@ function coinStat(label, value) {
   return d;
 }
 
-// Sections of the (shared) coin-detail screen that only make sense for a
-// real, chartable crypto asset -- hidden entirely for a plain fiat currency
-// row (see openCurrencyDetail below) and always restored here so a real
-// coin opened afterwards looks exactly as it always has. coin-swap-card is
-// handled separately (openCurrencyDetail can still show it, just with only
-// the swap button, when a verified stablecoin exists for that currency).
-function setCoinDetailCryptoSectionsVisible(visible) {
-  ["coin-chart", "coin-chart-readout", "coin-ranges", "coin-stats-title", "coin-stats", "coin-about-title", "coin-cg-row"]
-    .forEach((id) => $(id).classList.toggle("hidden", !visible));
-}
-
 async function openCoinDetail(c, fromScreen) {
   const gen = ++coinDetail.gen;
   coinDetail.coin = c;
-  coinDetail.currency = null;
-  coinDetail.currencySwapAddress = null;
   coinDetail.swapTarget = null;
-  coinDetail.switchNetworkTarget = null;
-  coinDetail.prefillTokenAddress = null;
-  setCoinDetailCryptoSectionsVisible(true);
-  showCoinCashActions(currentCurrency);
-  $("coin-swap-card").classList.remove("hidden");
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
   $("coin-icon").innerHTML = tokenIconHtml(c.symbol, c.image);
@@ -1596,169 +1231,11 @@ async function openCoinDetail(c, fromScreen) {
   btn.disabled = true;
   $("coin-holding").classList.add("hidden");
   $("coin-swap-note").classList.add("hidden");
-  $("btn-coin-switch-network").classList.add("hidden");
-  $("btn-coin-add-token").classList.add("hidden");
   document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
   showScreen("screen-coin");
   loadCoinChart(gen);
   loadCoinInfo(gen);
   loadCoinSwapState(gen);
-}
-
-// A currency's "closest crypto equivalent" tag (shown on the Prices list
-// row) is purely informational -- most of those tickers turned out, on
-// direct verification, to have no real deployment this wallet's users could
-// actually trade into (wrong/legacy contract, unverified, or technically a
-// real token with ~$0 trading volume, i.e. abandoned). This table is the
-// much narrower subset actually offered as a SWAP target: a real,
-// source-verified contract on one of this wallet's supported chains, with
-// confirmed non-trivial trading activity at the time it was checked
-// (2026-09-21, cross-referenced against the issuer's own site, that chain's
-// block explorer, and CoinGecko/DexScreener/PancakeSwap for live volume --
-// same bar as KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN below). Deliberately leaves
-// out tGBP (real contract, ~$745 total pool, $0 24h volume), QCAD (no
-// verified+liquid deployment on any supported chain), AE Coin (no on-chain
-// token found at all -- a bank/app-based instrument, not a swappable
-// asset), and wARS (verified contracts on Ethereum/Base, but $0 24h volume
-// on both at check time) -- pointing someone at any of those would be
-// offering a swap that can't actually fill.
-const KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN = {
-  EUR: {
-    1: { address: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", symbol: "EURC" }, // Ethereum (Circle)
-    8453: { address: "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42", symbol: "EURC" }, // Base (Circle)
-  },
-  JPY: {
-    1: { address: "0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29", symbol: "JPYC" }, // Ethereum -- the current, bank-backed relaunch; NOT the older, thinly-traded "JPYC Prepaid" contract
-  },
-  AUD: {
-    1: { address: "0x4cce605ed955295432958d8951d0b176c10720d5", symbol: "AUDD" }, // Ethereum (Novatti)
-    8453: { address: "0x449B3317a6d1efb1Bc3ba0700C9EaA4FFFf4Ae65", symbol: "AUDD" }, // Base (Novatti)
-  },
-  BRL: {
-    137: { address: "0x4eD141110F6EEeAba9A1df36d8C26f684D2475Dc", symbol: "BRZ" }, // Polygon (Transfero) -- BRZ's real liquidity venue; its Ethereum contract is verified but effectively untraded ($0/24h)
-  },
-};
-
-// USD's stablecoin is USDC. Its contracts are the same verified, native Circle
-// deployments already listed in KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN, so USD reuses
-// that table instead of repeating the addresses here. Every other currency
-// uses KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN above.
-function knownStablecoinsFor(code) {
-  if (code === "USD") return KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN.USDC || {};
-  return KNOWN_STABLECOIN_BY_CURRENCY_AND_CHAIN[code] || {};
-}
-
-function fiatLabel(code) {
-  const info = TM_PRICES.SUPPORTED_CURRENCIES[String(code).toLowerCase()];
-  return info ? info.label : String(code).toUpperCase();
-}
-
-// Buy / Sell buttons shown under the swap card on every coin screen and every
-// currency screen. `fiatCode` is the currency the person is looking at (or,
-// for a coin, their display currency); it is carried into the Transak Buy and
-// Sell screens so the bank leg is in the right currency.
-function showCoinCashActions(fiatCode) {
-  coinDetail.fiat = fiatCode;
-  const label = fiatLabel(fiatCode);
-  $("btn-coin-buy").textContent = TM_I18N.t("coin.buyBtn", { currency: label });
-  $("btn-coin-sell").textContent = TM_I18N.t("coin.sellBtn", { currency: label });
-  const meta = ((currentStatus && currentStatus.accounts) || []).find((a) => a.address === currentStatus.selectedAddress);
-  $("btn-coin-sell").disabled = !!meta && meta.type === "watch"; // same gating as the main Sell button
-  $("coin-cash-actions").classList.remove("hidden");
-}
-
-// Re-applies the coin-swap-card's contents for whichever currency is
-// currently open (see openCurrencyDetail) -- pulled out on its own so the
-// "Switch to X to swap" button (shared with loadCoinSwapState above) can
-// re-run this after actually switching networks, the same way it re-runs
-// loadCoinSwapState for a real coin.
-function applyCurrencySwapState() {
-  const r = coinDetail.currency;
-  if (!r) return;
-  showCoinCashActions(String(r.code).toLowerCase());
-  coinDetail.currencySwapAddress = null;
-  coinDetail.switchNetworkTarget = null;
-  $("coin-holding").classList.add("hidden");
-  $("btn-coin-add-token").classList.add("hidden");
-  $("btn-coin-switch-network").classList.add("hidden");
-  const knownByChain = knownStablecoinsFor(r.code);
-  const known = currentNetwork ? knownByChain[currentNetwork.chainId] : null;
-  if (known) {
-    coinDetail.currencySwapAddress = known.address;
-    $("coin-swap-card").classList.remove("hidden");
-    const btn = $("btn-coin-swap");
-    btn.textContent = TM_I18N.t("coin.swapBtn", { symbol: known.symbol });
-    btn.disabled = false;
-    btn.classList.remove("hidden");
-    $("coin-swap-note").textContent = TM_I18N.t("prices.currencySwapNote", { stablecoin: known.symbol, currency: r.name });
-    $("coin-swap-note").classList.remove("hidden");
-    return;
-  }
-  // Not on the current network -- but if it's verified+liquid on some OTHER
-  // network this wallet already supports, offer switching there instead of
-  // just giving up, the same courtesy loadCoinSwapState gives a coin that's
-  // really some other network's native currency.
-  const elsewhereChainId = Object.keys(knownByChain).map(Number).find((cid) => (currentNetworks || []).some((n) => n.chainId === cid));
-  const elsewhereNet = elsewhereChainId ? currentNetworks.find((n) => n.chainId === elsewhereChainId) : null;
-  if (elsewhereNet) {
-    $("coin-swap-card").classList.remove("hidden");
-    $("btn-coin-swap").classList.add("hidden");
-    coinDetail.switchNetworkTarget = elsewhereNet;
-    $("coin-swap-note").textContent = TM_I18N.t("prices.currencySwapSwitchNetwork", {
-      stablecoin: knownByChain[elsewhereNet.chainId].symbol, currency: r.name, network: elsewhereNet.name,
-    });
-    $("coin-swap-note").classList.remove("hidden");
-    const switchBtn = $("btn-coin-switch-network");
-    switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: elsewhereNet.name });
-    switchBtn.classList.remove("hidden");
-    return;
-  }
-  // No verified, liquid token for this currency on any network this wallet
-  // supports. Rather than leave the currency with nothing to do, offer the
-  // closest thing that IS real and liquid: USDC, a US-dollar stablecoin, on
-  // the current network. The note says plainly that it's dollars, not the
-  // local currency; the Sell button below is the way out to a bank account.
-  const usdcHere = currentNetwork ? (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN.USDC || {})[currentNetwork.chainId] : null;
-  if (usdcHere && r.code !== "USD") {
-    coinDetail.currencySwapAddress = usdcHere.address;
-    $("coin-swap-card").classList.remove("hidden");
-    const fbBtn = $("btn-coin-swap");
-    fbBtn.textContent = TM_I18N.t("coin.swapBtn", { symbol: usdcHere.symbol });
-    fbBtn.disabled = false;
-    fbBtn.classList.remove("hidden");
-    $("coin-swap-note").textContent = TM_I18N.t("prices.currencyFallbackNote", { currency: r.name, code: r.code });
-    $("coin-swap-note").classList.remove("hidden");
-    return;
-  }
-  $("coin-swap-card").classList.add("hidden");
-}
-
-// A fiat currency (the "Currencies" tab) isn't a network asset -- there's
-// no chart history, market stats, or holding for it, so this reuses just
-// the header + price part of the coin-detail screen (opened the exact same
-// way a crypto row opens it) and hides those. Its "about" text mirrors the
-// closest-crypto-equivalent note already shown on the Prices list row (or
-// says plainly that none is tracked yet); the swap card below it, when
-// applyCurrencySwapState finds a real one to offer, is what actually lets
-// someone exchange into it rather than just reading about it.
-function openCurrencyDetail(r, fromScreen) {
-  coinDetail.gen++; // invalidate any in-flight real-coin chart/info/swap loads
-  coinDetail.coin = null;
-  coinDetail.currency = r;
-  setCoinDetailCryptoSectionsVisible(false);
-  $("coin-back").dataset.back = fromScreen || "screen-prices";
-  hideError("coin-error");
-  $("coin-icon").innerHTML = tokenIconHtml(r.code);
-  $("coin-name").textContent = r.name;
-  $("coin-symbol").textContent = r.code;
-  $("coin-rank").classList.add("hidden");
-  $("coin-price").textContent = TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true });
-  $("coin-change").classList.add("hidden");
-  $("coin-about").textContent = r.stablecoin
-    ? `${TM_I18N.t("prices.stablecoinTagTitle", { stablecoin: r.stablecoin, currency: r.name })}. ${TM_I18N.t("prices.stablecoinNote")}`
-    : TM_I18N.t("prices.noStablecoinYet", { currency: r.name });
-  applyCurrencySwapState();
-  showScreen("screen-coin");
 }
 
 async function loadCoinInfo(gen) {
@@ -1886,166 +1363,11 @@ document.querySelectorAll(".coin-range").forEach((b) => {
   });
 });
 
-// This wallet has no real Bitcoin-network support at all (Bitcoin's own
-// chain doesn't do smart contracts, so there's nothing to "switch to" the
-// way POL -> Polygon or BNB -> BSC works) -- BTC on the Prices screen is
-// informational only. But every network this wallet DOES support has one
-// single, dominant, verifiable <coin>-backed token already circulating on
-// it, so "+ Add token" can point straight at that instead of leaving
-// someone to go find a contract address themselves. Getting one of these
-// wrong would mean prefilling someone's wallet with the wrong token, so
-// each address below was checked directly against that chain's own block
-// explorer (name/symbol/decimals matching), cross-referenced with
-// CoinGecko/DexScreener for real trading liquidity (not just an existing
-// contract) -- not just recalled -- and picked for being the most
-// established/liquid option on that specific chain, not necessarily the
-// same brand everywhere (e.g. BSC's own BTCB long predates and outweighs
-// any bridged WBTC there; Base is Coinbase's own chain, so Coinbase's own
-// cbBTC/cbDOGE are the obvious picks over a bridged token of uncertain
-// provenance).
-//
-// Keyed by the coin's own symbol, then by chainId -- most coins here have
-// no entry at all for most chains, and that's expected: a chain only gets
-// listed once a real, actively-traded token for it turns up. Bitcoin has
-// one on every network this wallet supports; Dogecoin (checked 2026-09-21)
-// only has one on BSC (Binance-Peg) and Base (Coinbase's cbDOGE) -- every
-// "wrapped DOGE" found on Ethereum, Polygon, Arbitrum and Optimism turned
-// out to be abandoned, near-zero-liquidity, or tied to the defunct
-// Multichain/CelsiusX bridges, so those are deliberately left blank rather
-// than pointing someone at a token nobody can actually trade.
-const KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN = {
-  BTC: {
-    1: { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", symbol: "WBTC" }, // Ethereum
-    137: { address: "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6", symbol: "WBTC" }, // Polygon
-    42161: { address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", symbol: "WBTC" }, // Arbitrum
-    10: { address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095", symbol: "WBTC" }, // Optimism
-    56: { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", symbol: "BTCB" }, // BNB Smart Chain
-    8453: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC" }, // Base
-  },
-  DOGE: {
-    56: { address: "0xbA2aE424d960c26247Dd6c32edC70B295c744C43", symbol: "DOGE" }, // BNB Smart Chain (Binance-Peg)
-    8453: { address: "0xcbD06E5A2B0C65597161de254AA074E489dEb510", symbol: "cbDOGE" }, // Base (Coinbase)
-  },
-  // The rest of this table (checked 2026-09-21) extends the same coverage to
-  // every other coin in the price list. A few entries are a genuine, real
-  // first-party deployment of the coin itself (USDC/USDT/LINK/UNI/SHIB are
-  // often literally the same token on multiple chains, not a "wrapper"), so
-  // the swap-unavailable copy that calls this table "the network's own
-  // {symbol}-backed version" is a little imprecise for those -- it's still
-  // the correct, safe address, just not always a *wrapped* version.
-  USDT: {
-    1: { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", symbol: "USDT", native: true }, // Ethereum -- direct Tether issuance (tether.to/en/supported-protocols)
-    137: { address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", symbol: "USDT" }, // Polygon -- canonical PoS-bridge USDT, deep liquidity
-    56: { address: "0x55d398326f99059fF775485246999027B3197955", symbol: "BSC-USD" }, // BNB Smart Chain -- Binance-Peg; on-chain symbol is literally BSC-USD, not USDT
-    // Arbitrum, Optimism, Base: left blank. Arbitrum's old "USDT" contract has
-    // migrated to a different product (USD₮0); Optimism's bridged USDT
-    // carries an explicit on-chain disclaimer that it isn't issued or
-    // redeemable by Tether; no official/liquid Base deployment was found.
-  },
-  USDC: {
-    1: { address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", symbol: "USDC", native: true }, // Ethereum -- native Circle issuance
-    137: { address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", symbol: "USDC", native: true }, // Polygon -- native Circle issuance
-    42161: { address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", symbol: "USDC", native: true }, // Arbitrum -- native Circle issuance
-    10: { address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", symbol: "USDC", native: true }, // Optimism -- native Circle issuance
-    8453: { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", native: true }, // Base -- native Circle issuance
-    56: { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", symbol: "USDC" }, // BNB Smart Chain -- Circle doesn't issue here; this is Binance-Peg, same category as BTCB above
-    // developers.circle.com/stablecoins/usdc-contract-addresses for the 5 native ones.
-  },
-  LINK: {
-    1: { address: "0x514910771AF9Ca656af840dff83E8264EcF986CA", symbol: "LINK", native: true }, // Ethereum -- docs.chain.link
-    42161: { address: "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", symbol: "LINK", native: true }, // Arbitrum -- docs.chain.link
-    10: { address: "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6", symbol: "LINK", native: true }, // Optimism -- docs.chain.link
-    8453: { address: "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196", symbol: "LINK", native: true }, // Base -- docs.chain.link
-    // Polygon and BSC: Chainlink's own docs list a LINK address on each, but
-    // both have collapsed to near-zero on-chain liquidity. The addresses
-    // below are the ones actually carrying LINK's real trading volume there
-    // (Polygon's official bridge-mapped LINK; BSC's Binance-Peg LINK) --
-    // verified on their block explorers with a matching name/symbol, same
-    // bar as everything else here, just not the literal docs-table address.
-    137: { address: "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FAbAd39", symbol: "LINK" }, // Polygon (bridge-mapped, real liquidity)
-    56: { address: "0xf8A0BF9cF54Bb92F17374d9e9D321e6a11a51bd", symbol: "LINK" }, // BSC (Binance-Peg, real liquidity)
-  },
-  UNI: {
-    1: { address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", symbol: "UNI", native: true }, // Ethereum -- Uniswap's own default token list
-    137: { address: "0xb33EaAd8d922B1083446DC23f610c2567fB5180f", symbol: "UNI" }, // Polygon -- Uniswap's own default token list
-    42161: { address: "0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0", symbol: "UNI" }, // Arbitrum -- verified + real liquidity (not on Uniswap's own list)
-    8453: { address: "0xc3De830EA07524a0761646a6a4e4be0e114a3C83", symbol: "UNI" }, // Base -- Uniswap's own default token list
-    56: { address: "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1", symbol: "UNI" }, // BSC -- verified + real liquidity (not on Uniswap's own list)
-    // Optimism: the deployed UNI contract is real but its only pool is thin
-    // and an outlier low next to every other chain here -- excluded.
-  },
-  SHIB: {
-    1: { address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", symbol: "SHIB", native: true }, // Ethereum -- SHIB's native/original contract
-    56: { address: "0x2859e4544C4bB03966803b044A93563Bd2D0DD4D", symbol: "SHIB" }, // BNB Smart Chain -- Binance-Peg, real liquidity
-    // Polygon/Arbitrum/Optimism/Base: bridged SHIB candidates exist but are
-    // dead or unrelated copycat tokens -- excluded.
-  },
-  AVAX: {
-    56: { address: "0x1ce0C2827e2Ef14D5c4f29a091d735A204794041", symbol: "AVAX" }, // BNB Smart Chain -- Binance-Peg Avalanche, only chain with real liquidity
-  },
-  FIL: {
-    56: { address: "0x0D8Ce2A99Bb6e3B7Db580eD848240e4a0F9aE153", symbol: "FIL" }, // BNB Smart Chain -- Binance-Peg Filecoin, actively priced/traded
-    // Ethereum: checked 2026-09-21. Filecoin's own docs
-    // (docs.filecoin.io/build-on-filecoin/advanced/wrapped-fil) only give a
-    // canonical wFIL address on Filecoin's OWN network -- not one of this
-    // wallet's built-in chains, and not Ethereum. Multiple unrelated
-    // third-party "Wrapped Filecoin"/"eFIL" contracts exist on Ethereum with
-    // no official endorsement tying any one of them back to real FIL --
-    // same situation as XRP above, excluded rather than risk the wrong one.
-    // Polygon/Arbitrum/Optimism/Base: no candidate found with confirmed real
-    // liquidity -- left blank rather than guess.
-  },
-  XRP: {
-    56: { address: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dbe", symbol: "XRP" }, // BNB Smart Chain -- Binance-Peg XRP
-    8453: { address: "0xcb585250F852C6c6bf90434AB21A00f02833a4Af", symbol: "cbXRP" }, // Base -- Coinbase Wrapped XRP, 1:1 custody-backed
-    // Ethereum: multiple colliding "Wrapped XRP" tokens from different,
-    // unclear issuers found -- excluded rather than risk the wrong one.
-  },
-  TRX: {
-    56: { address: "0xCE7de646e7208a4Ef112cb6ed5038FA6cC6b12e3", symbol: "TRX" }, // BNB Smart Chain -- official Binance-Peg TRX (post-2023 contract swap; do not use the older TRXOLD address)
-  },
-  ADA: {
-    56: { address: "0x3EE2200Efb3400fAbB9AAcf31297cBdd1d435D47", symbol: "ADA" }, // BNB Smart Chain -- Binance-Peg Cardano
-    8453: { address: "0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c", symbol: "cbADA" }, // Base -- Coinbase Wrapped ADA, 1:1 custody-backed
-  },
-  SOL: {
-    1: { address: "0xD31a59c85aE9D8edEFeC411D448f90841571b89c", symbol: "SOL" }, // Ethereum -- Wormhole-bridged, verified + real liquidity
-    56: { address: "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF", symbol: "SOL" }, // BNB Smart Chain -- Binance-Peg SOL
-    // Polygon/Arbitrum/Optimism/Base: bridged SOL exists on each but every
-    // pool checked was dormant/near-zero volume -- excluded.
-  },
-  DOT: {
-    56: { address: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", symbol: "DOT" }, // BNB Smart Chain -- Binance-Peg Polkadot
-    // Ethereum: skip -- the only bridged-DOT pathway found there (Hyperbridge)
-    // was exploited in April 2026; not a safe recommendation right now.
-  },
-  LTC: {
-    56: { address: "0x4338665CBB7B2485A8855A139b75D5e34AB0DB94", symbol: "LTC" }, // BNB Smart Chain -- Binance-Peg Litecoin
-    8453: { address: "0xcb17C9Db87B595717C857a08468793f5bAb6445F", symbol: "cbLTC" }, // Base -- Coinbase Wrapped LTC, 1:1 custody-backed
-  },
-  TON: {
-    1: { address: "0x582d872A1B094FC48F5DE31D3B73F2D9be47def1", symbol: "TONCOIN" }, // Ethereum -- TON Foundation's own official EVM bridge
-    // BSC: the same official bridge token is deployed there too, but its
-    // liquidity is too thin (~$150K spread across dormant pools) -- excluded.
-  },
-};
-
 async function loadCoinSwapState(gen) {
   const c = coinDetail.coin;
   const btn = $("btn-coin-swap");
   const note = $("coin-swap-note");
   const showNote = (text) => { note.textContent = text; note.classList.remove("hidden"); };
-  // This can re-run on the same coin-detail screen (e.g. right after
-  // "Switch to Polygon to swap" changes currentNetwork), not just once on
-  // open -- so it has to reset the switch-network/add-token buttons back
-  // to hidden every time rather than only ever showing them, or a coin
-  // that becomes swappable after a switch would still show both as
-  // leftovers from the previous, unswappable state.
-  coinDetail.switchNetworkTarget = null;
-  coinDetail.prefillTokenAddress = null;
-  $("btn-coin-switch-network").classList.add("hidden");
-  $("btn-coin-add-token").classList.add("hidden");
-  $("btn-coin-add-token").textContent = TM_I18N.t("main.addTokenBtn");
   if (!currentNetwork || !currentStatus || !currentStatus.selectedAddress) {
     showNote(TM_I18N.t("coin.swapNeedsWallet"));
     return;
@@ -2059,83 +1381,7 @@ async function loadCoinSwapState(gen) {
   const want = normalizeCoinSymbol(c.symbol);
   const match = held.find((a) => normalizeCoinSymbol(a.symbol) === want);
   if (!match) {
-    // Very often the real fix isn't "add this as a token here" at all --
-    // it's that the coin being viewed is actually some OTHER network's
-    // own native coin (POL on Polygon, BNB on BSC, etc). Checking that
-    // first means someone looking at POL while on Ethereum Mainnet gets
-    // pointed straight at "switch to Polygon" instead of being left to
-    // guess why Add token doesn't feel right for a coin that isn't
-    // really an Ethereum token at all.
-    const nativeElsewhere = currentNetworks.find(
-      (n) => n.chainId !== currentNetwork.chainId && normalizeCoinSymbol(n.nativeCurrency.symbol) === want
-    );
-    if (nativeElsewhere) {
-      coinDetail.switchNetworkTarget = nativeElsewhere;
-      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetwork", { symbol: c.symbol, network: nativeElsewhere.name }));
-      const switchBtn = $("btn-coin-switch-network");
-      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: nativeElsewhere.name });
-      switchBtn.classList.remove("hidden");
-      // Still offered as a secondary option, in case what's actually meant
-      // is a bridged ERC-20 version of this coin on the CURRENT network
-      // rather than the real thing on its home network.
-      $("btn-coin-add-token").classList.remove("hidden");
-      return;
-    }
-    const knownToken = (KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {})[currentNetwork.chainId];
-    if (knownToken) {
-      // Most entries here are a genuinely different, wrapped/bridged token
-      // ("doesn't run on X itself, but here's the network's own version"),
-      // but a handful (USDC/USDT/LINK/UNI/SHIB on their real, first-party
-      // chains) are the literal coin itself, just not added to this wallet
-      // yet -- "doesn't run on Ethereum itself" would be simply false for
-      // real USDC on Ethereum. knownToken.native picks the accurate copy.
-      showNote(
-        knownToken.native
-          ? TM_I18N.t("coin.swapUnavailableAddNativeToken", { symbol: c.symbol, network: currentNetwork.name })
-          : TM_I18N.t("coin.swapUnavailableAddKnownToken", { symbol: c.symbol, network: currentNetwork.name, tokenSymbol: knownToken.symbol })
-      );
-      coinDetail.prefillTokenAddress = knownToken.address;
-      const addBtn = $("btn-coin-add-token");
-      addBtn.textContent = TM_I18N.t("coin.addKnownTokenBtn", { tokenSymbol: knownToken.symbol });
-      addBtn.classList.remove("hidden");
-      return;
-    }
-    // No verified address for this coin on the CURRENT network -- but one
-    // might still exist on some OTHER network this wallet supports (e.g.
-    // XRP has no safe Ethereum address, per the comment on XRP's entry
-    // above, but does have a Binance-Peg one on BNB Smart Chain). Rather
-    // than send someone to "+ Add token" with nothing safe to actually add,
-    // point them at the network where a verified version already exists --
-    // same "switch there" pattern as the native-coin case above. BNB Smart
-    // Chain is checked first when it's an option: this table's own coverage
-    // (checked 2026-09-21) shows the wallet has more verified entries there
-    // than on any other single chain, so it's the most likely to have this
-    // coin if any chain does.
-    const tokenEntries = KNOWN_TOKENS_BY_SYMBOL_AND_CHAIN[want] || {};
-    const elsewhereChainIds = Object.keys(tokenEntries)
-      .map(Number)
-      .filter((id) => id !== currentNetwork.chainId);
-    elsewhereChainIds.sort((a, b) => (a === 56 ? -1 : b === 56 ? 1 : 0));
-    const tokenElsewhereChainId = elsewhereChainIds.find((id) => currentNetworks.some((n) => n.chainId === id));
-    const tokenElsewhereNet = tokenElsewhereChainId
-      ? currentNetworks.find((n) => n.chainId === tokenElsewhereChainId)
-      : null;
-    if (tokenElsewhereNet) {
-      coinDetail.switchNetworkTarget = tokenElsewhereNet;
-      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetworkToken", { symbol: c.symbol, network: tokenElsewhereNet.name }));
-      const switchBtn = $("btn-coin-switch-network");
-      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: tokenElsewhereNet.name });
-      switchBtn.classList.remove("hidden");
-      // Still offered too, in case a different address on THIS network is
-      // actually what's meant.
-      $("btn-coin-add-token").classList.remove("hidden");
-      return;
-    }
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
-    // Not a dead end -- this is almost always the reason a coin shows as
-    // unswappable (see the note above), so put the fix one tap away instead
-    // of making the person go find "+ Add token" back on the main screen.
-    $("btn-coin-add-token").classList.remove("hidden");
     return;
   }
   coinDetail.swapTarget = match;
@@ -2152,49 +1398,10 @@ async function loadCoinSwapState(gen) {
 }
 
 $("btn-coin-swap").addEventListener("click", () => {
-  if (coinDetail.currencySwapAddress) {
-    setupSwapScreen({ toCustomAddress: coinDetail.currencySwapAddress });
-    showScreen("screen-swap");
-    return;
-  }
   const m = coinDetail.swapTarget;
   if (!m) return;
   setupSwapScreen({ toKey: m.key });
   showScreen("screen-swap");
-});
-
-$("btn-coin-buy").addEventListener("click", () => {
-  setupBuyScreen(coinDetail.fiat);
-  showScreen("screen-buy");
-});
-
-$("btn-coin-sell").addEventListener("click", () => {
-  setupSellScreen(coinDetail.fiat);
-  showScreen("screen-sell");
-});
-
-$("btn-coin-add-token").addEventListener("click", () => {
-  resetAddTokenScreen(coinDetail.prefillTokenAddress || undefined);
-  showScreen("screen-add-token");
-});
-
-$("btn-coin-switch-network").addEventListener("click", async () => {
-  const net = coinDetail.switchNetworkTarget;
-  if (!net) return;
-  const btn = $("btn-coin-switch-network");
-  btn.disabled = true;
-  try {
-    await sendMsg("TM_SELECT_NETWORK", { chainId: net.chainId });
-    await refreshMain(); // same call the main screen's own network picker uses
-    // Re-run whichever availability check applies -- a real coin's swap
-    // state, or a currency's swap-into-its-stablecoin state -- now that
-    // currentNetwork has changed. Exactly one of these is ever active,
-    // since openCoinDetail/openCurrencyDetail each clear the other's state.
-    if (coinDetail.coin) loadCoinSwapState(coinDetail.gen);
-    else if (coinDetail.currency) applyCurrencySwapState();
-  } finally {
-    btn.disabled = false;
-  }
 });
 
 // Compact live-prices card on the main screen -- just the first handful of
@@ -2227,10 +1434,7 @@ function formatMarketVolume(v) {
   return `$${Math.round(v)}`;
 }
 
-// `compact` skips the "Bet on Polymarket" link -- used for the 3-row
-// main-dashboard card, which already has its own "See all" link into the
-// full screen-predictions list where the real link lives, one tap away.
-function renderMarketRow(m, { compact = false } = {}) {
+function renderMarketRow(m) {
   const row = document.createElement("div");
   row.className = "market-row";
   let metaHtml = "";
@@ -2243,16 +1447,7 @@ function renderMarketRow(m, { compact = false } = {}) {
   row.innerHTML = `
     <span class="market-question">${m.question}</span>
     <span class="market-meta">${metaHtml}</span>
-    ${compact ? "" : `<button type="button" class="link market-open-link">${TM_I18N.t("predictions.openOnPolymarket")}</button>`}
   `;
-  if (!compact) {
-    row.querySelector(".market-open-link").addEventListener("click", () => {
-      // Opens Polymarket's own site in a new tab -- this wallet never places
-      // the bet itself. Polymarket's own page enforces Polymarket's own
-      // location/eligibility restrictions, same as visiting it directly.
-      window.open(TM_POLYMARKET.buildMarketUrl(m), "_blank", "noopener,noreferrer");
-    });
-  }
   return row;
 }
 
@@ -2290,7 +1485,7 @@ async function refreshMainPredictionsCard() {
     if (!markets.length) {
       list.innerHTML = `<div class="market-row skeleton">${TM_I18N.t("predictions.empty")}</div>`;
     } else {
-      markets.forEach((m) => list.appendChild(renderMarketRow(m, { compact: true })));
+      markets.forEach((m) => list.appendChild(renderMarketRow(m)));
     }
   } catch (e) {
     list.innerHTML = `<div class="market-row skeleton">${TM_I18N.t("predictions.cardUnavailable")}</div>`;
@@ -2298,243 +1493,76 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Transak is the primary Buy provider (it replaced MoonPay, which declined
-// Token Exchange's business application). Coinbase Onramp and Onramper are
-// independent alternatives; each shows depending on what's
-// configured/supported. Transak and Coinbase open in a new tab; Onramper
-// shares this screen's iframe (below). See lib/transak-config.js.
-// The fiat currency a Buy widget should open in: whatever the person was
-// looking at (a currency or coin screen), else their display currency.
-let buyFiat = null;
-function setupBuyScreen(fiatCode) {
-  buyFiat = fiatCode || currentCurrency;
+// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
+// of opening a new tab -- see lib/buy-config.js's header comment for why
+// that's safe. Each time the screen is (re)opened, this resets back to the
+// "not loaded yet" state: description text, address row and Continue
+// button visible, iframe hidden -- ready for a fresh click.
+function setupBuyScreen() {
   hideError("buy-error");
+  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+  $("buy-description-manual").classList.remove("hidden");
+  $("buy-description-autofill").classList.add("hidden");
+  $("buy-address-row").classList.remove("hidden");
+  $("btn-buy-open").classList.remove("hidden");
   $("buy-frame-wrap").classList.add("hidden");
   $("buy-frame").src = "about:blank";
-  // Coinbase Onramp -- see lib/coinbase-onramp-config.js's header comment.
-  // Only shown for networks Coinbase is confirmed to support; hidden
-  // entirely otherwise rather than showing a button that would just error.
-  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
-  $("btn-buy-coinbase").classList.toggle("hidden", !coinbaseSupported);
-  $("buy-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
-  $("btn-buy-coinbase").disabled = false;
-  // Onramper -- an aggregator covering 20+ underlying providers. See
-  // lib/onramper-config.js's header comment for why it needs no signing
-  // backend and so isn't network-gated the way Coinbase is above:
-  // Onramper's own widget handles network/asset selection, so it's simply
-  // muted until an API key is configured.
-  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
-  $("btn-buy-onramper").classList.toggle("hidden", !onramperLive);
-  $("buy-onramper-note").classList.toggle("hidden", !onramperLive);
-  $("btn-buy-onramper").disabled = false;
-  // Transak works on every network (its own screen handles network/asset
-  // choice), so it is always offered and the "nothing configured" note
-  // below never applies.
-  $("btn-buy-transak").classList.remove("hidden");
-  $("buy-transak-note").classList.remove("hidden");
-  $("btn-buy-transak").disabled = false;
-  $("buy-none-note").classList.add("hidden");
 }
 
-$("btn-buy-transak").addEventListener("click", async () => {
-  hideError("buy-error");
-  const btn = $("btn-buy-transak");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    // Single-use link -- fetched fresh on every click, opened in a new tab.
-    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, buyFiat);
-    window.open(url, "_blank", "noopener,noreferrer");
-  } catch (e) {
-    showError("buy-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-buy-coinbase").addEventListener("click", async () => {
-  hideError("buy-error");
-  const btn = $("btn-buy-coinbase");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOnrampUrl(currentNetwork.key, address);
-    window.open(url, "_blank", "noopener,noreferrer");
-  } catch (e) {
-    showError("buy-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-buy-onramper").addEventListener("click", () => {
-  hideError("buy-error");
-  const btn = $("btn-buy-onramper");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    // Onramper's widget loads fine with the address in the URL directly --
-    // no signing backend needed (see lib/onramper-config.js) -- so this
-    // embeds straight into the same shared iframe,
-    // rather than opening a new tab like Coinbase.
-    const url = TM_ONRAMPER_CONFIG.buildOnramperBuyUrl(currentNetwork.key, address, buyFiat);
-    $("buy-frame").src = url;
-    $("buy-frame-wrap").classList.remove("hidden");
-    $("btn-buy-onramper").classList.add("hidden");
-    $("btn-buy-coinbase").classList.add("hidden");
-    $("btn-buy-transak").classList.add("hidden");
-    $("buy-transak-note").classList.add("hidden");
-  } catch (e) {
-    showError("buy-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
+$("btn-buy-copy-address").addEventListener("click", () => {
+  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
 });
 
 $("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 
+$("btn-buy-open").addEventListener("click", async () => {
+  hideError("buy-error");
+  const btn = $("btn-buy-open");
+  btn.disabled = true;
+  try {
+    // Try for a signed URL with the address already filled in first (see
+    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
+    // manual "paste your address" flow) if that backend isn't configured
+    // or can't be reached. Either way this always embeds in the iframe
+    // below rather than opening a new tab.
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
+    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    $("buy-frame").src = url;
+    $("buy-frame-wrap").classList.remove("hidden");
+    btn.classList.add("hidden");
+    if (signedUrl) {
+      $("buy-description-manual").classList.add("hidden");
+      $("buy-description-autofill").classList.remove("hidden");
+      $("buy-address-row").classList.add("hidden");
+    }
+  } catch (e) {
+    showError("buy-error", e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // ---------------------------------------------------------------- SELL
-// Transak is the primary Sell provider, same as Buy above; Coinbase Offramp
-// and Onramper are independent alternatives.
-// The fiat currency a Sell widget should pay out in: whatever the person
-// was looking at (a currency or coin screen), else their display currency.
-let sellFiat = null;
-function setupSellScreen(fiatCode) {
-  sellFiat = fiatCode || currentCurrency;
+// Same embedding change as Buy -- see lib/sell-config.js's header comment
+// for why there's no address to auto-fill here.
+function setupSellScreen() {
   hideError("sell-error");
-  hideError("sell-deposit-error");
+  $("btn-sell-open").classList.remove("hidden");
   $("sell-frame-wrap").classList.add("hidden");
   $("sell-frame").src = "about:blank";
-  $("sell-send-helper").classList.add("hidden");
-  $("sell-deposit-address").value = "";
-  $("sell-deposit-amount").value = "";
-  // Coinbase Offramp -- see lib/coinbase-onramp-config.js's header comment
-  // for the two-step flow (open Coinbase in a tab, then come back and
-  // fetch the deposit details). Same network-support gating as Buy.
-  const coinbaseSupported = currentNetwork && TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(currentNetwork.key);
-  $("btn-sell-coinbase").classList.toggle("hidden", !coinbaseSupported);
-  $("sell-coinbase-note").classList.toggle("hidden", !coinbaseSupported);
-  $("btn-sell-coinbase-check").classList.add("hidden");
-  $("btn-sell-coinbase").disabled = false;
-  $("btn-sell-coinbase-check").disabled = false;
-  // Transak Sell -- always offered (see Buy above); the person pastes the
-  // deposit address Transak gives them into the step-2 helper below.
-  $("btn-sell-transak").classList.remove("hidden");
-  $("sell-transak-note").classList.remove("hidden");
-  $("btn-sell-transak").disabled = false;
-  // Onramper Sell -- same muting-until-configured pattern as Buy above.
-  const onramperLive = TM_ONRAMPER_CONFIG.isOnramperLive();
-  $("btn-sell-onramper").classList.toggle("hidden", !onramperLive);
-  $("sell-onramper-note").classList.toggle("hidden", !onramperLive);
-  $("btn-sell-onramper").disabled = false;
-  $("sell-none-note").classList.add("hidden");
 }
 
-$("btn-sell-transak").addEventListener("click", async () => {
-  hideError("sell-error");
-  const btn = $("btn-sell-transak");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, sellFiat || currentCurrency);
-    window.open(url, "_blank", "noopener,noreferrer");
-    // Same "paste the deposit address -> Review in Send" step Onramper's
-    // Sell uses: Transak shows the deposit address on its own page.
-    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
-    $("sell-send-helper").classList.remove("hidden");
-  } catch (e) {
-    showError("sell-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-sell-onramper").addEventListener("click", () => {
+$("btn-sell-open").addEventListener("click", () => {
   hideError("sell-error");
   try {
-    const url = TM_ONRAMPER_CONFIG.buildOnramperSellUrl(sellFiat || currentCurrency);
+    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
     $("sell-frame").src = url;
     $("sell-frame-wrap").classList.remove("hidden");
-    $("btn-sell-onramper").classList.add("hidden");
-    $("btn-sell-coinbase").classList.add("hidden");
-    $("btn-sell-transak").classList.add("hidden");
-    $("sell-transak-note").classList.add("hidden");
-    // Same "paste the deposit address Onramper gives you -> Review in
-    // Send" step as Transak's Sell flow -- see lib/onramper-config.js's
-    // buildOnramperSellUrl() comment for why there's nothing to
-    // auto-fill here.
-    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
-    $("sell-send-helper").classList.remove("hidden");
+    $("btn-sell-open").classList.add("hidden");
   } catch (e) {
     showError("sell-error", e.message);
   }
-});
-
-$("btn-sell-coinbase").addEventListener("click", async () => {
-  hideError("sell-error");
-  const btn = $("btn-sell-coinbase");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_COINBASE_ONRAMP_CONFIG.buildCoinbaseOfframpUrl(currentNetwork.key, address);
-    window.open(url, "_blank", "noopener,noreferrer");
-    // Now that a sell session exists, reveal the "I've finished -- get my
-    // deposit details" step. Coinbase's own page is where the person
-    // actually picks an asset/amount and completes the sell; this wallet
-    // only fetches what to send afterwards (see the click handler below).
-    $("btn-sell-coinbase-check").classList.remove("hidden");
-  } catch (e) {
-    showError("sell-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-sell-coinbase-check").addEventListener("click", async () => {
-  hideError("sell-error");
-  const btn = $("btn-sell-coinbase-check");
-  btn.disabled = true;
-  try {
-    const tx = await TM_COINBASE_ONRAMP_CONFIG.checkCoinbaseOfframpStatus();
-    if (!tx) {
-      showError("sell-error", TM_I18N.t("sell.coinbaseNotReady"));
-      return;
-    }
-    // Same "paste deposit details -> Review in Send" UI as Transak's Sell
-    // flow uses, just filled in for us instead of pasted by hand -- the
-    // Send screen's own review/confirm step still runs either way.
-    $("sell-deposit-address").value = tx.toAddress || "";
-    $("sell-deposit-amount").value = tx.amount || "";
-    $("sell-network-hint").textContent = TM_I18N.t("sell.networkHint", { network: currentNetwork.name });
-    $("sell-send-helper").classList.remove("hidden");
-  } catch (e) {
-    showError("sell-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-sell-to-send").addEventListener("click", () => {
-  hideError("sell-deposit-error");
-  const addr = $("sell-deposit-address").value.trim();
-  const amt = $("sell-deposit-amount").value.trim();
-  if (!ethers.utils.isAddress(addr)) {
-    showError("sell-deposit-error", TM_I18N.t("sell.invalidAddress"));
-    return;
-  }
-  if (amt && !(Number(amt) > 0)) {
-    showError("sell-deposit-error", TM_I18N.t("sell.invalidAmount"));
-    return;
-  }
-  // Prefill only. The Send screen's own review/confirm step (and the
-  // sanctions check) still run, so nothing leaves the wallet unreviewed.
-  $("send-to").value = addr;
-  $("send-to").dispatchEvent(new Event("input"));
-  $("send-amount").value = amt;
-  $("send-amount").dispatchEvent(new Event("input"));
-  setSendSpeed("standard");
-  showScreen("screen-send");
-  refreshSendFeePreview();
 });
 
 // ---------------------------------------------------------------- SETTINGS
@@ -2542,7 +1570,6 @@ $("btn-add-account").addEventListener("click", async () => {
   try {
     await sendMsg("TM_ADD_ACCOUNT", {});
     await refreshMain();
-    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) { alert(friendlyErrorMessage(e.message)); }
 });
 $("btn-goto-import-key").addEventListener("click", () => showScreen("screen-import-key"));
@@ -2572,7 +1599,6 @@ $("btn-import-key-submit").addEventListener("click", async () => {
     await sendMsg("TM_IMPORT_PRIVATE_KEY", { privateKey: $("import-key-input").value });
     await refreshMain();
     showScreen("screen-main");
-    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) {
     showError("import-key-error", e.message);
   }
@@ -2586,7 +1612,6 @@ $("btn-add-watch-submit").addEventListener("click", async () => {
     $("add-watch-label").value = "";
     await refreshMain();
     showScreen("screen-main");
-    window.TM_ACCOUNT_UI?.autoSync();
   } catch (e) {
     showError("add-watch-error", e.message);
   }
@@ -3128,50 +2153,63 @@ function setupSwapScreen(pre) {
   hideError("swap-error");
   $("swap-status").classList.add("hidden");
   $("swap-quote-display").classList.add("hidden");
-  $("swap-quote-loading").classList.add("hidden");
   const unsupported = !currentNetwork.swapRouter;
   $("swap-unsupported").classList.toggle("hidden", !unsupported);
   $("swap-form").classList.toggle("hidden", unsupported);
-  if (unsupported) return;
-
-  swapToken = { from: null, to: null };
-  $("swap-amount-in").value = "";
-  $("swap-amount-out").value = "";
-  $("swap-from-usd").textContent = "";
-  $("swap-to-usd").textContent = "";
-  $("swap-from-balance").textContent = "";
-  renderSwapPill("from");
-  renderSwapPill("to");
-  refreshSwapFromBalance();
-  applySwapPrefill(pre || {});
+  if (!unsupported) populateSwapSelects(pre || {}).catch(() => {});
 }
 
-// Pre-selects the "To" side when arriving from a coin/currency detail
-// screen's "Swap into X" button (see openCurrencyDetail/openCoinDetail).
-// `toCustomAddress` is a verified contract address that isn't necessarily
-// one of the person's held assets yet (e.g. a currency's paired
-// stablecoin); `toKey` is one of the person's own held assets, looked up
-// the same way the token picker itself lists them.
-async function applySwapPrefill(pre) {
+$("btn-swap-quote").addEventListener("click", async () => {
+  hideError("swap-error");
   try {
-    if (pre.toCustomAddress) {
-      const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: pre.toCustomAddress });
-      swapToken.to = { address: ethers.utils.getAddress(pre.toCustomAddress), symbol: info.symbol, decimals: info.decimals, name: info.name || "" };
-      renderSwapPill("to");
-      refreshSwapUsd("to");
-      return;
+    const tokenIn = $("swap-from-custom").value.trim() || TM_NATIVE();
+    const tokenOut = $("swap-to-custom").value.trim() || TM_NATIVE();
+    const amountStr = $("swap-amount-in").value.trim();
+    let decimalsIn = 18;
+    if (tokenIn !== TM_NATIVE()) {
+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenIn });
+      decimalsIn = info.decimals;
     }
-    if (pre.toKey && pre.toKey !== "native") {
-      const held = await getHeldAssets();
-      const match = held.find((a) => a.key === pre.toKey);
-      if (match) {
-        swapToken.to = { address: match.address, symbol: match.symbol, decimals: match.decimals, name: "" };
-        renderSwapPill("to");
-        refreshSwapUsd("to");
+    // This is the TOTAL amount the user is putting in -- the app fee comes
+    // off the top of this before anything is swapped (see TM_SWAP_QUOTE in
+    // background.js / lib/fee-config.js).
+    const totalAmountInWei = ethers.utils.parseUnits(amountStr || "0", decimalsIn);
+    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
+
+    let decimalsOut = 18;
+    if (tokenOut !== TM_NATIVE()) {
+      const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenOut });
+      decimalsOut = info.decimals;
+    }
+    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
+      percent: quote.feePercentLabel,
+      amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
+    });
+    $("swap-net-line").textContent = TM_I18N.t("swap.netAmountLine", {
+      amount: ethers.utils.formatUnits(quote.netAmountInWei, decimalsIn),
+    });
+    $("swap-quote-line").textContent = TM_I18N.t("swap.estimatedOutLine", {
+      amount: ethers.utils.formatUnits(quote.amountOutWei, decimalsOut),
+    });
+    $("swap-quote-display").dataset.tokenIn = tokenIn;
+    $("swap-quote-display").dataset.tokenOut = tokenOut;
+    $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
+    $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
+
+    // Router allowance only ever needs to cover the NET amount -- the fee
+    // portion moves as a separate plain transfer, never through the router.
+    $("btn-swap-approve").classList.add("hidden");
+    if (tokenIn !== TM_NATIVE()) {
+      const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
+      if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
+        $("btn-swap-approve").classList.remove("hidden");
       }
     }
-  } catch (e) { /* best-effort -- the picker still lets them pick manually */ }
-}
+    $("swap-quote-display").classList.remove("hidden");
+  } catch (e) {
+    showError("swap-error", e.message);
+  }
+});
 
 $("btn-swap-approve").addEventListener("click", async () => {
   hideError("swap-error");
@@ -3229,14 +2267,6 @@ async function initApprovalFlow(requestId) {
       } catch (e) {
         showError("approve-unlock-error", e.message);
       }
-    });
-    // Previously there was no way out of this screen at all -- unlock or be
-    // stuck, even if the site you didn't recognize just popped this dialog
-    // unprompted. This properly rejects the pending request (same as every
-    // other approve screen's reject button) rather than leaving the dapp's
-    // request hanging.
-    $("btn-approve-unlock-cancel").addEventListener("click", () => {
-      respondApproval(requestId, false, null, "User rejected -- wallet was locked.");
     });
     return;
   }
@@ -3467,101 +2497,30 @@ $("support-input").addEventListener("keydown", (e) => {
 // not a claim that the language belongs to only that place (there's no
 // single flag for Arabic or English) -- this is the same convention almost
 // every app's language picker uses, just to make the list scannable.
-//
-// This used to be a plain <select> with a Unicode flag-emoji character
-// (Regional Indicator Symbol pairs) prepended to each option's text. That
-// works fine in the app's own rendered text, but a native <select>'s
-// dropdown popup is drawn by the OS/browser, not by us -- and a lot of
-// Android devices ship without the color-emoji flag glyphs installed, so
-// the popup falls back to showing the two raw letters ("US", "ES", ...)
-// instead of a flag picture, which is exactly the confusing thing a flag
-// was supposed to avoid. Real <img> flags fix that everywhere, but a
-// native <option> can't contain an <img> in any browser -- so each
-// ".language-select" element is progressively enhanced here into a small
-// custom dropdown (a button showing the current flag+name, and a listbox
-// of flag+name rows) while the original <select> stays in the DOM, hidden,
-// purely as the value-holder every other bit of code already reads/writes.
+const TM_LANGUAGE_FLAGS = {
+  en: "\u{1F1FA}\u{1F1F8}", // English -> US
+  ar: "\u{1F1F8}\u{1F1E6}", // Arabic -> Saudi Arabia
+  zh: "\u{1F1E8}\u{1F1F3}", // Chinese (Simplified) -> China
+  es: "\u{1F1EA}\u{1F1F8}", // Spanish -> Spain
+  fr: "\u{1F1EB}\u{1F1F7}", // French -> France
+  hi: "\u{1F1EE}\u{1F1F3}", // Hindi -> India
+  pt: "\u{1F1F5}\u{1F1F9}", // Portuguese -> Portugal
+  ja: "\u{1F1EF}\u{1F1F5}", // Japanese -> Japan
+  ru: "\u{1F1F7}\u{1F1FA}", // Russian -> Russia
+};
+
 function populateLanguageSelects() {
   document.querySelectorAll(".language-select").forEach((sel) => {
-    let wrap = sel.parentNode.classList && sel.parentNode.classList.contains("lang-picker") ? sel.parentNode : null;
-    let trigger, list;
-
-    if (!wrap) {
-      wrap = document.createElement("span");
-      wrap.className = "lang-picker";
-      sel.parentNode.insertBefore(wrap, sel);
-      wrap.appendChild(sel);
-
-      // Move the select's id (e.g. "language-select-header") onto the
-      // trigger so any CSS or labeling keyed off that id keeps applying to
-      // the thing that's actually visible now.
-      trigger = document.createElement("button");
-      trigger.type = "button";
-      if (sel.id) { trigger.id = sel.id; sel.removeAttribute("id"); }
-      if (sel.title) trigger.title = sel.title;
-      if (sel.getAttribute("aria-label")) trigger.setAttribute("aria-label", sel.getAttribute("aria-label"));
-      trigger.className = "lang-picker-trigger";
-      trigger.innerHTML = '<img class="lang-flag" alt="" /><span class="lang-name"></span><span class="lang-caret" aria-hidden="true">▾</span>';
-      wrap.appendChild(trigger);
-
-      sel.classList.add("lang-picker-native-hidden");
-      sel.setAttribute("tabindex", "-1");
-      sel.setAttribute("aria-hidden", "true");
-
-      list = document.createElement("ul");
-      list.className = "lang-picker-list hidden";
-      list.setAttribute("role", "listbox");
-      wrap.appendChild(list);
-
-      trigger.addEventListener("click", () => {
-        const willOpen = list.classList.contains("hidden");
-        document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
-        if (willOpen) list.classList.remove("hidden");
-      });
-      if (!document.body.dataset.langPickerOutsideClick) {
-        document.body.dataset.langPickerOutsideClick = "1";
-        document.addEventListener("click", (e) => {
-          if (!e.target.closest(".lang-picker")) {
-            document.querySelectorAll(".lang-picker-list").forEach((l) => l.classList.add("hidden"));
-          }
-        });
-      }
-    } else {
-      trigger = wrap.querySelector(".lang-picker-trigger");
-      list = wrap.querySelector(".lang-picker-list");
-    }
-
-    const updateTrigger = (code) => {
-      const lang = TM_I18N.LANGS.find((l) => l.code === code) || TM_I18N.LANGS[0];
-      trigger.querySelector(".lang-flag").src = `img/flag-${lang.code}.svg`;
-      trigger.querySelector(".lang-name").textContent = lang.name;
-      list.querySelectorAll(".lang-picker-item").forEach((it) => it.classList.toggle("active", it.dataset.code === lang.code));
-    };
-
     sel.innerHTML = "";
-    list.innerHTML = "";
     TM_I18N.LANGS.forEach((lang) => {
       const opt = document.createElement("option");
       opt.value = lang.code;
-      opt.textContent = lang.name;
+      const flag = TM_LANGUAGE_FLAGS[lang.code];
+      opt.textContent = flag ? `${flag} ${lang.name}` : lang.name;
       sel.appendChild(opt);
-
-      const item = document.createElement("li");
-      item.className = "lang-picker-item";
-      item.setAttribute("role", "option");
-      item.dataset.code = lang.code;
-      item.innerHTML = `<img class="lang-flag" src="img/flag-${lang.code}.svg" alt="" /><span>${lang.name}</span>`;
-      item.addEventListener("click", () => {
-        sel.value = lang.code;
-        TM_I18N.setLanguage(lang.code);
-        updateTrigger(lang.code);
-        list.classList.add("hidden");
-      });
-      list.appendChild(item);
     });
-
     sel.value = TM_I18N.getLanguage();
-    updateTrigger(sel.value);
+    sel.addEventListener("change", (e) => TM_I18N.setLanguage(e.target.value));
   });
 }
 
@@ -3605,13 +2564,7 @@ document.addEventListener("tm-language-changed", () => {
     const netSel = $("network-select");
     Array.from(netSel.options).forEach((opt) => {
       const n = currentNetworks.find((net) => String(net.chainId) === opt.value);
-      if (n) {
-        const coinbaseCashOut = TM_COINBASE_ONRAMP_CONFIG.isCoinbaseOnrampSupportedNetwork(n.key);
-        opt.textContent =
-          n.name +
-          (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix")) +
-          (coinbaseCashOut ? TM_I18N.t("network.coinbaseCashOutSuffix") : "");
-      }
+      if (n) opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
     });
   }
   if ($("support-chips") && $("support-chips").children.length) renderSupportChips();
@@ -4114,16 +3067,7 @@ function renderActivity() {
   }
 
   showScreen("screen-loading");
-  let status;
-  try {
-    status = await withTimeout(sendMsg("TM_GET_STATUS"), 8000);
-  } catch (e) {
-    $("loading-text").classList.add("hidden");
-    $("loading-spinner").classList.add("hidden");
-    $("loading-stuck").classList.remove("hidden");
-    $("btn-loading-retry").addEventListener("click", () => location.reload());
-    return;
-  }
+  const status = await sendMsg("TM_GET_STATUS");
   if (!status.hasVault) {
     showScreen("screen-onboarding");
     activateSplashLanding();
