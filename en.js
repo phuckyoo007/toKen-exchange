@@ -142,6 +142,8 @@
     "buy.continueBtn": "Continue to MoonPay",
 
     "sell.title": "Sell for cash",
+    "sell.comingSoonChip": "Coming soon",
+    "sell.comingSoonBodyHtml": "Cashing out straight from Token Exchange isn't live yet -- we're finishing that up. In the meantime, use <strong>Swap</strong> to move into a stablecoin, or send to an exchange you already use to cash out.",
     "sell.description1": "Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
     "sell.description2": "MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.",
     "sell.description3Html": "Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.",

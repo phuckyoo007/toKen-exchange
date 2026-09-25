@@ -148,6 +148,15 @@ body {
 @media (prefers-color-scheme: light) {
   #app::before { background-image: url(img/card-watermark-light.jpg); }
 }
+/* splash-light.jpg already has "TOKEN EXCHANGE" painted into the artwork
+   itself (twice, in fact -- a badge plus a hologram-style repeat) near
+   the same top edge #splash-brand sits at. Pairing the dark-mode splash
+   (which has no baked-in wordmark) with this DOM badge made sense; doing
+   the same for the light-mode image just stacks a third redundant label
+   on top. Hide the DOM badge only for the light variant. */
+@media (prefers-color-scheme: light) {
+  #splash-brand { display: none; }
+}
 
 /* ---------------- splash screen ----------------
    Shown for a brief moment every time the popup opens, before the
@@ -1321,18 +1330,28 @@ body.tm-web-wallet #app {
    tagline floating just below it on the page background. On an actual
    phone-width screen (the media query below) it goes back to filling
    the whole viewport, same as #app does there -- there's no "desk"
-   around it to show on a real phone screen anyway. */
+   around it to show on a real phone screen anyway.
+   Anchored to top:32px (not viewport-centered) to match #app's own
+   position exactly -- #app is a top-aligned flex child of body's
+   "padding: 32px 12px" / "align-items: flex-start" (see above), so a
+   viewport-centered splash (the old top:50%/translate(-50%,-50%)) only
+   coincided with #app on short windows. On anything taller than about
+   704px the two landed at different heights, leaving whatever screen
+   was underneath #app (onboarding/unlock) visible at the same time as
+   the splash -- a real "two screens at once" bug, not a look anyone
+   wanted. Matching #app's own top offset keeps them stacked exactly,
+   at any viewport height. */
 body.tm-web-wallet #splash-screen {
   position: fixed;
-  top: 50%;
+  top: 32px;
   left: 50%;
   right: auto;
   bottom: auto;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 390px;
   height: 640px;
   max-width: calc(100% - 24px);
-  max-height: calc(100vh - 24px);
+  max-height: calc(100vh - 64px);
   border-radius: 20px;
   border: 2px solid var(--gold-deep);
   box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
@@ -1340,7 +1359,7 @@ body.tm-web-wallet #splash-screen {
 body.tm-web-wallet #splash-tagline {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   position: fixed; z-index: 999;
-  left: 50%; top: calc(50% + 320px + 18px);
+  left: 50%; top: calc(32px + 640px + 18px);
   transform: translateX(-50%);
   color: var(--text-faint); font-size: 12px; letter-spacing: 0.02em;
   white-space: nowrap;
