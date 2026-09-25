@@ -1196,8 +1196,18 @@ function syncSwapAsset(side) {
     renderSwapAssetBtn(side, null, null);
   }
   if (side === "from") renderSwapBalance();
+  updateSwapFlipState();
   clearSwapQuote();
   scheduleSwapAutoQuote();
+}
+
+// Flip is only safe when the "To" asset is itself something held with a
+// balance -- From can never be a zero-balance asset (the picker enforces
+// this), so flipping into one would leave the form in a state the rest
+// of the UI can't otherwise reach.
+function updateSwapFlipState() {
+  const toAsset = findHeldAsset(swapState.toKey);
+  $("swap-flip-btn").disabled = !(swapState.fromKey && toAsset && Number(toAsset.balance) > 0);
 }
 
 async function populateSwapSelects(pre) {
@@ -1268,6 +1278,18 @@ $("swap-picker-custom-btn").addEventListener("click", () => {
   if (!addr) return;
   if (side === "from") swapState.fromKey = addr; else swapState.toKey = addr;
   syncSwapAsset(side);
+});
+
+$("swap-flip-btn").addEventListener("click", (e) => {
+  if (e.currentTarget.disabled) return;
+  const prevFromKey = swapState.fromKey;
+  swapState.fromKey = swapState.toKey;
+  swapState.toKey = prevFromKey;
+  $("swap-amount-in").value = "";
+  syncSwapAsset("from");
+  syncSwapAsset("to");
+  e.currentTarget.classList.add("is-flipping");
+  setTimeout(() => e.currentTarget.classList.remove("is-flipping"), 200);
 });
 
 $("swap-max-btn").addEventListener("click", () => {

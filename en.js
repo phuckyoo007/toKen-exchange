@@ -204,6 +204,7 @@
     "swap.minReceivedLabel": "Minimum received",
     "swap.selectAssetTitle": "Select asset",
     "swap.noAssetsHint": "Nothing available here yet.",
+    "swap.flipBtnTitle": "Swap direction",
     "swap.appFeeLine": "{percent} ({amount} {symbol})",
     "swap.slippageLabel": "Slippage tolerance",
     "swap.approveBtn": "Approve token first",

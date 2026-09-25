@@ -460,7 +460,9 @@
         <input type="text" id="swap-from-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
       </div>
 
-      <div class="swap-divider" aria-hidden="true"><span class="swap-divider-icon">&#8595;</span></div>
+      <div class="swap-divider">
+        <button type="button" id="swap-flip-btn" class="swap-divider-icon" data-i18n-title="swap.flipBtnTitle" title="Swap direction" aria-label="Swap direction" disabled>&#8645;</button>
+      </div>
 
       <div class="swap-panel" data-side="to">
         <div class="swap-panel-head">

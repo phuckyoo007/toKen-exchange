@@ -954,13 +954,25 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .swap-panel-foot { display: flex; align-items: center; justify-content: space-between; min-height: 16px; }
 .swap-usd-value { font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .swap-max-btn { font-size: 11px; padding: 0; }
-.swap-divider { display: flex; justify-content: center; margin: -4px 0; }
+.swap-divider { display: flex; justify-content: center; margin: -4px 0; position: relative; z-index: 1; }
+/* Now a real button: flips From/To (and their amount) in one tap instead
+   of reopening both asset pickers. Disabled -- same faded treatment as
+   .swap-max-btn getting hidden -- whenever the current "To" asset isn't
+   something held with a balance, since From can never hold a zero-balance
+   asset (see the picker's balance>0 filter). */
 .swap-divider-icon {
   width: 26px; height: 26px; border-radius: 50%;
   background: var(--bg-raised); border: 1px solid var(--line);
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; color: var(--text-muted);
+  font-size: 12px; color: var(--text-muted); font-family: inherit;
+  padding: 0; cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s, color 0.15s, background 0.15s;
 }
+.swap-divider-icon:hover:not(:disabled), .swap-divider-icon:focus-visible:not(:disabled) {
+  border-color: var(--gold-deep); color: var(--gold-bright); background: var(--bg-hover);
+}
+.swap-divider-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+.swap-divider-icon.is-flipping { transform: rotate(180deg); }
 
 /* ---- Swap: rate/fee/slippage/min-received breakdown ---- */
 #swap-quote-display {
