@@ -450,8 +450,8 @@ async function refreshTokens() {
     row.className = "token-row";
     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
     const priceEntry = prices[t.address.toLowerCase()];
-    const usdText =
-      priceEntry && typeof priceEntry.price === "number" ? formatCurrency(Number(formatted) * priceEntry.price) : "";
+    const priceNum = priceEntry && typeof priceEntry.price === "number" ? priceEntry.price : null;
+    const usdText = priceNum != null ? formatCurrency(Number(formatted) * priceNum) : "";
     const nameEl = document.createElement("span");
     nameEl.className = "token-name muted small";
     nameEl.textContent = t.name || (t.error ? TM_I18N.t("tokens.loadError") : "");
@@ -474,18 +474,39 @@ async function refreshTokens() {
       balEl.appendChild(usdSpan);
     }
 
+    // The whole row (icon, name, balance) opens the same in-app coin
+    // detail screen the Prices tab uses -- same pattern as .price-link
+    // there. It already knows how to show "you're holding X" and offer a
+    // swap when the symbol matches something in this wallet, so this just
+    // wires the missing entry point rather than adding new UI.
+    const linkBtn = document.createElement("button");
+    linkBtn.type = "button";
+    linkBtn.className = "token-link";
+    const linkLabel = TM_I18N.t("prices.viewCoin", { name: t.name || t.symbol });
+    linkBtn.setAttribute("aria-label", linkLabel);
+    linkBtn.title = linkLabel;
+    linkBtn.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol));
+    linkBtn.appendChild(mainEl);
+    linkBtn.appendChild(balEl);
+    linkBtn.addEventListener("click", () => {
+      const id = TM_PRICES.COINGECKO_IDS[normalizeCoinSymbol(t.symbol)];
+      openCoinDetail(
+        { symbol: t.symbol, name: t.name || t.symbol, price: priceNum, change24h: null, url: id ? `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}` : null },
+        "screen-main"
+      );
+    });
+
     const removeBtn = document.createElement("button");
     removeBtn.className = "token-remove-btn";
     removeBtn.title = TM_I18N.t("tokens.removeTitle");
     removeBtn.textContent = "×";
-    removeBtn.addEventListener("click", async () => {
+    removeBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       await sendMsg("TM_REMOVE_TRACKED_TOKEN", { tokenAddress: t.address });
       await refreshTokens();
     });
 
-    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol));
-    row.appendChild(mainEl);
-    row.appendChild(balEl);
+    row.appendChild(linkBtn);
     row.appendChild(removeBtn);
     list.appendChild(row);
   });
@@ -637,10 +658,26 @@ let pricesRatesData = [];
 function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
-  row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
-    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
-  `;
+  const pegSymbol = TM_PRICES.FIAT_STABLECOIN_PEG[r.code.toLowerCase()];
+  const nameHtml = `<span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>`;
+  const quoteHtml = `<span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>`;
+  if (pegSymbol) {
+    // Currencies with a known, well-established pegged stablecoin (see
+    // FIAT_STABLECOIN_PEG) open that stablecoin's coin-detail screen --
+    // the closest thing to "this currency, as a cryptocurrency". Price/
+    // change here start null; openCoinDetail's own loadCoinInfo() fills
+    // them in from CoinGecko once the screen opens, same as any other row.
+    const linkLabel = TM_I18N.t("prices.viewPeggedCoin", { currency: r.name, name: pegSymbol });
+    row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}">${nameHtml}</button>${quoteHtml}`;
+    row.querySelector(".price-link").addEventListener("click", () => {
+      openCoinDetail(
+        { symbol: pegSymbol, name: pegSymbol, price: null, change24h: null, url: `https://www.coingecko.com/en/coins/${encodeURIComponent(TM_PRICES.COINGECKO_IDS[pegSymbol])}` },
+        $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices"
+      );
+    });
+  } else {
+    row.innerHTML = nameHtml + quoteHtml;
+  }
   return row;
 }
 

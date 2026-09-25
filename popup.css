@@ -740,6 +740,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .token-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .token-balance-col { display: flex; flex-direction: column; align-items: flex-end; }
 .token-balance { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold-bright); }
+.token-link {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  background: none; border: 0; padding: 0; margin: 0; font: inherit; text-align: start; cursor: pointer;
+}
+.token-link:hover .token-symbol { text-decoration: underline; text-underline-offset: 2px; }
+.token-link:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; border-radius: 8px; }
 .token-remove-btn {
   background: transparent; border: none; color: var(--text-muted);
   font-size: 16px; line-height: 1; padding: 2px 4px; cursor: pointer;
