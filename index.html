@@ -31,7 +31,7 @@
       <span class="splash-tab-label" data-i18n="home.tabHome">Home</span>
     </button>
     <button id="splash-tab-assets" class="splash-tab" data-i18n-title="home.tabAssets" title="Assets">
-      <span class="splash-tab-icon" aria-hidden="true">&#9679;</span>
+      <span class="splash-tab-icon" aria-hidden="true">🪙</span>
       <span class="splash-tab-label" data-i18n="home.tabAssets">Assets</span>
     </button>
     <button id="splash-tab-activity" class="splash-tab" data-i18n-title="home.tabActivity" title="Activity">
@@ -140,7 +140,7 @@
         <span class="cube-tab-label" data-i18n="home.tabHome">Home</span>
       </button>
       <button type="button" class="cube-tab" id="cube-tab-assets" data-cube-goto="assets" data-i18n-title="home.tabAssets" title="Assets">
-        <span class="cube-tab-icon" aria-hidden="true">&#9679;</span>
+        <span class="cube-tab-icon" aria-hidden="true">🪙</span>
         <span class="cube-tab-label" data-i18n="home.tabAssets">Assets</span>
       </button>
       <button type="button" class="cube-tab" id="cube-tab-activity" data-cube-goto="1" data-i18n-title="home.tabActivity" title="Activity">
@@ -181,7 +181,7 @@
       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
-      <button id="btn-goto-sell" class="secondary is-soon" data-i18n="common.sell">Sell<span class="badge-soon" data-i18n="common.soon">Soon</span></button>
+      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
     </div>
     <div class="prices-card">
       <div class="prices-card-header">
@@ -385,21 +385,13 @@
   <!-- BUY -->
   <section id="screen-buy" class="screen hidden">
     <h2 data-i18n="buy.title">Buy crypto</h2>
-    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
+    <p class="muted" data-i18n="buy.description1">Buy is powered by Transak, a separate third-party service -- Token Exchange never touches your payment details.</p>
     <div class="no-third-party-callout">
-      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip MoonPay entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip Transak entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
       <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
     </div>
-    <p class="muted" id="buy-description-manual" data-i18n-html="buy.description2Html">MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:</p>
-    <p class="muted hidden" id="buy-description-autofill" data-i18n="buy.description2AutoFill">MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.</p>
-    <div class="address-row" id="buy-address-row">
-      <span id="buy-address-display" class="mono"></span>
-      <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
-    </div>
-    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
-    <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
-      <iframe id="buy-frame" class="widget-frame" title="MoonPay Buy" allow="payment"></iframe>
-    </div>
+    <p class="muted" data-i18n="buy.description2">Transak opens in a new tab, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
+    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="buy-error" class="error hidden"></p>
   </section>
@@ -407,17 +399,9 @@
   <!-- SELL -->
   <section id="screen-sell" class="screen hidden">
     <h2 data-i18n="sell.title">Sell for cash</h2>
-    <div class="coming-soon-panel">
-      <span class="coming-soon-chip" data-i18n="sell.comingSoonChip">Coming soon</span>
-      <p class="muted" data-i18n-html="sell.comingSoonBodyHtml">Cashing out straight from Token Exchange isn't live yet -- we're finishing that up. In the meantime, use <strong>Swap</strong> to move into a stablecoin, or send to an exchange you already use to cash out.</p>
-    </div>
-    <p class="muted force-hidden" data-i18n="sell.description1">Sell is powered by MoonPay, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
-    <p class="muted force-hidden" data-i18n="sell.description2">MoonPay opens right here, below, and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once MoonPay receives it, it converts and pays out to your linked bank account or card.</p>
-    <p class="muted force-hidden" data-i18n-html="sell.description3Html">Come back here and use <strong>Send</strong> with the address MoonPay gives you -- this wallet never sends funds anywhere on its own.</p>
-    <button id="btn-sell-open" class="primary force-hidden" data-i18n="sell.continueBtn">Continue to MoonPay</button>
-    <div id="sell-frame-wrap" class="widget-frame-wrap hidden force-hidden">
-      <iframe id="sell-frame" class="widget-frame" title="MoonPay Sell" allow="payment"></iframe>
-    </div>
+    <p class="muted" data-i18n="sell.description1">Sell is powered by Transak, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
+    <p class="muted" data-i18n="sell.description2">Transak opens in a new tab and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.</p>
+    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to Transak</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="sell-error" class="error hidden"></p>
   </section>
@@ -745,8 +729,7 @@
 <script src="vendor/qrcode-generator.js"></script>
 <script src="lib/prices.js"></script>
 <script src="lib/polymarket.js"></script>
-<script src="lib/buy-config.js"></script>
-<script src="lib/sell-config.js"></script>
+<script src="lib/transak-config.js"></script>
 <script src="lib/i18n/en.js"></script>
 <script src="lib/i18n/ar.js"></script>
 <script src="lib/i18n/zh.js"></script>

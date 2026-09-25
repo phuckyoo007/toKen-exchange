@@ -1627,25 +1627,15 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
-// of opening a new tab -- see lib/buy-config.js's header comment for why
-// that's safe. Each time the screen is (re)opened, this resets back to the
-// "not loaded yet" state: description text, address row and Continue
-// button visible, iframe hidden -- ready for a fresh click.
+// Buy hands off to Transak in a brand-new tab (see lib/transak-config.js's
+// header comment) -- nothing is embedded in an <iframe> here anymore.
+// Each time the screen is (re)opened, this just clears any stale error and
+// makes sure the button is enabled again.
 function setupBuyScreen() {
   hideError("buy-error");
-  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
-  $("buy-description-manual").classList.remove("hidden");
-  $("buy-description-autofill").classList.add("hidden");
-  $("buy-address-row").classList.remove("hidden");
-  $("btn-buy-open").classList.remove("hidden");
-  $("buy-frame-wrap").classList.add("hidden");
-  $("buy-frame").src = "about:blank";
+  const btn = $("btn-buy-open");
+  if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
 }
-
-$("btn-buy-copy-address").addEventListener("click", () => {
-  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
-});
 
 $("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 
@@ -1654,22 +1644,9 @@ $("btn-buy-open").addEventListener("click", async () => {
   const btn = $("btn-buy-open");
   btn.disabled = true;
   try {
-    // Try for a signed URL with the address already filled in first (see
-    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
-    // manual "paste your address" flow) if that backend isn't configured
-    // or can't be reached. Either way this always embeds in the iframe
-    // below rather than opening a new tab.
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
-    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
-    $("buy-frame").src = url;
-    $("buy-frame-wrap").classList.remove("hidden");
-    btn.classList.add("hidden");
-    if (signedUrl) {
-      $("buy-description-manual").classList.add("hidden");
-      $("buy-description-autofill").classList.remove("hidden");
-      $("buy-address-row").classList.add("hidden");
-    }
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, currentCurrency);
+    window.open(url, "_blank", "noopener");
   } catch (e) {
     showError("buy-error", e.message);
   } finally {
@@ -1678,24 +1655,25 @@ $("btn-buy-open").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- SELL
-// Same embedding change as Buy -- see lib/sell-config.js's header comment
-// for why there's no address to auto-fill here.
+// Same new-tab handoff to Transak as Buy above.
 function setupSellScreen() {
   hideError("sell-error");
-  $("btn-sell-open").classList.remove("hidden");
-  $("sell-frame-wrap").classList.add("hidden");
-  $("sell-frame").src = "about:blank";
+  const btn = $("btn-sell-open");
+  if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
 }
 
-$("btn-sell-open").addEventListener("click", () => {
+$("btn-sell-open").addEventListener("click", async () => {
   hideError("sell-error");
+  const btn = $("btn-sell-open");
+  btn.disabled = true;
   try {
-    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
-    $("sell-frame").src = url;
-    $("sell-frame-wrap").classList.remove("hidden");
-    $("btn-sell-open").classList.add("hidden");
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, currentCurrency);
+    window.open(url, "_blank", "noopener");
   } catch (e) {
     showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
