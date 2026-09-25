@@ -845,6 +845,39 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   padding: 10px 12px; border-radius: 7px;
   font-size: 12px; line-height: 1.5; color: var(--text);
 }
+
+/* "Soon" badge on an actions-row button (e.g. Sell, while off-ramp isn't
+   live) -- signals the feature is intentionally paused, not broken. */
+.actions-row button.is-soon { position: relative; overflow: visible; }
+.badge-soon {
+  position: absolute; top: -7px; right: -6px;
+  background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold-deep) 100%);
+  color: var(--gold-ink); border: 1px solid #6e4f12;
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+/* Full-screen "coming soon" panel for a feature whose backend integration
+   isn't finished yet -- swap in for the real flow so it reads as an
+   intentional placeholder rather than something failing to load. */
+.coming-soon-panel {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  background: var(--bg-inset); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold-deep);
+  padding: 14px; border-radius: 9px;
+  font-size: 13px; line-height: 1.5; color: var(--text);
+}
+.coming-soon-chip {
+  display: inline-block; background: var(--bg-raised);
+  border: 1px solid var(--gold-deep); color: var(--gold);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px;
+}
+.force-hidden { display: none !important; }
 /* QR codes need real light/dark contrast to stay scannable, so this stays
    a plain white card regardless of the app's own dark theme -- the same
    compromise every dark-themed wallet's QR view makes. */
