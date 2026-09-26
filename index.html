@@ -811,5 +811,16 @@
 <script src="app.js"></script>
 <script src="lib/account.js"></script>
 <script src="lib/feature-requests.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js").catch(function () {
+      // Offline support is an enhancement, not a requirement -- if
+      // registration fails (unsupported browser, blocked storage, etc.)
+      // the site just runs exactly as it did before this existed.
+    });
+  });
+}
+</script>
 </body>
 </html>
