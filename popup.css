@@ -109,12 +109,39 @@ body {
     url(img/bg-scene.jpg) center top / cover no-repeat;
 }
 
+/* Thick metallic gold bezel wrapping the whole popup, color-picked
+   from the "phone in a gold frame" brand art the user supplied: lit
+   from above -- bright warm cream-gold along the top edge, fading
+   radially into a darker bronze/copper down the sides and bottom --
+   plus a thin near-black outer rim and a soft dark lip where #app
+   meets the frame, matching the reference's shadow line right before
+   its screen starts. #app sits inside as the actual opaque screen;
+   this wrapper only ever paints the frame around it. */
+#app-frame {
+  position: relative;
+  z-index: 1;
+  border-radius: 24px;
+  padding: 12px;
+  background: radial-gradient(130% 130% at 50% -15%, #faf6d1 0%, #f4dea2 45%, #c99a5b 68%, #8c6440 88%, #6b4a2c 100%);
+  /* Re-measured off the reference art: mostly a bright flat-lit face
+     (the wide bright zone in the gradient above) with a thin dark seam
+     at the outer edge and a distinct darker "lip" right before the
+     screen -- a defined edge, not a soft fade -- which is what actually
+     reads as a raised 3D bevel. */
+  box-shadow:
+    inset 0 0 1px 1px rgba(0,0,0,0.5),
+    inset 0 0 2px 5.5px rgba(246,228,175,0.92),
+    inset 0 0 1.5px 6.5px rgba(0,0,0,0.65);
+}
 #app {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  min-height: 480px;
+  min-height: 456px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
   /* Fully opaque -- nothing behind this card shows through. A faint
      copy of the splash artwork sits on the card's own face instead --
      see #app::before below -- a self-contained watermark baked onto
@@ -740,6 +767,12 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .token-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .token-balance-col { display: flex; flex-direction: column; align-items: flex-end; }
 .token-balance { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gold-bright); }
+.token-link {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  background: none; border: 0; padding: 0; margin: 0; font: inherit; text-align: start; cursor: pointer;
+}
+.token-link:hover .token-symbol { text-decoration: underline; text-underline-offset: 2px; }
+.token-link:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; border-radius: 8px; }
 .token-remove-btn {
   background: transparent; border: none; color: var(--text-muted);
   font-size: 16px; line-height: 1; padding: 2px 4px; cursor: pointer;

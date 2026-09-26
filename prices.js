@@ -32,6 +32,11 @@ const COINGECKO_IDS = {
   ADA: "cardano",
   USDT: "tether",
   USDC: "usd-coin",
+  EURC: "euro-coin", // Circle's EUR stablecoin -- NOT independently re-verified against a live
+                      // CoinGecko coin page the way the ids above were; spot-check before relying on it.
+  JPYC: "jpycoin", // JPYC Inc.'s JPY-pegged stablecoin -- verified live against CoinGecko's /coins/jpycoin endpoint.
+  BRZ: "brz", // Transfero's BRL-pegged stablecoin -- verified live against CoinGecko's /coins/brz endpoint
+             // (NOT "brazilian-digital-token" -- that id doesn't exist on CoinGecko despite matching its display name).
   AVAX: "avalanche-2", // NOT "avalanche" -- CoinGecko's own quirk, verified on their coin page
   LINK: "chainlink",
   DOT: "polkadot",
@@ -224,6 +229,25 @@ const SUPPORTED_CURRENCIES = {
   xrp: { symbol: "XRP", label: "XRP", name: "XRP", type: "crypto" },
 };
 const DEFAULT_CURRENCY = "usd";
+
+// Maps a fiat currency code (as used in SUPPORTED_CURRENCIES above) to the
+// symbol of the major, well-established stablecoin pegged 1:1 to it -- what
+// the Prices > Currencies tab's row links out to when tapped. Deliberately
+// small: most fiat currencies have no widely-used, liquid pegged stablecoin,
+// and a wrong or obscure pick here would be actively misleading, so a
+// currency with no confident entry just isn't clickable rather than
+// guessing. Extend this list only with ids verified the same way the ones
+// in COINGECKO_IDS above are.
+const FIAT_STABLECOIN_PEG = {
+  usd: "USDT",
+  eur: "EURC",
+  jpy: "JPYC",
+  brl: "BRZ",
+  // gbp and mxn deliberately left out: "GBPT"/"poundtoken" and "MXNT" both
+  // came back "coin not found" (zero hits, even by name) when re-checked
+  // live against CoinGecko's own API and search endpoint -- so per the
+  // policy above, they stay non-clickable rather than link to a dead page.
+};
 
 // Compact form for big numbers (market cap, volume): $1.2T, CHF 340B, 12.5M.
 function formatMoneyCompact(amount, currency) {
@@ -565,6 +589,7 @@ if (typeof self !== "undefined") {
     NETWORK_NATIVE_COINGECKO_ID,
     NETWORK_COINGECKO_PLATFORM,
     SUPPORTED_CURRENCIES,
+    FIAT_STABLECOIN_PEG,
     DEFAULT_CURRENCY,
   };
 }

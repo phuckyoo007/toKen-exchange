@@ -18,7 +18,7 @@
       <span class="splash-tab-label" data-i18n="home.tabHome">Home</span>
     </button>
     <button id="splash-tab-assets" class="splash-tab" data-i18n-title="home.tabAssets" title="Assets">
-      <span class="splash-tab-icon" aria-hidden="true">&#9679;</span>
+      <span class="splash-tab-icon" aria-hidden="true">🪙</span>
       <span class="splash-tab-label" data-i18n="home.tabAssets">Assets</span>
     </button>
     <button id="splash-tab-activity" class="splash-tab" data-i18n-title="home.tabActivity" title="Activity">
@@ -38,6 +38,7 @@
     <button type="button" id="splash-continue-btn" class="primary" data-i18n="home.continueBtn">Continue</button>
   </div>
 </div>
+<div id="app-frame">
 <div id="app">
 
   <header id="app-header">
@@ -161,7 +162,6 @@
     </div>
     <h2 data-i18n="onboarding.title">Welcome</h2>
     <p class="muted" data-i18n="onboarding.subtitle">Set up your wallet to get started.</p>
-    <p><button id="btn-onboarding-signin" type="button" class="link hidden" data-i18n="account.entryBtn">Sign in / Create account</button></p>
     <button id="btn-goto-create" class="primary" data-i18n="onboarding.createBtn">Create a new wallet</button>
     <button id="btn-goto-import" class="secondary" data-i18n="onboarding.importBtn">Import an existing wallet</button>
     <button id="btn-goto-support-onboarding" class="link" data-i18n="common.needHelp">Need help?</button>
@@ -222,7 +222,7 @@
         <span class="cube-tab-label" data-i18n="home.tabHome">Home</span>
       </button>
       <button type="button" class="cube-tab" id="cube-tab-assets" data-cube-goto="assets" data-i18n-title="home.tabAssets" title="Assets">
-        <span class="cube-tab-icon" aria-hidden="true">&#9679;</span>
+        <span class="cube-tab-icon" aria-hidden="true">🪙</span>
         <span class="cube-tab-label" data-i18n="home.tabAssets">Assets</span>
       </button>
       <button type="button" class="cube-tab" id="cube-tab-activity" data-cube-goto="1" data-i18n-title="home.tabActivity" title="Activity">
@@ -261,6 +261,7 @@
       <button id="btn-goto-send" class="secondary" data-i18n="common.send">Send</button>
       <button id="btn-goto-swap" class="secondary" data-i18n="common.swap">Swap</button>
       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
+      <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
     </div>
     <div class="prices-card">
       <div class="prices-card-header">
@@ -414,23 +415,25 @@
   <!-- BUY -->
   <section id="screen-buy" class="screen hidden">
     <h2 data-i18n="buy.title">Buy crypto</h2>
-    <p class="muted" data-i18n="buy.description1">Buy is powered by MoonPay, a separate third-party service -- Token Exchange never touches your payment details.</p>
+    <p class="muted" data-i18n="buy.description1">Buy is powered by Transak, a separate third-party service -- Token Exchange never touches your payment details.</p>
     <div class="no-third-party-callout">
-      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip MoonPay entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip Transak entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
       <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
     </div>
-    <p class="muted" id="buy-description-manual" data-i18n-html="buy.description2Html">MoonPay opens right here, below. Since this wallet can't safely sign requests with a secret key (that must never live inside a browser extension -- see <code>lib/buy-config.js</code>), <strong>paste in your receiving address yourself</strong> once it loads:</p>
-    <p class="muted hidden" id="buy-description-autofill" data-i18n="buy.description2AutoFill">MoonPay opens right here, below, with your receiving address already filled in -- nothing to paste.</p>
-    <div class="address-row" id="buy-address-row">
-      <span id="buy-address-display" class="mono"></span>
-      <button id="btn-buy-copy-address" class="link" data-i18n="common.copy">Copy</button>
-    </div>
-    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to MoonPay</button>
-    <div id="buy-frame-wrap" class="widget-frame-wrap hidden">
-      <iframe id="buy-frame" class="widget-frame" title="MoonPay Buy" allow="payment"></iframe>
-    </div>
+    <p class="muted" data-i18n="buy.description2">Transak opens in a new tab, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
+    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="buy-error" class="error hidden"></p>
+  </section>
+
+  <!-- SELL -->
+  <section id="screen-sell" class="screen hidden">
+    <h2 data-i18n="sell.title">Sell for cash</h2>
+    <p class="muted" data-i18n="sell.description1">Sell is powered by Transak, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
+    <p class="muted" data-i18n="sell.description2">Transak opens in a new tab and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.</p>
+    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to Transak</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="sell-error" class="error hidden"></p>
   </section>
 
   <!-- SUPPORT -->
@@ -487,44 +490,8 @@
   </section>
 
   <!-- SETTINGS -->
-  <!-- ACCOUNT (optional sign-in; syncs display settings only, never keys) -->
-  <section id="screen-account" class="screen hidden">
-    <h2 data-i18n="account.title">Sign in</h2>
-    <div id="account-signed-out">
-      <p class="muted" data-i18n="account.intro">Optional. An account syncs your display currency, language and watchlist between devices. It never stores your wallet, keys or recovery phrase.</p>
-      <div class="account-tabs" role="tablist">
-        <button type="button" class="account-tab active" data-account-mode="signin" data-i18n="account.tabSignIn">Sign in</button>
-        <button type="button" class="account-tab" data-account-mode="create" data-i18n="account.tabCreate">Create account</button>
-      </div>
-      <label for="account-username" data-i18n="account.usernameLabel">Username</label>
-      <input type="text" id="account-username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="24" />
-      <p id="account-username-hint" class="muted small hidden" data-i18n="account.usernameHint">3-24 characters: letters, numbers or underscore.</p>
-      <label for="account-password" data-i18n="account.passwordLabel">Password</label>
-      <input type="password" id="account-password" autocomplete="current-password" />
-      <div id="account-confirm-row" class="hidden">
-        <label for="account-password2" data-i18n="account.confirmLabel">Confirm password</label>
-        <input type="password" id="account-password2" autocomplete="new-password" />
-        <div class="warn small" data-i18n="account.walletWarning">This password can't recover your wallet. Keep your recovery phrase safe -- it's the only way to restore your funds.</div>
-      </div>
-      <button id="btn-account-submit" class="primary" data-i18n="account.signInSubmit">Sign in</button>
-    </div>
-    <div id="account-signed-in" class="hidden">
-      <p id="account-signed-in-as"></p>
-      <p class="muted small" data-i18n="account.syncNote">Syncing: display currency, language and watchlist.</p>
-      <button id="btn-account-signout" class="secondary" data-i18n="account.signOut">Sign out</button>
-      <label for="account-delete-password" data-i18n="account.deleteLabel">Delete account</label>
-      <input type="password" id="account-delete-password" autocomplete="current-password" data-i18n-placeholder="account.deletePlaceholder" placeholder="Password to confirm" />
-      <button id="btn-account-delete" class="danger" data-i18n="account.deleteBtn">Delete account</button>
-    </div>
-    <p id="account-status" class="hint hidden"></p>
-    <p id="account-error" class="error hidden"></p>
-    <button id="account-back" class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
-  </section>
-
-  <!-- SETTINGS -->
   <section id="screen-settings" class="screen hidden">
     <h2 data-i18n="settings.title">Settings</h2>
-    <button id="btn-goto-account" class="secondary hidden" data-i18n="account.entryBtn">Sign in / Create account</button>
     <button id="btn-add-account" class="secondary" data-i18n="settings.addAccountBtn">Add account</button>
     <button id="btn-goto-import-key" class="secondary" data-i18n="settings.importKeyBtn">Import private key</button>
     <button id="btn-goto-add-network" class="secondary" data-i18n="settings.addNetworkBtn">Add network</button>
@@ -679,12 +646,13 @@
   </footer>
 
 </div>
+</div>
 <script src="../vendor/ethers.umd.min.js"></script>
 <script src="../lib/identicon.js"></script>
 <script src="../vendor/qrcode-generator.js"></script>
 <script src="../lib/prices.js"></script>
 <script src="../lib/polymarket.js"></script>
-<script src="../lib/buy-config.js"></script>
+<script src="../lib/transak-config.js"></script>
 <script src="../lib/i18n/en.js"></script>
 <script src="../lib/i18n/ar.js"></script>
 <script src="../lib/i18n/zh.js"></script>
