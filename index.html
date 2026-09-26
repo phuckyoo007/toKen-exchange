@@ -71,15 +71,17 @@
     <h2 data-i18n="onboarding.title">Welcome</h2>
     <p class="muted" data-i18n="onboarding.subtitle">Set up your wallet to get started.</p>
     <div class="warn onboarding-intro-card" style="text-align:left; margin: 10px 0;">
-      This is the standalone <strong>website</strong> version of Token Exchange. It
-      encrypts your wallet and stores it only in this browser (nowhere else) --
-      but a website is an easier target for phishing/DNS/lookalike-domain tricks
-      than an installed browser extension, which is why MetaMask and similar
-      wallets don't ship a key-holding website at all. If you're not sure which
-      to use: the <strong>browser extension</strong> version of Token Exchange is
-      the safer default for everyday use; this site is here for when an
-      extension truly isn't an option. See this page's README for the full
-      explanation before trusting it with real funds.
+      <details class="intro-details">
+        <summary>You're using the website version -- the browser extension is safer for everyday use.</summary>
+        <p>
+          This site encrypts your wallet and stores it only in this browser
+          (nowhere else) -- but a website is an easier target for
+          phishing/DNS/lookalike-domain tricks than an installed browser
+          extension, which is why MetaMask and similar wallets don't ship a
+          key-holding website at all. See this page's README for the full
+          explanation before trusting it with real funds.
+        </p>
+      </details>
     </div>
     <button id="btn-goto-create" class="primary" data-i18n="onboarding.createBtn">Create a new wallet</button>
     <button id="btn-goto-import" class="secondary" data-i18n="onboarding.importBtn">Import an existing wallet</button>
@@ -105,12 +107,12 @@
       <label data-i18n="create.passwordLabel">New password (min 8 characters)</label>
       <input type="password" id="create-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
       <input type="password" id="create-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
-      <p class="warn" data-i18n="create.passwordWarning">This password unlocks your wallet on this device. There is no recovery for it -- only your seed phrase can restore your funds.</p>
+      <p class="warn" data-i18n="create.passwordWarning">No recovery if you lose this -- only your seed phrase can restore your wallet.</p>
       <button id="btn-create-submit" class="primary" data-i18n="create.continueBtn">Continue</button>
       <button class="link back-btn" data-back="screen-onboarding" data-i18n="common.back">Back</button>
     </div>
     <div id="create-step-backup" class="hidden">
-      <p class="warn" data-i18n="create.backupWarning">Write down this recovery phrase and store it somewhere safe. Anyone with it can take everything in this wallet. Token Exchange cannot recover it for you.</p>
+      <p class="warn" data-i18n="create.backupWarning">Write this down and keep it safe. Anyone who sees it can empty this wallet, and we can't recover it for you.</p>
       <div id="mnemonic-display" class="mnemonic-box"></div>
       <label class="checkbox-row"><input type="checkbox" id="backup-confirm-check" /> <span data-i18n="create.backupCheckbox">I've saved my recovery phrase</span></label>
       <button id="btn-backup-done" class="primary" disabled data-i18n="create.finishBtn">Finish</button>
@@ -374,6 +376,7 @@
     <div class="coin-swap-card">
       <p id="coin-holding" class="muted small hidden"></p>
       <button type="button" id="btn-coin-swap" class="primary"></button>
+      <button type="button" id="btn-coin-buy" class="secondary"></button>
       <p id="coin-swap-note" class="hint hidden"></p>
     </div>
     <h3 data-i18n="coin.statsTitle">Market stats</h3>
@@ -404,6 +407,7 @@
       <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
     </div>
     <p class="muted" data-i18n="buy.description2">Transak opens in a new tab, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
+    <p id="buy-preset-note" class="hint hidden"></p>
     <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="buy-error" class="error hidden"></p>

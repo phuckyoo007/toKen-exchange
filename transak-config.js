@@ -21,7 +21,11 @@ const TRANSAK_SESSION_ENDPOINT = "https://web-wallet-production.up.railway.app/a
 //   networkKey: this wallet's network key (see lib/networks.js)
 //   address: the wallet's selected address
 //   fiatCode: optional 3-letter currency code, used only as a default
-async function buildTransakUrl(product, networkKey, address, fiatCode) {
+//   cryptoSymbol: optional crypto ticker (e.g. "USDC"), used only as a
+//     default -- same "default, not lock" reasoning as fiatCode, so an
+//     asset Transak doesn't recognize on the chosen network just leaves
+//     their own picker in control instead of dead-ending the flow.
+async function buildTransakUrl(product, networkKey, address, fiatCode, cryptoSymbol) {
   const label = product === "SELL" ? "Sell" : "Buy";
   if (!address) throw new Error("No wallet address available yet.");
 
@@ -30,7 +34,7 @@ async function buildTransakUrl(product, networkKey, address, fiatCode) {
     res = await fetch(TRANSAK_SESSION_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product, network: networkKey, address, fiat: fiatCode || "" }),
+      body: JSON.stringify({ product, network: networkKey, address, fiat: fiatCode || "", crypto: cryptoSymbol || "" }),
     });
   } catch (e) {
     throw new Error("Couldn't reach Transak. Check your internet connection.");

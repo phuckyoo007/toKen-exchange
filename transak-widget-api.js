@@ -176,8 +176,9 @@ function sendJson(res, status, obj) {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body),
     // Lets the extension (chrome-extension:// origin) call this too. The
-    // request only carries a public address, a network name and a currency
-    // code; the response is a single-use URL that only works once.
+    // request only carries a public address, a network name, and currency
+    // / crypto-ticker defaults; the response is a single-use URL that only
+    // works once.
     "Access-Control-Allow-Origin": "*",
   });
   res.end(body);
@@ -200,6 +201,7 @@ function readBody(req) {
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 const FIAT_RE = /^[A-Za-z]{3}$/;
+const CRYPTO_RE = /^[A-Za-z0-9]{1,15}$/;
 
 // Returns true if handled (caller must not fall through to static files).
 function handleTransakApi(req, res) {
@@ -249,6 +251,7 @@ function handleTransakApi(req, res) {
       }
       const network = typeof body.network === "string" ? body.network.trim().toLowerCase() : "";
       const fiat = typeof body.fiat === "string" && FIAT_RE.test(body.fiat.trim()) ? body.fiat.trim().toUpperCase() : "";
+      const crypto = typeof body.crypto === "string" && CRYPTO_RE.test(body.crypto.trim()) ? body.crypto.trim().toUpperCase() : "";
 
       const widgetParams = {
         apiKey: TRANSAK_API_KEY,
@@ -257,9 +260,14 @@ function handleTransakApi(req, res) {
       };
       const transakNetwork = NETWORK_TO_TRANSAK_NETWORK[network];
       if (transakNetwork) widgetParams.network = transakNetwork;
-      // A default, not a lock: the person can still change currency inside
-      // Transak (an unsupported code would otherwise dead-end the flow).
+      // Both of these are defaults, not locks (Transak's own "default" params,
+      // confirmed at docs.transak.com/docs/customization-options -- not the
+      // locking fiatCurrency/cryptoCurrencyCode variants): the person can
+      // still change either inside Transak, so an unsupported fiat code or a
+      // ticker Transak doesn't recognize on this network just leaves their
+      // picker in control instead of dead-ending the flow.
       if (fiat) widgetParams.defaultFiatCurrency = fiat;
+      if (crypto) widgetParams.defaultCryptoCurrency = crypto;
       if (product === "BUY") {
         // Pre-fill the receiving address and stop it being edited, so
         // purchased crypto can't be redirected by a tampered page.

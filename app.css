@@ -667,6 +667,19 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
     url(img/card-banner.jpg) center top / 100% auto no-repeat;
   padding-top: 64px;
 }
+/* Website-vs-extension explanation collapses behind one summary line by
+   default (see index.html) -- most people creating a wallet don't need
+   the full phishing/DNS explanation up front, but it stays one tap away
+   for anyone who does. */
+.intro-details summary {
+  cursor: pointer; font-weight: 600; list-style: none;
+}
+.intro-details summary::-webkit-details-marker { display: none; }
+.intro-details summary::before {
+  content: "▸ "; display: inline-block; transition: transform 0.15s;
+}
+.intro-details[open] summary::before { transform: rotate(90deg); }
+.intro-details p { margin: 8px 0 0; font-weight: normal; }
 .hint {
   color: var(--success); font-size: 12px; line-height: 1.5;
   background: #142822; border: 1px solid #234a3d;
@@ -1536,6 +1549,7 @@ html[dir="rtl"] .prices-search { background-position: right 11px center; }
 .coin-swap-card p { margin: 0 0 8px; }
 .coin-swap-card button { width: 100%; }
 .coin-swap-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+.coin-swap-card button + button { margin-top: 8px; }
 .coin-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
 .coin-stat {
   background: var(--bg-inset); border: 1px solid var(--line); border-radius: 10px;

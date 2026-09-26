@@ -720,18 +720,39 @@ async function refreshTokens() {
       balEl.appendChild(usdSpan);
     }
 
+    // The whole row (icon, name, balance) opens the same in-app coin
+    // detail screen the Prices tab uses -- same pattern as .price-link
+    // there. It already knows how to show "you're holding X" and offer a
+    // swap when the symbol matches something in this wallet, so this just
+    // wires the missing entry point rather than adding new UI.
+    const linkBtn = document.createElement("button");
+    linkBtn.type = "button";
+    linkBtn.className = "token-link";
+    const linkLabel = TM_I18N.t("prices.viewCoin", { name: t.name || t.symbol });
+    linkBtn.setAttribute("aria-label", linkLabel);
+    linkBtn.title = linkLabel;
+    linkBtn.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol, trustWalletLogoUrl(currentNetwork && currentNetwork.key, t.address)));
+    linkBtn.appendChild(mainEl);
+    linkBtn.appendChild(balEl);
+    linkBtn.addEventListener("click", () => {
+      const id = TM_PRICES.COINGECKO_IDS[normalizeCoinSymbol(t.symbol)];
+      openCoinDetail(
+        { symbol: t.symbol, name: t.name || t.symbol, price: priceEntry && typeof priceEntry.price === "number" ? priceEntry.price : null, change24h: null, url: id ? `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}` : null },
+        "screen-main"
+      );
+    });
+
     const removeBtn = document.createElement("button");
     removeBtn.className = "token-remove-btn";
     removeBtn.title = TM_I18N.t("tokens.removeTitle");
     removeBtn.textContent = "×";
-    removeBtn.addEventListener("click", async () => {
+    removeBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       await sendMsg("TM_REMOVE_TRACKED_TOKEN", { tokenAddress: t.address });
       await refreshTokens();
     });
 
-    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol, trustWalletLogoUrl(currentNetwork && currentNetwork.key, t.address)));
-    row.appendChild(mainEl);
-    row.appendChild(balEl);
+    row.appendChild(linkBtn);
     row.appendChild(removeBtn);
     list.appendChild(row);
   });
@@ -980,7 +1001,6 @@ function toggleWatchlist(symbol) {
   if (watchlistSymbols.has(key)) watchlistSymbols.delete(key);
   else watchlistSymbols.add(key);
   chrome.storage.local.set({ [TM_WATCHLIST_KEY]: Array.from(watchlistSymbols) });
-  scheduleAccountPush();
 }
 
 // Stable sort (guaranteed by the spec for Array#sort) -- starred coins move
@@ -1031,10 +1051,26 @@ let pricesRatesData = [];
 function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
-  row.innerHTML = `
-    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
-    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
-  `;
+  const pegSymbol = TM_PRICES.FIAT_STABLECOIN_PEG[r.code.toLowerCase()];
+  const nameHtml = `<span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>`;
+  const quoteHtml = `<span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>`;
+  if (pegSymbol) {
+    // Currencies with a known, well-established pegged stablecoin (see
+    // FIAT_STABLECOIN_PEG in lib/prices.js) open that stablecoin's coin-
+    // detail screen -- the closest thing to "this currency, as a
+    // cryptocurrency". Price/change here start null; openCoinDetail's own
+    // loadCoinInfo() fills them in from CoinGecko once the screen opens.
+    const linkLabel = TM_I18N.t("prices.viewPeggedCoin", { currency: r.name, name: pegSymbol });
+    row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}">${nameHtml}</button>${quoteHtml}`;
+    row.querySelector(".price-link").addEventListener("click", () => {
+      openCoinDetail(
+        { symbol: pegSymbol, name: pegSymbol, price: null, change24h: null, url: `https://www.coingecko.com/en/coins/${encodeURIComponent(TM_PRICES.COINGECKO_IDS[pegSymbol])}` },
+        $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices"
+      );
+    });
+  } else {
+    row.innerHTML = nameHtml + quoteHtml;
+  }
   return row;
 }
 
@@ -1130,61 +1166,158 @@ async function getHeldAssets() {
   return assets;
 }
 
-function assetLabel(a) {
-  const n = Number(a.balance);
-  return `${a.symbol} (${isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 5 }) : a.balance})`;
+// ---- Swap screen asset pickers (From = what you hold, To = any of your assets)
+// Pill-button + bottom-sheet picker, replacing the old plain <select>s. Each
+// side tracks its chosen asset in swapState; the hidden swap-*-custom
+// inputs are kept around as the actual "which token address" source of
+// truth (same contract the quote/approve/execute handlers already expect),
+// just no longer directly visible/typed into except via the picker's
+// custom-address entry.
+let swapPopulateGen = 0;
+let swapState = { held: [], fromKey: null, toKey: null, pickerSide: null };
+
+function findHeldAsset(key) {
+  return swapState.held.find((a) => a.key === key) || null;
 }
 
-// ---- Swap screen asset pickers (From = what you hold, To = any of your assets)
-let swapPopulateGen = 0;
+// key -> the address string the quote/approve/execute code expects
+// ("" / native pseudo-address for the native coin, else the contract).
+function keyToAddress(key) {
+  if (!key || key === "native") return "";
+  return key;
+}
+
+function renderSwapAssetBtn(side, asset, customAddress) {
+  const iconSlot = $(`swap-${side}-icon`);
+  const symbolEl = $(`swap-${side}-symbol`);
+  if (asset) {
+    const img = asset.key === "native" ? null : trustWalletLogoUrl(currentNetwork && currentNetwork.key, asset.address);
+    iconSlot.innerHTML = tokenIconHtml(asset.symbol, img);
+    symbolEl.textContent = asset.symbol;
+  } else if (customAddress) {
+    iconSlot.innerHTML = tokenIconHtml("?", null);
+    symbolEl.textContent = `${customAddress.slice(0, 6)}…${customAddress.slice(-4)}`;
+  } else {
+    iconSlot.innerHTML = "";
+    symbolEl.textContent = TM_I18N.t("swap.selectBtn");
+  }
+}
+
+function renderSwapBalance() {
+  const balEl = $("swap-from-balance");
+  const maxBtn = $("swap-max-btn");
+  const asset = findHeldAsset(swapState.fromKey);
+  if (asset) {
+    balEl.textContent = TM_I18N.t("swap.balanceLabel", { amount: Number(asset.balance).toLocaleString(undefined, { maximumFractionDigits: 6 }), symbol: asset.symbol });
+    balEl.classList.remove("hidden");
+    maxBtn.classList.toggle("hidden", !(Number(asset.balance) > 0));
+  } else {
+    balEl.classList.add("hidden");
+    maxBtn.classList.add("hidden");
+  }
+}
 
 function syncSwapAsset(side) {
-  const sel = $(`swap-${side}-select`);
-  const input = $(`swap-${side}-custom`);
-  if (sel.value === "custom") {
-    input.classList.remove("hidden");
-    input.value = "";
+  const custom = $(`swap-${side}-custom`);
+  const key = side === "from" ? swapState.fromKey : swapState.toKey;
+  const asset = findHeldAsset(key);
+  if (asset) {
+    custom.value = keyToAddress(asset.key);
+    renderSwapAssetBtn(side, asset, null);
+  } else if (key) {
+    // Custom-pasted address: key IS the address.
+    custom.value = key;
+    renderSwapAssetBtn(side, null, key);
   } else {
-    input.classList.add("hidden");
-    input.value = sel.value === "native" ? "" : sel.value; // blank = native coin, as the quote code expects
+    custom.value = "";
+    renderSwapAssetBtn(side, null, null);
   }
-  $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
+  if (side === "from") renderSwapBalance();
+  clearSwapQuote();
+  scheduleSwapAutoQuote();
 }
 
 async function populateSwapSelects(pre) {
   const myGen = ++swapPopulateGen;
   const held = await getHeldAssets();
   if (myGen !== swapPopulateGen) return;
-  const fromSel = $("swap-from-select");
-  const toSel = $("swap-to-select");
-  const toKey = pre && pre.toKey;
-  const fill = (sel, items) => {
-    sel.innerHTML = "";
-    items.forEach((a) => {
-      const o = document.createElement("option");
-      o.value = a.key;
-      o.textContent = assetLabel(a);
-      sel.appendChild(o);
-    });
-    const custom = document.createElement("option");
-    custom.value = "custom";
-    custom.textContent = TM_I18N.t("swap.customAddressOption");
-    sel.appendChild(custom);
-  };
-  // "From" only offers what the person actually holds (plus a paste-address
-  // escape hatch); the coin being bought is never offered as its own source.
+  swapState.held = held;
+  const toKey = (pre && pre.toKey) || swapState.toKey;
+  // "From" only offers what the person actually holds; the coin being
+  // bought is never offered as its own source.
   let fromItems = held.filter((a) => Number(a.balance) > 0 && a.key !== toKey);
   if (!fromItems.length) fromItems = held.filter((a) => a.key === "native" && a.key !== toKey);
-  fill(fromSel, fromItems);
-  fill(toSel, held);
-  if (toKey && held.some((a) => a.key === toKey)) toSel.value = toKey;
-  else toSel.value = (held.find((a) => a.key !== fromSel.value) || held[0] || { key: "custom" }).key;
+  swapState.fromKey = fromItems[0] ? fromItems[0].key : null;
+  if (toKey && held.some((a) => a.key === toKey)) swapState.toKey = toKey;
+  else swapState.toKey = (held.find((a) => a.key !== swapState.fromKey) || held[0] || null)?.key || null;
   syncSwapAsset("from");
   syncSwapAsset("to");
 }
 
-["from", "to"].forEach((side) => {
-  $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
+function closeAssetPicker() {
+  $("swap-asset-picker").classList.add("hidden");
+  swapState.pickerSide = null;
+}
+
+function openAssetPicker(side) {
+  swapState.pickerSide = side;
+  $("swap-picker-title").textContent = TM_I18N.t(side === "from" ? "swap.fromLabel" : "swap.toLabel");
+  const list = $("swap-picker-list");
+  list.innerHTML = "";
+  // From only lists what's actually held (can't sell what you don't have);
+  // To lists every held asset, since you can buy into something at zero
+  // balance. Either side excludes whatever the OTHER side currently holds.
+  const otherKey = side === "from" ? swapState.toKey : swapState.fromKey;
+  let items = swapState.held.filter((a) => a.key !== otherKey);
+  if (side === "from") items = items.filter((a) => Number(a.balance) > 0);
+  if (!items.length) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t("swap.noAssetsHint");
+    list.appendChild(p);
+  }
+  items.forEach((a) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "asset-picker-row";
+    const img = a.key === "native" ? null : trustWalletLogoUrl(currentNetwork && currentNetwork.key, a.address);
+    row.innerHTML =
+      tokenIconHtml(a.symbol, img) +
+      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(a.symbol)}</span>` +
+      `<span class="asset-picker-row-balance">${escapeHtml(Number(a.balance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span></span>`;
+    row.addEventListener("click", () => {
+      if (side === "from") swapState.fromKey = a.key; else swapState.toKey = a.key;
+      syncSwapAsset(side);
+      closeAssetPicker();
+    });
+    list.appendChild(row);
+  });
+  $("swap-asset-picker").classList.remove("hidden");
+}
+
+$("swap-from-asset-btn").addEventListener("click", () => openAssetPicker("from"));
+$("swap-to-asset-btn").addEventListener("click", () => openAssetPicker("to"));
+$("swap-picker-close").addEventListener("click", closeAssetPicker);
+$("swap-picker-custom-btn").addEventListener("click", () => {
+  const side = swapState.pickerSide;
+  const addr = (prompt(TM_I18N.t("common.tokenAddressPlaceholderParen")) || "").trim();
+  closeAssetPicker();
+  if (!addr) return;
+  if (side === "from") swapState.fromKey = addr; else swapState.toKey = addr;
+  syncSwapAsset(side);
+});
+
+$("swap-max-btn").addEventListener("click", () => {
+  const asset = findHeldAsset(swapState.fromKey);
+  if (!asset) return;
+  $("swap-amount-in").value = asset.balance;
+  clearSwapQuote();
+  scheduleSwapAutoQuote();
+});
+
+$("swap-amount-in").addEventListener("input", () => {
+  clearSwapQuote();
+  scheduleSwapAutoQuote();
 });
 
 // ---- Coin screen
@@ -1230,6 +1363,12 @@ async function openCoinDetail(c, fromScreen) {
   const btn = $("btn-coin-swap");
   btn.textContent = TM_I18N.t("coin.swapBtn", { symbol: c.symbol });
   btn.disabled = true;
+  // Buy is always available (Transak doesn't require already holding a
+  // different asset to swap from), so this button isn't gated the way Swap
+  // is below -- it's the fallback that keeps a coin-detail screen from
+  // dead-ending when Swap can't be offered.
+  const buyBtn = $("btn-coin-buy");
+  if (buyBtn) buyBtn.textContent = TM_I18N.t("coin.buyBtn", { symbol: c.symbol });
   $("coin-holding").classList.add("hidden");
   $("coin-swap-note").classList.add("hidden");
   document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
@@ -1405,247 +1544,12 @@ $("btn-coin-swap").addEventListener("click", () => {
   showScreen("screen-swap");
 });
 
-// ---------------------------------------------------------------- ACCOUNT (optional)
-// Username sign-in for the website only. It syncs three display settings
-// (currency, language, watchlist) and nothing else -- never keys, phrases,
-// addresses or balances. See accounts-api.js for the server side. The
-// browser never sends the raw password: it derives an auth key from
-// (username, password) and sends that instead. The whole feature stays
-// hidden unless the server reports that accounts are switched on.
-let accountEnabled = false;
-let accountUser = null;
-let accountMode = "signin";
-let accountApplying = false; // true while applying pulled settings, so that doesn't echo back as a push
-let accountPushTimer = null;
-
-async function accountApi(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    headers: Object.assign({ "X-TM-Requested-With": "web" }, body ? { "Content-Type": "application/json" } : {}),
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let json = null;
-  try { json = await res.json(); } catch (e) { /* non-JSON reply */ }
-  if (!res.ok) {
-    const err = new Error((json && json.error) || "server_error");
-    err.code = err.message;
-    err.status = res.status;
-    throw err;
-  }
-  return json;
-}
-
-async function deriveAccountAuthKey(username, password) {
-  const enc = new TextEncoder();
-  const material = await crypto.subtle.importKey("raw", enc.encode(password.normalize("NFKC")), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode("tm-account-v1:" + username), iterations: 310000 },
-    material,
-    256
-  );
-  return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function accountErrorText(code) {
-  const map = {
-    bad_credentials: "account.errBadLogin",
-    username_taken: "account.errTaken",
-    rate_limited: "account.errRateLimited",
-    unavailable: "account.errUnavailable",
-    bad_request: "account.errUsername",
-  };
-  return TM_I18N.t(map[code] || "account.errGeneric");
-}
-
-function updateAccountUi() {
-  const entry = $("btn-goto-account");
-  const onboardingLink = $("btn-onboarding-signin");
-  entry.classList.toggle("hidden", !accountEnabled);
-  onboardingLink.classList.toggle("hidden", !accountEnabled || !!accountUser);
-  if (accountUser) {
-    entry.removeAttribute("data-i18n"); // otherwise a language switch would overwrite the name
-    entry.textContent = TM_I18N.t("account.signedInAs", { username: accountUser });
-  } else {
-    entry.setAttribute("data-i18n", "account.entryBtn");
-    entry.textContent = TM_I18N.t("account.entryBtn");
-  }
-  $("account-signed-out").classList.toggle("hidden", !!accountUser);
-  $("account-signed-in").classList.toggle("hidden", !accountUser);
-  $("account-signed-in-as").textContent = accountUser ? TM_I18N.t("account.signedInAs", { username: accountUser }) : "";
-  $("account-back").dataset.back = $("account-back").dataset.back || "screen-settings";
-}
-
-function setAccountMode(mode) {
-  accountMode = mode;
-  document.querySelectorAll(".account-tab").forEach((b) => b.classList.toggle("active", b.dataset.accountMode === mode));
-  const creating = mode === "create";
-  $("account-confirm-row").classList.toggle("hidden", !creating);
-  $("account-username-hint").classList.toggle("hidden", !creating);
-  $("account-password").setAttribute("autocomplete", creating ? "new-password" : "current-password");
-  $("btn-account-submit").textContent = TM_I18N.t(creating ? "account.createSubmit" : "account.signInSubmit");
-  $("btn-account-submit").setAttribute("data-i18n", creating ? "account.createSubmit" : "account.signInSubmit");
-  hideError("account-error");
-}
-
-function openAccountScreen(fromScreen) {
-  $("account-back").dataset.back = fromScreen;
-  hideError("account-error");
-  $("account-status").classList.add("hidden");
-  $("account-password").value = "";
-  $("account-password2").value = "";
-  $("account-delete-password").value = "";
-  updateAccountUi();
-  showScreen("screen-account");
-}
-
-function accountSnapshot() {
-  return { currency: currentCurrency, language: TM_I18N.getLanguage(), watchlist: Array.from(watchlistSymbols) };
-}
-
-// Pull: the server's values win for currency and language; watchlists are
-// merged so stars set before signing in aren't lost. Returns true if the
-// merged result differs from what the server had (so we push it back).
-async function applyRemoteSettings(remote) {
-  if (!remote) return true; // nothing stored yet -- push what this device has
-  accountApplying = true;
-  let serverMissedSomething = false;
-  try {
-    if (remote.currency && TM_PRICES.SUPPORTED_CURRENCIES[remote.currency] && remote.currency !== currentCurrency) {
-      currentCurrency = remote.currency;
-      chrome.storage.local.set({ [TM_CURRENCY_KEY]: currentCurrency });
-      const sel = $("currency-select-settings");
-      if (sel) sel.value = currentCurrency;
-    }
-    if (remote.language && remote.language !== TM_I18N.getLanguage()) {
-      TM_I18N.setLanguage(remote.language);
-      document.querySelectorAll(".language-select").forEach((sel) => { sel.value = TM_I18N.getLanguage(); });
-    }
-    const remoteList = Array.isArray(remote.watchlist) ? remote.watchlist : [];
-    const before = watchlistSymbols.size;
-    remoteList.forEach((sym) => watchlistSymbols.add(String(sym).toUpperCase()));
-    if (watchlistSymbols.size !== before) {
-      chrome.storage.local.set({ [TM_WATCHLIST_KEY]: Array.from(watchlistSymbols) });
-    }
-    serverMissedSomething = Array.from(watchlistSymbols).some((s) => !remoteList.map((x) => String(x).toUpperCase()).includes(s));
-    // Re-render anything that shows prices or translated text.
-    try {
-      if (!$("screen-prices").classList.contains("hidden")) refreshPrices();
-      refreshMainPricesCard();
-      if (currentStatus && currentStatus.unlocked) { refreshBalanceUsd(); refreshTokens(); }
-    } catch (e) { /* best effort */ }
-  } finally {
-    accountApplying = false;
-  }
-  return serverMissedSomething;
-}
-
-function scheduleAccountPush() {
-  if (!accountUser || accountApplying) return;
-  clearTimeout(accountPushTimer);
-  accountPushTimer = setTimeout(pushAccountSettings, 1500);
-}
-
-async function pushAccountSettings() {
-  if (!accountUser) return;
-  try {
-    await accountApi("PUT", "/api/account/settings", { settings: accountSnapshot() });
-  } catch (e) {
-    if (e.status === 401) { accountUser = null; updateAccountUi(); } // session expired
-  }
-}
-
-async function onAccountSignedIn(resp) {
-  accountUser = resp.username;
-  const needsPush = await applyRemoteSettings(resp.settings);
-  if (needsPush) await pushAccountSettings();
-  updateAccountUi();
-}
-
-$("btn-goto-account").addEventListener("click", () => openAccountScreen("screen-settings"));
-$("btn-onboarding-signin").addEventListener("click", () => openAccountScreen("screen-onboarding"));
-document.querySelectorAll(".account-tab").forEach((b) => b.addEventListener("click", () => setAccountMode(b.dataset.accountMode)));
-
-$("btn-account-submit").addEventListener("click", async () => {
-  hideError("account-error");
-  $("account-status").classList.add("hidden");
-  const username = $("account-username").value.trim().toLowerCase();
-  const password = $("account-password").value;
-  if (!/^[a-z0-9_]{3,24}$/.test(username)) return showError("account-error", TM_I18N.t("account.errUsername"));
-  if (accountMode === "create") {
-    if (password.length < 10) return showError("account-error", TM_I18N.t("account.errPasswordShort"));
-    if (password !== $("account-password2").value) return showError("account-error", TM_I18N.t("account.errMismatch"));
-  } else if (!password) {
-    return showError("account-error", TM_I18N.t("account.errBadLogin"));
-  }
-  const btn = $("btn-account-submit");
-  btn.disabled = true;
-  $("account-status").textContent = TM_I18N.t("account.working");
-  $("account-status").classList.remove("hidden");
-  try {
-    const authKey = await deriveAccountAuthKey(username, password);
-    const resp = await accountApi("POST", accountMode === "create" ? "/api/account/register" : "/api/account/login", { username, authKey });
-    $("account-password").value = "";
-    $("account-password2").value = "";
-    await onAccountSignedIn(resp);
-    $("account-status").textContent = TM_I18N.t("account.synced");
-  } catch (e) {
-    $("account-status").classList.add("hidden");
-    showError("account-error", accountErrorText(e.code));
-  } finally {
-    btn.disabled = false;
-  }
+$("btn-coin-buy").addEventListener("click", () => {
+  const c = coinDetail.coin;
+  if (!c) return;
+  setupBuyScreen(c.symbol);
+  showScreen("screen-buy");
 });
-
-$("btn-account-signout").addEventListener("click", async () => {
-  try { await accountApi("POST", "/api/account/logout", {}); } catch (e) { /* signed out locally either way */ }
-  accountUser = null;
-  clearTimeout(accountPushTimer);
-  updateAccountUi();
-  setAccountMode("signin");
-});
-
-$("btn-account-delete").addEventListener("click", async () => {
-  hideError("account-error");
-  const password = $("account-delete-password").value;
-  if (!password) return showError("account-error", TM_I18N.t("account.deleteNeedsPassword"));
-  if (!window.confirm(TM_I18N.t("account.deleteConfirm"))) return;
-  try {
-    const authKey = await deriveAccountAuthKey(accountUser, password);
-    await accountApi("POST", "/api/account/delete", { authKey });
-    accountUser = null;
-    clearTimeout(accountPushTimer);
-    $("account-delete-password").value = "";
-    updateAccountUi();
-    setAccountMode("signin");
-  } catch (e) {
-    showError("account-error", accountErrorText(e.code));
-  }
-});
-
-// Keep the server copy in step whenever one of the synced settings changes.
-document.addEventListener("tm-language-changed", () => { updateAccountUi(); scheduleAccountPush(); });
-
-async function initAccount() {
-  try {
-    const res = await fetch("/api/account/status", { credentials: "same-origin" });
-    const st = await res.json();
-    accountEnabled = !!(st && st.enabled);
-  } catch (e) {
-    accountEnabled = false; // no API here (older server, file://, offline) -- feature stays hidden
-  }
-  updateAccountUi();
-  if (!accountEnabled) return;
-  try {
-    const me = await accountApi("GET", "/api/account/me");
-    accountUser = me.username;
-    const needsPush = await applyRemoteSettings(me.settings);
-    if (needsPush) scheduleAccountPush();
-  } catch (e) {
-    accountUser = null;
-  }
-  updateAccountUi();
-}
 
 // Compact live-prices card on the main screen -- just the first handful of
 // PRICE_BOARD's coins, at a glance, without navigating away. Best-effort
@@ -1736,25 +1640,31 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
-// of opening a new tab -- see lib/buy-config.js's header comment for why
-// that's safe. Each time the screen is (re)opened, this resets back to the
-// "not loaded yet" state: description text, address row and Continue
-// button visible, iframe hidden -- ready for a fresh click.
-function setupBuyScreen() {
-  hideError("buy-error");
-  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
-  $("buy-description-manual").classList.remove("hidden");
-  $("buy-description-autofill").classList.add("hidden");
-  $("buy-address-row").classList.remove("hidden");
-  $("btn-buy-open").classList.remove("hidden");
-  $("buy-frame-wrap").classList.add("hidden");
-  $("buy-frame").src = "about:blank";
-}
+// Buy hands off to Transak in a brand-new tab (see lib/transak-config.js's
+// header comment) -- nothing is embedded in an <iframe> here anymore.
+// Each time the screen is (re)opened, this just clears any stale error and
+// makes sure the button is enabled again.
+// A specific asset to default Transak's picker to, set by setupBuyScreen()
+// when Buy is opened from a coin-detail screen (see btn-coin-buy above).
+// Null for the plain "Buy crypto" entry point (Settings / main), where
+// Transak's own picker starts from its usual default.
+let buyPresetSymbol = null;
 
-$("btn-buy-copy-address").addEventListener("click", () => {
-  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
-});
+function setupBuyScreen(presetSymbol) {
+  hideError("buy-error");
+  buyPresetSymbol = presetSymbol || null;
+  const note = $("buy-preset-note");
+  if (note) {
+    if (buyPresetSymbol) {
+      note.textContent = TM_I18N.t("buy.presetNote", { symbol: buyPresetSymbol });
+      note.classList.remove("hidden");
+    } else {
+      note.classList.add("hidden");
+    }
+  }
+  const btn = $("btn-buy-open");
+  if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
+}
 
 $("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 
@@ -1763,22 +1673,9 @@ $("btn-buy-open").addEventListener("click", async () => {
   const btn = $("btn-buy-open");
   btn.disabled = true;
   try {
-    // Try for a signed URL with the address already filled in first (see
-    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
-    // manual "paste your address" flow) if that backend isn't configured
-    // or can't be reached. Either way this always embeds in the iframe
-    // below rather than opening a new tab.
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
-    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
-    $("buy-frame").src = url;
-    $("buy-frame-wrap").classList.remove("hidden");
-    btn.classList.add("hidden");
-    if (signedUrl) {
-      $("buy-description-manual").classList.add("hidden");
-      $("buy-description-autofill").classList.remove("hidden");
-      $("buy-address-row").classList.add("hidden");
-    }
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, currentCurrency, buyPresetSymbol);
+    window.open(url, "_blank", "noopener");
   } catch (e) {
     showError("buy-error", e.message);
   } finally {
@@ -1787,24 +1684,25 @@ $("btn-buy-open").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- SELL
-// Same embedding change as Buy -- see lib/sell-config.js's header comment
-// for why there's no address to auto-fill here.
+// Same new-tab handoff to Transak as Buy above.
 function setupSellScreen() {
   hideError("sell-error");
-  $("btn-sell-open").classList.remove("hidden");
-  $("sell-frame-wrap").classList.add("hidden");
-  $("sell-frame").src = "about:blank";
+  const btn = $("btn-sell-open");
+  if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
 }
 
-$("btn-sell-open").addEventListener("click", () => {
+$("btn-sell-open").addEventListener("click", async () => {
   hideError("sell-error");
+  const btn = $("btn-sell-open");
+  btn.disabled = true;
   try {
-    const url = TM_SELL_CONFIG.buildSellUrl(currentNetwork.key, currentCurrency);
-    $("sell-frame").src = url;
-    $("sell-frame-wrap").classList.remove("hidden");
-    $("btn-sell-open").classList.add("hidden");
+    const address = (currentStatus && currentStatus.selectedAddress) || "";
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, currentCurrency);
+    window.open(url, "_blank", "noopener");
   } catch (e) {
     showError("sell-error", e.message);
+  } finally {
+    btn.disabled = false;
   }
 });
 
@@ -2395,64 +2293,148 @@ $("btn-send-submit").addEventListener("click", async () => {
 function setupSwapScreen(pre) {
   hideError("swap-error");
   $("swap-status").classList.add("hidden");
-  $("swap-quote-display").classList.add("hidden");
+  closeAssetPicker();
+  clearSwapQuote();
+  $("swap-amount-in").value = "";
   const unsupported = !currentNetwork.swapRouter;
   $("swap-unsupported").classList.toggle("hidden", !unsupported);
   $("swap-form").classList.toggle("hidden", unsupported);
   if (!unsupported) populateSwapSelects(pre || {}).catch(() => {});
 }
 
-$("btn-swap-quote").addEventListener("click", async () => {
-  hideError("swap-error");
+// Resets the quote/breakdown area back to its empty state -- called on any
+// change (amount, asset, or slippage) so a stale quote/price is never left
+// on screen next to inputs that no longer match it.
+function clearSwapQuote() {
+  swapAutoQuoteGen++;
+  $("swap-quoting-hint").classList.add("hidden");
+  $("swap-quote-display").classList.add("hidden");
+  $("btn-swap-execute").disabled = true;
+  $("swap-amount-out").textContent = "0.0";
+  $("swap-amount-out").classList.remove("has-value");
+  $("swap-to-usd").textContent = "";
+  $("swap-from-usd").textContent = "";
+  delete $("swap-quote-display").dataset.tokenIn;
+  delete $("swap-quote-display").dataset.tokenOut;
+  delete $("swap-quote-display").dataset.totalAmountInWei;
+  delete $("swap-quote-display").dataset.netAmountInWei;
+  delete $("swap-quote-display").dataset.amountOutWei;
+  delete $("swap-quote-display").dataset.decimalsOut;
+}
+
+// Looks up a live unit price for a held/custom asset, in currentCurrency.
+// Returns null (rather than throwing) on anything unpriced -- USD display
+// is a nice-to-have here, never a blocker for getting a quote.
+async function getAssetUsdPrice(address) {
   try {
-    const tokenIn = $("swap-from-custom").value.trim() || TM_NATIVE();
-    const tokenOut = $("swap-to-custom").value.trim() || TM_NATIVE();
-    const amountStr = $("swap-amount-in").value.trim();
-    let decimalsIn = 18;
+    if (!address) return await TM_PRICES.getNativePriceForNetwork(currentNetwork.key, currentCurrency);
+    const res = await TM_PRICES.getTokenPricesByContract(currentNetwork.key, [address], currentCurrency);
+    const entry = res[address.toLowerCase()];
+    return entry ? entry.price : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderSwapMinReceived() {
+  const ds = $("swap-quote-display").dataset;
+  if (!ds.amountOutWei) return;
+  const slippageBps = Number($("swap-slippage").value);
+  const minWei = ethers.BigNumber.from(ds.amountOutWei).mul(10000 - slippageBps).div(10000);
+  const symbolOut = ds.symbolOut || "";
+  $("swap-min-received-line").textContent =
+    `${ethers.utils.formatUnits(minWei, Number(ds.decimalsOut) || 18)} ${symbolOut}`;
+}
+$("swap-slippage").addEventListener("change", renderSwapMinReceived);
+
+let swapAutoQuoteGen = 0;
+let swapAutoQuoteTimer = null;
+function scheduleSwapAutoQuote() {
+  clearTimeout(swapAutoQuoteTimer);
+  swapAutoQuoteTimer = setTimeout(runSwapAutoQuote, 450);
+}
+
+async function runSwapAutoQuote() {
+  const myGen = ++swapAutoQuoteGen;
+  hideError("swap-error");
+  const tokenIn = $("swap-from-custom").value.trim() || TM_NATIVE();
+  const tokenOut = $("swap-to-custom").value.trim() || TM_NATIVE();
+  const amountStr = $("swap-amount-in").value.trim();
+  const amountNum = Number(amountStr);
+  if (!currentNetwork.swapRouter || !amountStr || !isFinite(amountNum) || amountNum <= 0) {
+    $("swap-quoting-hint").classList.add("hidden");
+    return;
+  }
+  $("swap-quoting-hint").classList.remove("hidden");
+  $("swap-quote-display").classList.add("hidden");
+  $("btn-swap-execute").disabled = true;
+  try {
+    let decimalsIn = 18, symbolIn = (currentNetwork.nativeCurrency && currentNetwork.nativeCurrency.symbol) || "";
     if (tokenIn !== TM_NATIVE()) {
       const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenIn });
-      decimalsIn = info.decimals;
+      decimalsIn = info.decimals; symbolIn = info.symbol || symbolIn;
     }
     // This is the TOTAL amount the user is putting in -- the app fee comes
     // off the top of this before anything is swapped (see TM_SWAP_QUOTE in
     // background.js / lib/fee-config.js).
-    const totalAmountInWei = ethers.utils.parseUnits(amountStr || "0", decimalsIn);
+    const totalAmountInWei = ethers.utils.parseUnits(amountStr, decimalsIn);
     const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
+    if (myGen !== swapAutoQuoteGen) return; // superseded by a newer edit
 
-    let decimalsOut = 18;
+    let decimalsOut = 18, symbolOut = (currentNetwork.nativeCurrency && currentNetwork.nativeCurrency.symbol) || "";
     if (tokenOut !== TM_NATIVE()) {
       const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: tokenOut });
-      decimalsOut = info.decimals;
+      decimalsOut = info.decimals; symbolOut = info.symbol || symbolOut;
     }
+    if (myGen !== swapAutoQuoteGen) return;
+
+    const amountOutStr = ethers.utils.formatUnits(quote.amountOutWei, decimalsOut);
+    $("swap-amount-out").textContent = Number(amountOutStr).toLocaleString(undefined, { maximumFractionDigits: 6 });
+    $("swap-amount-out").classList.add("has-value");
+
+    const rate = amountNum > 0 ? Number(amountOutStr) / amountNum : 0;
+    $("swap-rate-line").textContent = `1 ${symbolIn} \u2248 ${rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${symbolOut}`;
     $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
       percent: quote.feePercentLabel,
       amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
+      symbol: symbolIn,
     });
-    $("swap-net-line").textContent = TM_I18N.t("swap.netAmountLine", {
-      amount: ethers.utils.formatUnits(quote.netAmountInWei, decimalsIn),
-    });
-    $("swap-quote-line").textContent = TM_I18N.t("swap.estimatedOutLine", {
-      amount: ethers.utils.formatUnits(quote.amountOutWei, decimalsOut),
-    });
-    $("swap-quote-display").dataset.tokenIn = tokenIn;
-    $("swap-quote-display").dataset.tokenOut = tokenOut;
-    $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
-    $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
+
+    const ds = $("swap-quote-display").dataset;
+    ds.tokenIn = tokenIn; ds.tokenOut = tokenOut;
+    ds.totalAmountInWei = totalAmountInWei.toString();
+    ds.netAmountInWei = quote.netAmountInWei;
+    ds.amountOutWei = quote.amountOutWei.toString();
+    ds.decimalsOut = String(decimalsOut);
+    ds.symbolOut = symbolOut;
+    renderSwapMinReceived();
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
     $("btn-swap-approve").classList.add("hidden");
+    $("btn-swap-execute").disabled = false;
     if (tokenIn !== TM_NATIVE()) {
       const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
       if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
         $("btn-swap-approve").classList.remove("hidden");
+        $("btn-swap-execute").disabled = true; // approve first, same sequencing as before
       }
     }
+    if (myGen !== swapAutoQuoteGen) return;
+    $("swap-quoting-hint").classList.add("hidden");
     $("swap-quote-display").classList.remove("hidden");
+
+    // Live USD estimates, best-effort -- never block the quote on these.
+    const [priceIn, priceOut] = await Promise.all([getAssetUsdPrice(tokenIn === TM_NATIVE() ? "" : tokenIn), getAssetUsdPrice(tokenOut === TM_NATIVE() ? "" : tokenOut)]);
+    if (myGen !== swapAutoQuoteGen) return;
+    $("swap-from-usd").textContent = priceIn != null ? TM_PRICES.formatMoney(amountNum * priceIn, currentCurrency) : "";
+    $("swap-to-usd").textContent = priceOut != null ? TM_PRICES.formatMoney(Number(amountOutStr) * priceOut, currentCurrency) : "";
   } catch (e) {
+    if (myGen !== swapAutoQuoteGen) return;
+    $("swap-quoting-hint").classList.add("hidden");
     showError("swap-error", e.message);
   }
-});
+}
 
 $("btn-swap-approve").addEventListener("click", async () => {
   hideError("swap-error");
@@ -2464,6 +2446,7 @@ $("btn-swap-approve").addEventListener("click", async () => {
     await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: netAmountInWei });
     $("swap-status").textContent = TM_I18N.t("swap.approvedStatus");
     $("btn-swap-approve").classList.add("hidden");
+    $("btn-swap-execute").disabled = false;
   } catch (e) {
     showError("swap-error", e.message);
   }
@@ -2480,7 +2463,10 @@ $("btn-swap-execute").addEventListener("click", async () => {
     $("swap-status").classList.remove("hidden");
     const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
+    $("swap-amount-in").value = "";
+    clearSwapQuote();
     await refreshBalance();
+    populateSwapSelects({ toKey: swapState.toKey }).catch(() => {});
   } catch (e) {
     showError("swap-error", e.message);
   }
@@ -2786,7 +2772,6 @@ function populateCurrencySelect() {
   sel.addEventListener("change", async (e) => {
     currentCurrency = e.target.value;
     chrome.storage.local.set({ [TM_CURRENCY_KEY]: currentCurrency });
-    scheduleAccountPush();
     // Re-render whatever's currently showing a price so the switch feels
     // immediate rather than waiting for the next natural refresh.
     if (currentStatus && currentStatus.unlocked) {
@@ -3298,7 +3283,6 @@ function renderActivity() {
   await loadWatchlist();
   await loadCurrency();
   populateCurrencySelect();
-  initAccount(); // not awaited: the wallet must never wait on the network
   await loadSendDelay();
   populateSendDelaySelect();
   await loadAutoLockMinutes();
