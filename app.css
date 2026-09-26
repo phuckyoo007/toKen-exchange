@@ -1343,6 +1343,14 @@ html[dir="rtl"] .mono { direction: ltr; unicode-bidi: embed; text-align: right; 
    body.tm-web-wallet so it only ever applies here.
    ============================================================ */
 html { background: #08070a; }
+/* iOS Safari's pull-down rubber-band bounce temporarily extends the
+   visible area above the page's normal top, which briefly exposes more
+   of the fixed #bg-scene backdrop above/around the app card than the
+   design ever intends to show on its own (the gradient in #bg-scene is
+   tuned for a normal, non-bounced viewport). Turning off the bounce
+   removes that gap entirely rather than just swapping which image sits
+   behind it. */
+html, body.tm-web-wallet { overscroll-behavior-y: none; }
 body.tm-web-wallet {
   position: relative;
   width: auto;
