@@ -34,10 +34,9 @@ const COINGECKO_IDS = {
   USDC: "usd-coin",
   EURC: "euro-coin", // Circle's EUR stablecoin -- NOT independently re-verified against a live
                       // CoinGecko coin page the way the ids above were; spot-check before relying on it.
-  GBPT: "poundtoken", // Fasset's GBP-pegged stablecoin -- CoinGecko slug confirmed via their own coin page.
-  JPYC: "jpycoin", // JPYC Inc.'s JPY-pegged stablecoin -- CoinGecko slug confirmed via their own coin page.
-  BRZ: "brazilian-digital-token", // Transfero's BRL-pegged stablecoin (ticker BRZ) -- CoinGecko slug confirmed via their own coin page.
-  MXNT: "mexican-peso-tether", // Tether's MXN-pegged stablecoin -- CoinGecko slug confirmed via their own coin page.
+  JPYC: "jpycoin", // JPYC Inc.'s JPY-pegged stablecoin -- verified live against CoinGecko's /coins/jpycoin endpoint.
+  BRZ: "brz", // Transfero's BRL-pegged stablecoin -- verified live against CoinGecko's /coins/brz endpoint
+             // (NOT "brazilian-digital-token" -- that id doesn't exist on CoinGecko despite matching its display name).
   AVAX: "avalanche-2", // NOT "avalanche" -- CoinGecko's own quirk, verified on their coin page
   LINK: "chainlink",
   DOT: "polkadot",
@@ -242,10 +241,12 @@ const DEFAULT_CURRENCY = "usd";
 const FIAT_STABLECOIN_PEG = {
   usd: "USDT",
   eur: "EURC",
-  gbp: "GBPT",
   jpy: "JPYC",
   brl: "BRZ",
-  mxn: "MXNT",
+  // gbp and mxn deliberately left out: "GBPT"/"poundtoken" and "MXNT" both
+  // came back "coin not found" (zero hits, even by name) when re-checked
+  // live against CoinGecko's own API and search endpoint -- so per the
+  // policy above, they stay non-clickable rather than link to a dead page.
 };
 
 // Compact form for big numbers (market cap, volume): $1.2T, CHF 340B, 12.5M.
