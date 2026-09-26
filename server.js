@@ -3,10 +3,8 @@ const path = require("path");
 const fs = require("fs");
 const handler = require("serve-handler");
 const { handleFeatureRequestsApi } = require("./feature-requests-api");
-const { handleSwapQuoteApi } = require("./swap-quote-api");
-const { handleAuthApi } = require("./auth-api");
-const { handleCoinbaseOnrampApi } = require("./coinbase-onramp-api");
-const { handleTransakApi } = require("./transak-widget-api");
+const { handleMoonpaySignApi } = require("./moonpay-sign-api");
+const { handleAccountsApi } = require("./accounts-api");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -17,11 +15,11 @@ const FONTS_DIR = path.join(PUBLIC_DIR, "fonts");
 const IMG_DIR = path.join(PUBLIC_DIR, "img");
 const PORT = process.env.PORT || 3000;
 
-const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "manifest.json", "privacy.html", "terms.html", "support.html"];
+const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "manifest.json"];
 const LIB_FILES = [
-"account.js", "coinbase-onramp-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
-"identicon.js", "networks.js", "onramper-config.js", "polymarket.js", "prices.js",
-"sanctions-list.js", "support-config.js", "swap.js", "transak-config.js", "wallet.js",
+"buy-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
+"identicon.js", "networks.js", "polymarket.js", "prices.js", "sell-config.js",
+"sanctions-list.js", "support-config.js", "swap.js", "wallet.js",
 "walletconnect-config.js",
 ];
 const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];
@@ -30,8 +28,6 @@ const IMG_FILES = [
 "bg-scene.jpg", "spinner-coin.png", "splash.jpg", "splash-light.jpg",
 "apple-touch-icon.png", "icon-192.png", "icon-512.png", "favicon-32.png",
 "card-banner.jpg", "card-watermark.jpg", "card-watermark-light.jpg",
-"flag-en.svg", "flag-ar.svg", "flag-zh.svg", "flag-es.svg", "flag-fr.svg",
-"flag-hi.svg", "flag-pt.svg", "flag-ja.svg", "flag-ru.svg",
 ];
 
 function copyIfExists(srcName, destDir) {
@@ -79,10 +75,8 @@ layoutPublicDir();
 copyVendorFiles();
 const server = http.createServer((req, res) => {
 if (handleFeatureRequestsApi(req, res)) return;
-if (handleSwapQuoteApi(req, res)) return;
-if (handleAuthApi(req, res)) return;
-if (handleCoinbaseOnrampApi(req, res)) return;
-if (handleTransakApi(req, res)) return;
+if (handleMoonpaySignApi(req, res)) return;
+if (handleAccountsApi(req, res)) return;
 handler(req, res, { public: PUBLIC_DIR });
 });
 server.listen(PORT, () => console.log("Serving on port " + PORT));

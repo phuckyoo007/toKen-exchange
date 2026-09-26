@@ -414,7 +414,6 @@ $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScre
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
 $("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
-$("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
 
 // ---------------------------------------------------------------- TOKENS
@@ -451,8 +450,8 @@ async function refreshTokens() {
     row.className = "token-row";
     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
     const priceEntry = prices[t.address.toLowerCase()];
-    const priceNum = priceEntry && typeof priceEntry.price === "number" ? priceEntry.price : null;
-    const usdText = priceNum != null ? formatCurrency(Number(formatted) * priceNum) : "";
+    const usdText =
+      priceEntry && typeof priceEntry.price === "number" ? formatCurrency(Number(formatted) * priceEntry.price) : "";
     const nameEl = document.createElement("span");
     nameEl.className = "token-name muted small";
     nameEl.textContent = t.name || (t.error ? TM_I18N.t("tokens.loadError") : "");
@@ -475,39 +474,18 @@ async function refreshTokens() {
       balEl.appendChild(usdSpan);
     }
 
-    // The whole row (icon, name, balance) opens the same in-app coin
-    // detail screen the Prices tab uses -- same pattern as .price-link
-    // there. It already knows how to show "you're holding X" and offer a
-    // swap when the symbol matches something in this wallet, so this just
-    // wires the missing entry point rather than adding new UI.
-    const linkBtn = document.createElement("button");
-    linkBtn.type = "button";
-    linkBtn.className = "token-link";
-    const linkLabel = TM_I18N.t("prices.viewCoin", { name: t.name || t.symbol });
-    linkBtn.setAttribute("aria-label", linkLabel);
-    linkBtn.title = linkLabel;
-    linkBtn.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol));
-    linkBtn.appendChild(mainEl);
-    linkBtn.appendChild(balEl);
-    linkBtn.addEventListener("click", () => {
-      const id = TM_PRICES.COINGECKO_IDS[normalizeCoinSymbol(t.symbol)];
-      openCoinDetail(
-        { symbol: t.symbol, name: t.name || t.symbol, price: priceNum, change24h: null, url: id ? `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}` : null },
-        "screen-main"
-      );
-    });
-
     const removeBtn = document.createElement("button");
     removeBtn.className = "token-remove-btn";
     removeBtn.title = TM_I18N.t("tokens.removeTitle");
     removeBtn.textContent = "×";
-    removeBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
+    removeBtn.addEventListener("click", async () => {
       await sendMsg("TM_REMOVE_TRACKED_TOKEN", { tokenAddress: t.address });
       await refreshTokens();
     });
 
-    row.appendChild(linkBtn);
+    row.insertAdjacentHTML("beforeend", tokenIconHtml(t.symbol));
+    row.appendChild(mainEl);
+    row.appendChild(balEl);
     row.appendChild(removeBtn);
     list.appendChild(row);
   });
@@ -609,6 +587,7 @@ function toggleWatchlist(symbol) {
   if (watchlistSymbols.has(key)) watchlistSymbols.delete(key);
   else watchlistSymbols.add(key);
   chrome.storage.local.set({ [TM_WATCHLIST_KEY]: Array.from(watchlistSymbols) });
+  scheduleAccountPush();
 }
 
 // Stable sort (guaranteed by the spec for Array#sort) -- starred coins move
@@ -659,26 +638,10 @@ let pricesRatesData = [];
 function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
-  const pegSymbol = TM_PRICES.FIAT_STABLECOIN_PEG[r.code.toLowerCase()];
-  const nameHtml = `<span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>`;
-  const quoteHtml = `<span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>`;
-  if (pegSymbol) {
-    // Currencies with a known, well-established pegged stablecoin (see
-    // FIAT_STABLECOIN_PEG) open that stablecoin's coin-detail screen --
-    // the closest thing to "this currency, as a cryptocurrency". Price/
-    // change here start null; openCoinDetail's own loadCoinInfo() fills
-    // them in from CoinGecko once the screen opens, same as any other row.
-    const linkLabel = TM_I18N.t("prices.viewPeggedCoin", { currency: r.name, name: pegSymbol });
-    row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}">${nameHtml}</button>${quoteHtml}`;
-    row.querySelector(".price-link").addEventListener("click", () => {
-      openCoinDetail(
-        { symbol: pegSymbol, name: pegSymbol, price: null, change24h: null, url: `https://www.coingecko.com/en/coins/${encodeURIComponent(TM_PRICES.COINGECKO_IDS[pegSymbol])}` },
-        $("screen-prices").classList.contains("hidden") ? "screen-main" : "screen-prices"
-      );
-    });
-  } else {
-    row.innerHTML = nameHtml + quoteHtml;
-  }
+  row.innerHTML = `
+    <span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>
+    <span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>
+  `;
   return row;
 }
 
@@ -1049,6 +1012,257 @@ $("btn-coin-swap").addEventListener("click", () => {
   showScreen("screen-swap");
 });
 
+// ---------------------------------------------------------------- ACCOUNT (optional)
+// Username sign-in for the website only. It syncs three display settings
+// (currency, language, watchlist) and nothing else -- never keys, phrases,
+// addresses or balances. See accounts-api.js for the server side. The
+// browser never sends the raw password: it derives an auth key from
+// (username, password) and sends that instead. The whole feature stays
+// hidden unless the server reports that accounts are switched on.
+let accountEnabled = false;
+let accountUser = null;
+let accountMode = "signin";
+let accountApplying = false; // true while applying pulled settings, so that doesn't echo back as a push
+let accountPushTimer = null;
+
+// EXTENSION NOTE: this popup runs at a chrome-extension:// origin, a
+// different origin from the wallet's website, so it cannot share the
+// website's session cookie or call its same-origin-only API. initAccount()
+// below simply finds no reachable API, accountEnabled stays false, and the
+// whole feature stays hidden here -- no separate flag needed. Real
+// extension support would need bearer-token cross-origin auth, not built
+// yet.
+
+async function accountApi(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers: Object.assign({ "X-TM-Requested-With": "web" }, body ? { "Content-Type": "application/json" } : {}),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json = null;
+  try { json = await res.json(); } catch (e) { /* non-JSON reply */ }
+  if (!res.ok) {
+    const err = new Error((json && json.error) || "server_error");
+    err.code = err.message;
+    err.status = res.status;
+    throw err;
+  }
+  return json;
+}
+
+async function deriveAccountAuthKey(username, password) {
+  const enc = new TextEncoder();
+  const material = await crypto.subtle.importKey("raw", enc.encode(password.normalize("NFKC")), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode("tm-account-v1:" + username), iterations: 310000 },
+    material,
+    256
+  );
+  return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function accountErrorText(code) {
+  const map = {
+    bad_credentials: "account.errBadLogin",
+    username_taken: "account.errTaken",
+    rate_limited: "account.errRateLimited",
+    unavailable: "account.errUnavailable",
+    bad_request: "account.errUsername",
+  };
+  return TM_I18N.t(map[code] || "account.errGeneric");
+}
+
+function updateAccountUi() {
+  const entry = $("btn-goto-account");
+  const onboardingLink = $("btn-onboarding-signin");
+  entry.classList.toggle("hidden", !accountEnabled);
+  onboardingLink.classList.toggle("hidden", !accountEnabled || !!accountUser);
+  if (accountUser) {
+    entry.removeAttribute("data-i18n"); // otherwise a language switch would overwrite the name
+    entry.textContent = TM_I18N.t("account.signedInAs", { username: accountUser });
+  } else {
+    entry.setAttribute("data-i18n", "account.entryBtn");
+    entry.textContent = TM_I18N.t("account.entryBtn");
+  }
+  $("account-signed-out").classList.toggle("hidden", !!accountUser);
+  $("account-signed-in").classList.toggle("hidden", !accountUser);
+  $("account-signed-in-as").textContent = accountUser ? TM_I18N.t("account.signedInAs", { username: accountUser }) : "";
+  $("account-back").dataset.back = $("account-back").dataset.back || "screen-settings";
+}
+
+function setAccountMode(mode) {
+  accountMode = mode;
+  document.querySelectorAll(".account-tab").forEach((b) => b.classList.toggle("active", b.dataset.accountMode === mode));
+  const creating = mode === "create";
+  $("account-confirm-row").classList.toggle("hidden", !creating);
+  $("account-username-hint").classList.toggle("hidden", !creating);
+  $("account-password").setAttribute("autocomplete", creating ? "new-password" : "current-password");
+  $("btn-account-submit").textContent = TM_I18N.t(creating ? "account.createSubmit" : "account.signInSubmit");
+  $("btn-account-submit").setAttribute("data-i18n", creating ? "account.createSubmit" : "account.signInSubmit");
+  hideError("account-error");
+}
+
+function openAccountScreen(fromScreen) {
+  $("account-back").dataset.back = fromScreen;
+  hideError("account-error");
+  $("account-status").classList.add("hidden");
+  $("account-password").value = "";
+  $("account-password2").value = "";
+  $("account-delete-password").value = "";
+  updateAccountUi();
+  showScreen("screen-account");
+}
+
+function accountSnapshot() {
+  return { currency: currentCurrency, language: TM_I18N.getLanguage(), watchlist: Array.from(watchlistSymbols) };
+}
+
+// Pull: the server's values win for currency and language; watchlists are
+// merged so stars set before signing in aren't lost. Returns true if the
+// merged result differs from what the server had (so we push it back).
+async function applyRemoteSettings(remote) {
+  if (!remote) return true; // nothing stored yet -- push what this device has
+  accountApplying = true;
+  let serverMissedSomething = false;
+  try {
+    if (remote.currency && TM_PRICES.SUPPORTED_CURRENCIES[remote.currency] && remote.currency !== currentCurrency) {
+      currentCurrency = remote.currency;
+      chrome.storage.local.set({ [TM_CURRENCY_KEY]: currentCurrency });
+    scheduleAccountPush();
+      const sel = $("currency-select-settings");
+      if (sel) sel.value = currentCurrency;
+    }
+    if (remote.language && remote.language !== TM_I18N.getLanguage()) {
+      TM_I18N.setLanguage(remote.language);
+      document.querySelectorAll(".language-select").forEach((sel) => { sel.value = TM_I18N.getLanguage(); });
+    }
+    const remoteList = Array.isArray(remote.watchlist) ? remote.watchlist : [];
+    const before = watchlistSymbols.size;
+    remoteList.forEach((sym) => watchlistSymbols.add(String(sym).toUpperCase()));
+    if (watchlistSymbols.size !== before) {
+      chrome.storage.local.set({ [TM_WATCHLIST_KEY]: Array.from(watchlistSymbols) });
+    }
+    serverMissedSomething = Array.from(watchlistSymbols).some((s) => !remoteList.map((x) => String(x).toUpperCase()).includes(s));
+    // Re-render anything that shows prices or translated text.
+    try {
+      if (!$("screen-prices").classList.contains("hidden")) refreshPrices();
+      refreshMainPricesCard();
+      if (currentStatus && currentStatus.unlocked) { refreshBalanceUsd(); refreshTokens(); }
+    } catch (e) { /* best effort */ }
+  } finally {
+    accountApplying = false;
+  }
+  return serverMissedSomething;
+}
+
+function scheduleAccountPush() {
+  if (!accountUser || accountApplying) return;
+  clearTimeout(accountPushTimer);
+  accountPushTimer = setTimeout(pushAccountSettings, 1500);
+}
+
+async function pushAccountSettings() {
+  if (!accountUser) return;
+  try {
+    await accountApi("PUT", "/api/account/settings", { settings: accountSnapshot() });
+  } catch (e) {
+    if (e.status === 401) { accountUser = null; updateAccountUi(); } // session expired
+  }
+}
+
+async function onAccountSignedIn(resp) {
+  accountUser = resp.username;
+  const needsPush = await applyRemoteSettings(resp.settings);
+  if (needsPush) await pushAccountSettings();
+  updateAccountUi();
+}
+
+$("btn-goto-account").addEventListener("click", () => openAccountScreen("screen-settings"));
+$("btn-onboarding-signin").addEventListener("click", () => openAccountScreen("screen-onboarding"));
+document.querySelectorAll(".account-tab").forEach((b) => b.addEventListener("click", () => setAccountMode(b.dataset.accountMode)));
+
+$("btn-account-submit").addEventListener("click", async () => {
+  hideError("account-error");
+  $("account-status").classList.add("hidden");
+  const username = $("account-username").value.trim().toLowerCase();
+  const password = $("account-password").value;
+  if (!/^[a-z0-9_]{3,24}$/.test(username)) return showError("account-error", TM_I18N.t("account.errUsername"));
+  if (accountMode === "create") {
+    if (password.length < 10) return showError("account-error", TM_I18N.t("account.errPasswordShort"));
+    if (password !== $("account-password2").value) return showError("account-error", TM_I18N.t("account.errMismatch"));
+  } else if (!password) {
+    return showError("account-error", TM_I18N.t("account.errBadLogin"));
+  }
+  const btn = $("btn-account-submit");
+  btn.disabled = true;
+  $("account-status").textContent = TM_I18N.t("account.working");
+  $("account-status").classList.remove("hidden");
+  try {
+    const authKey = await deriveAccountAuthKey(username, password);
+    const resp = await accountApi("POST", accountMode === "create" ? "/api/account/register" : "/api/account/login", { username, authKey });
+    $("account-password").value = "";
+    $("account-password2").value = "";
+    await onAccountSignedIn(resp);
+    $("account-status").textContent = TM_I18N.t("account.synced");
+  } catch (e) {
+    $("account-status").classList.add("hidden");
+    showError("account-error", accountErrorText(e.code));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-account-signout").addEventListener("click", async () => {
+  try { await accountApi("POST", "/api/account/logout", {}); } catch (e) { /* signed out locally either way */ }
+  accountUser = null;
+  clearTimeout(accountPushTimer);
+  updateAccountUi();
+  setAccountMode("signin");
+});
+
+$("btn-account-delete").addEventListener("click", async () => {
+  hideError("account-error");
+  const password = $("account-delete-password").value;
+  if (!password) return showError("account-error", TM_I18N.t("account.deleteNeedsPassword"));
+  if (!window.confirm(TM_I18N.t("account.deleteConfirm"))) return;
+  try {
+    const authKey = await deriveAccountAuthKey(accountUser, password);
+    await accountApi("POST", "/api/account/delete", { authKey });
+    accountUser = null;
+    clearTimeout(accountPushTimer);
+    $("account-delete-password").value = "";
+    updateAccountUi();
+    setAccountMode("signin");
+  } catch (e) {
+    showError("account-error", accountErrorText(e.code));
+  }
+});
+
+// Keep the server copy in step whenever one of the synced settings changes.
+document.addEventListener("tm-language-changed", () => { updateAccountUi(); scheduleAccountPush(); });
+
+async function initAccount() {
+  try {
+    const res = await fetch("/api/account/status", { credentials: "same-origin" });
+    const st = await res.json();
+    accountEnabled = !!(st && st.enabled);
+  } catch (e) {
+    accountEnabled = false; // no API here (older server, file://, offline) -- feature stays hidden
+  }
+  updateAccountUi();
+  if (!accountEnabled) return;
+  try {
+    const me = await accountApi("GET", "/api/account/me");
+    accountUser = me.username;
+    const needsPush = await applyRemoteSettings(me.settings);
+    if (needsPush) scheduleAccountPush();
+  } catch (e) {
+    accountUser = null;
+  }
+  updateAccountUi();
+}
+
 // Compact live-prices card on the main screen -- just the first handful of
 // PRICE_BOARD's coins, at a glance, without navigating away. Best-effort
 // like the balance/token refreshes above: a rate-limited or unreachable
@@ -1138,15 +1352,25 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy hands off to Transak in a brand-new tab (see lib/transak-config.js's
-// header comment) -- nothing is embedded in an <iframe> here anymore.
-// Each time the screen is (re)opened, this just clears any stale error and
-// makes sure the button is enabled again.
+// Buy embeds MoonPay's widget in an <iframe> right on this screen instead
+// of opening a new tab -- see lib/buy-config.js's header comment for why
+// that's safe. Each time the screen is (re)opened, this resets back to the
+// "not loaded yet" state: description text, address row and Continue
+// button visible, iframe hidden -- ready for a fresh click.
 function setupBuyScreen() {
   hideError("buy-error");
-  const btn = $("btn-buy-open");
-  if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
+  $("buy-address-display").textContent = (currentStatus && currentStatus.selectedAddress) || "";
+  $("buy-description-manual").classList.remove("hidden");
+  $("buy-description-autofill").classList.add("hidden");
+  $("buy-address-row").classList.remove("hidden");
+  $("btn-buy-open").classList.remove("hidden");
+  $("buy-frame-wrap").classList.add("hidden");
+  $("buy-frame").src = "about:blank";
 }
+
+$("btn-buy-copy-address").addEventListener("click", () => {
+  navigator.clipboard.writeText((currentStatus && currentStatus.selectedAddress) || "");
+});
 
 $("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 
@@ -1155,34 +1379,24 @@ $("btn-buy-open").addEventListener("click", async () => {
   const btn = $("btn-buy-open");
   btn.disabled = true;
   try {
+    // Try for a signed URL with the address already filled in first (see
+    // lib/buy-config.js) -- falls back to the plain unsigned URL (today's
+    // manual "paste your address" flow) if that backend isn't configured
+    // or can't be reached. Either way this always embeds in the iframe
+    // below rather than opening a new tab.
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, currentCurrency);
-    window.open(url, "_blank", "noopener");
+    const signedUrl = await TM_BUY_CONFIG.buildSignedBuyUrl(currentNetwork.key, address);
+    const url = signedUrl || TM_BUY_CONFIG.buildBuyUrl(currentNetwork.key);
+    $("buy-frame").src = url;
+    $("buy-frame-wrap").classList.remove("hidden");
+    btn.classList.add("hidden");
+    if (signedUrl) {
+      $("buy-description-manual").classList.add("hidden");
+      $("buy-description-autofill").classList.remove("hidden");
+      $("buy-address-row").classList.add("hidden");
+    }
   } catch (e) {
     showError("buy-error", e.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-// ---------------------------------------------------------------- SELL
-// Same new-tab handoff to Transak as Buy above.
-function setupSellScreen() {
-  hideError("sell-error");
-  const btn = $("btn-sell-open");
-  if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
-}
-
-$("btn-sell-open").addEventListener("click", async () => {
-  hideError("sell-error");
-  const btn = $("btn-sell-open");
-  btn.disabled = true;
-  try {
-    const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, currentCurrency);
-    window.open(url, "_blank", "noopener");
-  } catch (e) {
-    showError("sell-error", e.message);
   } finally {
     btn.disabled = false;
   }
@@ -1959,6 +2173,7 @@ function renderActivity() {
   populateLanguageSelects();
   await loadWatchlist();
   await loadCurrency();
+  initAccount(); // not awaited; see EXTENSION NOTE above -- stays inert here
   populateCurrencySelect();
 
   const params = new URLSearchParams(location.search);
