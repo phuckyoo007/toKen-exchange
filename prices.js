@@ -32,11 +32,6 @@ const COINGECKO_IDS = {
   ADA: "cardano",
   USDT: "tether",
   USDC: "usd-coin",
-  EURC: "euro-coin", // Circle's EUR stablecoin -- NOT independently re-verified against a live
-                      // CoinGecko coin page the way the ids above were; spot-check before relying on it.
-  JPYC: "jpycoin", // JPYC Inc.'s JPY-pegged stablecoin -- verified live against CoinGecko's /coins/jpycoin endpoint.
-  BRZ: "brz", // Transfero's BRL-pegged stablecoin -- verified live against CoinGecko's /coins/brz endpoint
-             // (NOT "brazilian-digital-token" -- that id doesn't exist on CoinGecko despite matching its display name).
   AVAX: "avalanche-2", // NOT "avalanche" -- CoinGecko's own quirk, verified on their coin page
   LINK: "chainlink",
   DOT: "polkadot",
@@ -168,21 +163,40 @@ const FULL_PRICE_BOARD = PRICE_BOARD.concat(EXTRA_PRICE_BOARD);
 // keyless API can price directly (no separate FX-rate lookup needed) -- see
 // https://docs.coingecko.com/reference/simple-supported-vs-currencies.
 // Symbol is just for display; the code is what's actually sent to CoinGecko.
+// `stablecoin` is set only where a real, currently-circulating,
+// non-negligible stablecoin actually exists for that currency (checked
+// against issuer sites, exchange listings and news coverage, Sept 2026,
+// re-checked 2026-09-20 specifically to look for anything new since the
+// first pass) -- most currencies below have none, and none is invented
+// for them. A currency stays unmapped when the only options found are
+// still in a regulatory sandbox/pilot rather than open circulation (CHF's
+// CHFD, Malaysia's RMJDT), haven't actually launched despite announcements
+// (India's ARC, Taiwan/Thailand's planned tokens), or come from an
+// issuer whose legitimacy couldn't be verified (Chile's CLPX, dormant
+// since a 2021 announcement) -- an unverifiable or pre-launch pick is
+// worse than none. HKDAP (HKD) is real and live but currently
+// institutional-only (retail access is planned, not yet open) -- still
+// listed since it's genuinely circulating, not merely announced.
+// Every one of these regional/non-USD stablecoins is far smaller and less
+// liquid than USDC -- collectively they're under 0.5% of total stablecoin
+// market share -- so this is shown as informational context on the
+// Currencies tab (see coin.stablecoinNote), never as a swap option this
+// wallet actually offers or a recommendation to hold one.
 const SUPPORTED_CURRENCIES = {
   // ---- Fiat (national currencies). Every code below is in CoinGecko's own
   // /simple/supported_vs_currencies list (checked Sept 2026). `decimals`
   // defaults to 2; currencies with no minor unit in everyday use show 0,
   // and the Gulf dinars that split into 1000ths show 3.
-  usd: { symbol: "$", label: "USD", name: "US Dollar", type: "fiat" },
-  eur: { symbol: "€", label: "EUR", name: "Euro", type: "fiat" },
-  gbp: { symbol: "£", label: "GBP", name: "British Pound", type: "fiat" },
-  jpy: { symbol: "¥", label: "JPY", name: "Japanese Yen", type: "fiat", decimals: 0 },
-  cad: { symbol: "CA$", label: "CAD", name: "Canadian Dollar", type: "fiat" },
-  aud: { symbol: "AU$", label: "AUD", name: "Australian Dollar", type: "fiat" },
+  usd: { symbol: "$", label: "USD", name: "US Dollar", type: "fiat", stablecoin: "USDC" },
+  eur: { symbol: "€", label: "EUR", name: "Euro", type: "fiat", stablecoin: "EURC" },
+  gbp: { symbol: "£", label: "GBP", name: "British Pound", type: "fiat", stablecoin: "tGBP" },
+  jpy: { symbol: "¥", label: "JPY", name: "Japanese Yen", type: "fiat", decimals: 0, stablecoin: "JPYC" },
+  cad: { symbol: "CA$", label: "CAD", name: "Canadian Dollar", type: "fiat", stablecoin: "QCAD" },
+  aud: { symbol: "AU$", label: "AUD", name: "Australian Dollar", type: "fiat", stablecoin: "AUDD" },
   inr: { symbol: "₹", label: "INR", name: "Indian Rupee", type: "fiat" },
-  brl: { symbol: "R$", label: "BRL", name: "Brazilian Real", type: "fiat" },
-  aed: { symbol: "AED", label: "AED", name: "UAE Dirham", type: "fiat" },
-  ars: { symbol: "AR$", label: "ARS", name: "Argentine Peso", type: "fiat" },
+  brl: { symbol: "R$", label: "BRL", name: "Brazilian Real", type: "fiat", stablecoin: "BRZ" },
+  aed: { symbol: "AED", label: "AED", name: "UAE Dirham", type: "fiat", stablecoin: "AE Coin" },
+  ars: { symbol: "AR$", label: "ARS", name: "Argentine Peso", type: "fiat", stablecoin: "wARS" },
   bdt: { symbol: "৳", label: "BDT", name: "Bangladeshi Taka", type: "fiat" },
   bhd: { symbol: "BHD", label: "BHD", name: "Bahraini Dinar", type: "fiat", decimals: 3 },
   bmd: { symbol: "BD$", label: "BMD", name: "Bermudian Dollar", type: "fiat" },
@@ -192,32 +206,35 @@ const SUPPORTED_CURRENCIES = {
   czk: { symbol: "Kč", label: "CZK", name: "Czech Koruna", type: "fiat" },
   dkk: { symbol: "kr", label: "DKK", name: "Danish Krone", type: "fiat" },
   gel: { symbol: "₾", label: "GEL", name: "Georgian Lari", type: "fiat" },
-  hkd: { symbol: "HK$", label: "HKD", name: "Hong Kong Dollar", type: "fiat" },
+  hkd: { symbol: "HK$", label: "HKD", name: "Hong Kong Dollar", type: "fiat", stablecoin: "HKDAP" },
   huf: { symbol: "Ft", label: "HUF", name: "Hungarian Forint", type: "fiat", decimals: 0 },
-  idr: { symbol: "Rp", label: "IDR", name: "Indonesian Rupiah", type: "fiat", decimals: 0 },
-  ils: { symbol: "₪", label: "ILS", name: "Israeli Shekel", type: "fiat" },
-  krw: { symbol: "₩", label: "KRW", name: "South Korean Won", type: "fiat", decimals: 0 },
+  idr: { symbol: "Rp", label: "IDR", name: "Indonesian Rupiah", type: "fiat", decimals: 0, stablecoin: "IDRX" },
+  ils: { symbol: "₪", label: "ILS", name: "Israeli Shekel", type: "fiat", stablecoin: "BILS" },
+  krw: { symbol: "₩", label: "KRW", name: "South Korean Won", type: "fiat", decimals: 0, stablecoin: "KRWQ" },
   kwd: { symbol: "KWD", label: "KWD", name: "Kuwaiti Dinar", type: "fiat", decimals: 3 },
   lkr: { symbol: "Rs", label: "LKR", name: "Sri Lankan Rupee", type: "fiat" },
   mmk: { symbol: "K", label: "MMK", name: "Myanmar Kyat", type: "fiat", decimals: 0 },
-  mxn: { symbol: "MX$", label: "MXN", name: "Mexican Peso", type: "fiat" },
+  mxn: { symbol: "MX$", label: "MXN", name: "Mexican Peso", type: "fiat", stablecoin: "MXNe" },
   myr: { symbol: "RM", label: "MYR", name: "Malaysian Ringgit", type: "fiat" },
-  ngn: { symbol: "₦", label: "NGN", name: "Nigerian Naira", type: "fiat" },
+  ngn: { symbol: "₦", label: "NGN", name: "Nigerian Naira", type: "fiat", stablecoin: "cNGN" },
   nok: { symbol: "kr", label: "NOK", name: "Norwegian Krone", type: "fiat" },
-  nzd: { symbol: "NZ$", label: "NZD", name: "New Zealand Dollar", type: "fiat" },
-  php: { symbol: "₱", label: "PHP", name: "Philippine Peso", type: "fiat" },
+  nzd: { symbol: "NZ$", label: "NZD", name: "New Zealand Dollar", type: "fiat", stablecoin: "NZDS" },
+  php: { symbol: "₱", label: "PHP", name: "Philippine Peso", type: "fiat", stablecoin: "PHPC" },
   pkr: { symbol: "Rs", label: "PKR", name: "Pakistani Rupee", type: "fiat" },
   pln: { symbol: "zł", label: "PLN", name: "Polish Zloty", type: "fiat" },
+  // No stablecoin listed for the Russian ruble: the one that exists
+  // (A7A5) is tied to sanctions-evasion reporting, not something this
+  // wallet associates a currency with even informationally.
   rub: { symbol: "₽", label: "RUB", name: "Russian Ruble", type: "fiat" },
   sar: { symbol: "SAR", label: "SAR", name: "Saudi Riyal", type: "fiat" },
   sek: { symbol: "kr", label: "SEK", name: "Swedish Krona", type: "fiat" },
-  sgd: { symbol: "S$", label: "SGD", name: "Singapore Dollar", type: "fiat" },
+  sgd: { symbol: "S$", label: "SGD", name: "Singapore Dollar", type: "fiat", stablecoin: "XSGD" },
   thb: { symbol: "฿", label: "THB", name: "Thai Baht", type: "fiat" },
-  try: { symbol: "₺", label: "TRY", name: "Turkish Lira", type: "fiat" },
+  try: { symbol: "₺", label: "TRY", name: "Turkish Lira", type: "fiat", stablecoin: "TRYB" },
   twd: { symbol: "NT$", label: "TWD", name: "New Taiwan Dollar", type: "fiat" },
   uah: { symbol: "₴", label: "UAH", name: "Ukrainian Hryvnia", type: "fiat" },
   vnd: { symbol: "₫", label: "VND", name: "Vietnamese Dong", type: "fiat", decimals: 0 },
-  zar: { symbol: "R", label: "ZAR", name: "South African Rand", type: "fiat" },
+  zar: { symbol: "R", label: "ZAR", name: "South African Rand", type: "fiat", stablecoin: "ZARP" },
 
   // ---- Crypto (also valid CoinGecko vs_currencies, so balances and prices
   // can be shown in them directly). Shown with significant digits rather
@@ -229,25 +246,6 @@ const SUPPORTED_CURRENCIES = {
   xrp: { symbol: "XRP", label: "XRP", name: "XRP", type: "crypto" },
 };
 const DEFAULT_CURRENCY = "usd";
-
-// Maps a fiat currency code (as used in SUPPORTED_CURRENCIES above) to the
-// symbol of the major, well-established stablecoin pegged 1:1 to it -- what
-// the Prices > Currencies tab's row links out to when tapped. Deliberately
-// small: most fiat currencies have no widely-used, liquid pegged stablecoin,
-// and a wrong or obscure pick here would be actively misleading, so a
-// currency with no confident entry just isn't clickable rather than
-// guessing. Extend this list only with ids verified the same way the ones
-// in COINGECKO_IDS above are.
-const FIAT_STABLECOIN_PEG = {
-  usd: "USDT",
-  eur: "EURC",
-  jpy: "JPYC",
-  brl: "BRZ",
-  // gbp and mxn deliberately left out: "GBPT"/"poundtoken" and "MXNT" both
-  // came back "coin not found" (zero hits, even by name) when re-checked
-  // live against CoinGecko's own API and search endpoint -- so per the
-  // policy above, they stay non-clickable rather than link to a dead page.
-};
 
 // Compact form for big numbers (market cap, volume): $1.2T, CHF 340B, 12.5M.
 function formatMoneyCompact(amount, currency) {
@@ -507,10 +505,18 @@ async function getFiatRates(currency) {
   const out = [];
   Object.keys(SUPPORTED_CURRENCIES).forEach((code) => {
     const info = SUPPORTED_CURRENCIES[code];
-    if (info.type !== "fiat" || code === display) return;
+    if (info.type !== "fiat") return;
+    // The display currency itself is included too (rate 1) rather than
+    // hidden -- showing "1 USD = 1.00 USD" when displaying in USD is a
+    // little redundant, but people expect to see their own currency in
+    // the list rather than have it silently disappear.
+    if (code === display) {
+      out.push({ code: info.label, name: info.name, rate: 1, stablecoin: info.stablecoin || null, isDisplayCurrency: true });
+      return;
+    }
     const r = rates[code];
     if (!r || !r.value) return;
-    out.push({ code: info.label, name: info.name, rate: base.value / r.value });
+    out.push({ code: info.label, name: info.name, rate: base.value / r.value, stablecoin: info.stablecoin || null });
   });
   return out;
 }
@@ -523,6 +529,24 @@ async function getNativePriceForNetwork(networkKey, currency) {
   if (!id) return null;
   const { data, currency: vsCurrency } = await fetchPrices([id], currency);
   return data[id] ? data[id][vsCurrency] : null;
+}
+
+// Same lookup as getNativePriceForNetwork, but also returns the 24h %
+// change -- fetchPrices already requests include_24hr_change=true (see
+// above), getNativePriceForNetwork just wasn't reading that field back out.
+// Kept as its own function rather than changing getNativePriceForNetwork's
+// return shape, so existing callers of that one are untouched.
+async function getNativePriceAndChangeForNetwork(networkKey, currency) {
+  const id = NETWORK_NATIVE_COINGECKO_ID[networkKey];
+  if (!id) return { price: null, change24h: null };
+  const { data, currency: vsCurrency } = await fetchPrices([id], currency);
+  const entry = data[id];
+  if (!entry) return { price: null, change24h: null };
+  const changeKey = `${vsCurrency}_24h_change`;
+  return {
+    price: entry[vsCurrency] != null ? entry[vsCurrency] : null,
+    change24h: typeof entry[changeKey] === "number" ? entry[changeKey] : null,
+  };
 }
 
 // Maps this wallet's internal network `key` to CoinGecko's "asset platform"
@@ -584,12 +608,12 @@ if (typeof self !== "undefined") {
     formatMoney,
     formatMoneyCompact,
     getNativePriceForNetwork,
+    getNativePriceAndChangeForNetwork,
     getTokenPricesByContract,
     COINGECKO_IDS,
     NETWORK_NATIVE_COINGECKO_ID,
     NETWORK_COINGECKO_PLATFORM,
     SUPPORTED_CURRENCIES,
-    FIAT_STABLECOIN_PEG,
     DEFAULT_CURRENCY,
   };
 }
