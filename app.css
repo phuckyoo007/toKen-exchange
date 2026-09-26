@@ -1254,15 +1254,6 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
 }
 .language-picker select:focus { box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 3px rgba(221, 172, 77, 0.15); }
 #screen-onboarding .language-picker { margin-bottom: 10px; }
-/* Send delay and auto-lock have both a long label ("Send delay (cancel
-   window)", "Auto-lock after inactivity") and long option text ("30 seconds
-   (recommended)", "Off (never auto-lock)") -- the shared 62% max-width above
-   was clipping the selected value instead of wrapping it. Give these two
-   their own full-width row underneath the label instead. */
-#send-delay-select, #auto-lock-select {
-  flex: 1 1 100%;
-  max-width: 100%;
-}
 
 /* ---------------- RTL (Arabic) ----------------
    Applied via dir="rtl" on <html>, set by lib/i18n.js whenever Arabic is
