@@ -6,9 +6,11 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "^1.56.0",
     "serve-handler": "^6.1.6",
     "ethers": "5.7.2",
     "@walletconnect/sign-client": "2.24.0",
+    "playwright": "^1.63.0",
     "qrcode-generator": "2.0.4"
   },
   "engines": {
