@@ -146,14 +146,16 @@
     "buy.description1": "Buy is powered by Transak, a separate third-party service -- Token Exchange never touches your payment details.",
     "buy.noThirdPartyCallout": "Already hold some crypto? Skip Transak entirely -- swap it for what you need directly on-chain, no third party, no signup.",
     "buy.noThirdPartySwapBtn": "Swap instead",
-    "buy.description2": "Transak opens in a new tab, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.",
+    "buy.description2": "Transak's buy flow opens right here in the app, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.",
     "buy.presetNote": "Preset to buy {symbol} -- you can still pick a different asset once Transak opens.",
     "buy.continueBtn": "Continue to Transak",
+    "buy.closeWidgetBtn": "← Close",
 
     "sell.title": "Sell for cash",
     "sell.description1": "Sell is powered by Transak, the same third-party service Buy uses -- Token Exchange never touches your payout details.",
-    "sell.description2": "Transak opens in a new tab and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.",
+    "sell.description2": "Transak's sell flow opens right here in the app and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.",
     "sell.continueBtn": "Continue to Transak",
+    "sell.closeWidgetBtn": "← Close",
 
     "support.title": "Help & support",
     "support.description": "Ask a question or tap a topic below. This runs entirely on your device -- nothing you type here is sent anywhere.",

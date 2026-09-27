@@ -1971,19 +1971,38 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy hands off to Transak in a brand-new tab (see lib/transak-config.js's
-// header comment) -- nothing is embedded in an <iframe> here anymore.
-// Each time the screen is (re)opened, this just clears any stale error and
-// makes sure the button is enabled again.
-// A specific asset to default Transak's picker to, set by setupBuyScreen()
-// when Buy is opened from a coin-detail screen (see btn-coin-buy above).
-// Null for the plain "Buy crypto" entry point (Settings / main), where
-// Transak's own picker starts from its usual default.
+// Buy opens Transak's own widget in an <iframe> embedded right in this
+// screen, instead of bouncing out to a new tab -- Transak is still the one
+// handling payment/KYC, this just keeps you inside the app for it (the same
+// pattern MetaMask's own Buy flow uses). The widget URL is still built
+// exactly the same way as before (see lib/transak-config.js /
+// transak-widget-api.js at the repo root) -- it's single-use and expires in
+// 5 minutes, so a fresh one is always fetched when "Continue to Transak" is
+// pressed, never cached or reused across opens.
+//
+// Scope note: this iframe embedding only applies here, in the full-size
+// website/app view (index.html + this file). The toolbar extension popup
+// (popup.html/popup.js -- a separate, duplicated copy of this Buy/Sell code)
+// deliberately keeps the old "opens in a new tab" behavior. Transak's own
+// iframe integration docs flag that the KYC camera-capture step doesn't
+// work reliably inside a small popup that can lose focus and auto-close
+// mid-flow, and a bank-linking flow deserves more room than a ~360x600px
+// popup regardless. Nothing in popup.js needed to change for that reason.
 let buyPresetSymbol = null;
+
+function resetBuyWidget() {
+  const widget = $("buy-widget");
+  const iframe = $("buy-iframe");
+  const intro = $("buy-intro");
+  if (iframe) iframe.src = "about:blank"; // stop whatever Transak had loaded (releases camera/mic too)
+  if (widget) widget.classList.add("hidden");
+  if (intro) intro.classList.remove("hidden");
+}
 
 function setupBuyScreen(presetSymbol) {
   hideError("buy-error");
   buyPresetSymbol = presetSymbol || null;
+  resetBuyWidget();
   const note = $("buy-preset-note");
   if (note) {
     if (buyPresetSymbol) {
@@ -2006,7 +2025,9 @@ $("btn-buy-open").addEventListener("click", async () => {
   try {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
     const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, currentCurrency, buyPresetSymbol);
-    window.open(url, "_blank", "noopener");
+    $("buy-iframe").src = url;
+    $("buy-intro").classList.add("hidden");
+    $("buy-widget").classList.remove("hidden");
   } catch (e) {
     showError("buy-error", e.message);
   } finally {
@@ -2014,10 +2035,24 @@ $("btn-buy-open").addEventListener("click", async () => {
   }
 });
 
+$("btn-buy-widget-close").addEventListener("click", resetBuyWidget);
+$("btn-buy-back").addEventListener("click", resetBuyWidget);
+
 // ---------------------------------------------------------------- SELL
-// Same new-tab handoff to Transak as Buy above.
+// Same in-app iframe embedding as Buy above -- see the scope note there for
+// why the toolbar popup keeps its own separate new-tab handoff.
+function resetSellWidget() {
+  const widget = $("sell-widget");
+  const iframe = $("sell-iframe");
+  const intro = $("sell-intro");
+  if (iframe) iframe.src = "about:blank";
+  if (widget) widget.classList.add("hidden");
+  if (intro) intro.classList.remove("hidden");
+}
+
 function setupSellScreen() {
   hideError("sell-error");
+  resetSellWidget();
   const btn = $("btn-sell-open");
   if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
 }
@@ -2029,13 +2064,18 @@ $("btn-sell-open").addEventListener("click", async () => {
   try {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
     const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, currentCurrency);
-    window.open(url, "_blank", "noopener");
+    $("sell-iframe").src = url;
+    $("sell-intro").classList.add("hidden");
+    $("sell-widget").classList.remove("hidden");
   } catch (e) {
     showError("sell-error", e.message);
   } finally {
     btn.disabled = false;
   }
 });
+
+$("btn-sell-widget-close").addEventListener("click", resetSellWidget);
+$("btn-sell-back").addEventListener("click", resetSellWidget);
 
 // ---------------------------------------------------------------- SETTINGS
 $("btn-add-account").addEventListener("click", async () => {

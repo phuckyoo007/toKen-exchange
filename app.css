@@ -921,6 +921,21 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   padding: 10px 12px; border-radius: 7px;
   font-size: 12px; line-height: 1.5; color: var(--text);
 }
+/* Buy/Sell's embedded Transak widget (see app.js's BUY/SELL section for why
+   this is an iframe now instead of a new-tab handoff). #buy-widget/
+   #sell-widget start out hidden (plain .hidden, display:none !important)
+   and swap places with #buy-intro/#sell-intro when a widget URL loads. */
+.transak-widget {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.transak-widget-close {
+  align-self: flex-start; padding: 4px 2px; font-size: 13px;
+}
+.transak-iframe {
+  width: 100%; height: 560px; max-height: 70vh;
+  border: 0; border-radius: 14px;
+  background: #fff; /* Transak's own widget assumes a light host background */
+}
 /* QR codes need real light/dark contrast to stay scannable, so this stays
    a plain white card regardless of the app's own dark theme -- the same
    compromise every dark-themed wallet's QR view makes. */
