@@ -296,9 +296,22 @@ function friendlyErrorMessage(raw) {
   return looksTechnical ? "Something went wrong talking to the network. Please try again." : msg;
 }
 
-function showError(id, message) {
+// raw: true skips the friendlyErrorMessage() filter above. That filter
+// exists to hide raw ethers/RPC garbage (the stuff with "code=",
+// "version=providers", a jsonrpc blob, etc) behind a calm generic message --
+// but it's overly broad: its "contains a {...}" check also catches a
+// perfectly readable message that just happens to quote a small JSON detail
+// from a REST API we called ourselves, which is exactly the shape Transak
+// error messages come in (see buildTransakUrl() / transak-widget-api.js's
+// "Transak declined the request: <detail>" template). Those are already
+// plain-language and already ours to curate, so Buy/Sell pass raw: true
+// here rather than have their one useful diagnostic line get swallowed into
+// "Something went wrong talking to the network" -- which is exactly what
+// was happening and made a real Transak-side rejection look identical to a
+// generic network hiccup.
+function showError(id, message, raw) {
   const el = $(id);
-  el.textContent = friendlyErrorMessage(message);
+  el.textContent = raw ? String(message) : friendlyErrorMessage(message);
   el.classList.remove("hidden");
 }
 function hideError(id) { $(id).classList.add("hidden"); }
@@ -2029,7 +2042,7 @@ $("btn-buy-open").addEventListener("click", async () => {
     $("buy-intro").classList.add("hidden");
     $("buy-widget").classList.remove("hidden");
   } catch (e) {
-    showError("buy-error", e.message);
+    showError("buy-error", e.message, true);
   } finally {
     btn.disabled = false;
   }
@@ -2068,7 +2081,7 @@ $("btn-sell-open").addEventListener("click", async () => {
     $("sell-intro").classList.add("hidden");
     $("sell-widget").classList.remove("hidden");
   } catch (e) {
-    showError("sell-error", e.message);
+    showError("sell-error", e.message, true);
   } finally {
     btn.disabled = false;
   }
