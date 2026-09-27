@@ -97,7 +97,10 @@
     <input type="password" id="signin-password" placeholder="Password" autocomplete="current-password" />
     <button id="btn-signin-submit" class="primary">Sign in</button>
     <p id="signin-error" class="error hidden"></p>
-    <button class="link back-btn" data-back="screen-onboarding">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-onboarding" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span>Back</span>
+    </button>
   </section>
 
   <!-- CREATE -->
@@ -109,7 +112,10 @@
       <input type="password" id="create-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
       <p class="warn" data-i18n="create.passwordWarning">No recovery if you lose this -- only your seed phrase can restore your wallet.</p>
       <button id="btn-create-submit" class="primary" data-i18n="create.continueBtn">Continue</button>
-      <button class="link back-btn" data-back="screen-onboarding" data-i18n="common.back">Back</button>
+      <button type="button" class="back-btn top-back-btn" data-back="screen-onboarding" aria-label="Back">
+        <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+        <span data-i18n="common.back">Back</span>
+      </button>
     </div>
     <div id="create-step-backup" class="hidden">
       <p class="warn" data-i18n="create.backupWarning">Write this down and keep it safe. Anyone who sees it can empty this wallet, and we can't recover it for you.</p>
@@ -128,7 +134,10 @@
     <input type="password" id="import-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
     <input type="password" id="import-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
     <button id="btn-import-submit" class="primary" data-i18n="import.submitBtn">Import</button>
-    <button class="link back-btn" data-back="screen-onboarding" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-onboarding" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="import-error" class="error hidden"></p>
   </section>
 
@@ -271,7 +280,10 @@
     <h2 data-i18n="activity.title">Activity</h2>
     <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
     <div id="activity-list"></div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <!-- SEND (also a cube face -- see note above) -->
@@ -309,7 +321,10 @@
       <p id="send-confirm-poison-warning" class="error poison-warning hidden"></p>
       <button id="btn-send-cancel" class="secondary" data-i18n="send.cancelBtn">Cancel send</button>
     </div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="send-status" class="hint hidden"></p>
     <p id="send-error" class="error hidden"></p>
   </section>
@@ -318,6 +333,7 @@
   <section id="screen-add-token" class="screen hidden">
     <h2 data-i18n="addToken.title">Add token</h2>
     <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
+    <div id="add-token-quick" class="quick-add-chips hidden"></div>
     <label data-i18n="addToken.addressLabel">Token contract address</label>
     <input type="text" id="add-token-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
     <button id="btn-token-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
@@ -327,7 +343,10 @@
       <p class="muted"><span data-i18n="addToken.decimalsLabel">Decimals:</span> <span id="add-token-decimals" class="mono"></span></p>
       <button id="btn-token-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
     </div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="add-token-error" class="error hidden"></p>
   </section>
 
@@ -347,7 +366,10 @@
       <p id="add-nft-meta-warning" class="hint hidden" data-i18n="addNft.metaWarning">Couldn't load this NFT's image/name from its metadata URI, but the contract and token ID check out -- you can still add it and try again later.</p>
       <button id="btn-nft-confirm-add" class="primary" data-i18n="addToken.confirmBtn">Add to my wallet</button>
     </div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="add-nft-error" class="error hidden"></p>
   </section>
 
@@ -364,7 +386,10 @@
     <div id="prices-list" class="prices-list"></div>
     <p id="prices-error" class="error hidden"></p>
     <p id="prices-status" class="hint hidden"></p>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <!-- COIN DETAIL (opened from a Live prices row) -->
@@ -402,7 +427,10 @@
     <p id="coin-about" class="muted"></p>
     <p><a id="coin-link-cg" class="link" target="_blank" rel="noopener noreferrer" data-i18n="coin.viewCoingecko">View on CoinGecko</a></p>
     <p id="coin-error" class="error hidden"></p>
-    <button id="coin-back" class="link back-btn" data-back="screen-prices" data-i18n="common.back">Back</button>
+    <button type="button" id="coin-back" class="back-btn top-back-btn" data-back="screen-prices" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <!-- PREDICTIONS (read-only) -->
@@ -412,7 +440,10 @@
     <div id="predictions-list" class="prices-list"></div>
     <p id="predictions-error" class="error hidden"></p>
     <p id="predictions-status" class="hint hidden"></p>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <!-- BUY -->
@@ -426,7 +457,10 @@
     <p class="muted" data-i18n="buy.description2">Transak opens in a new tab, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
     <p id="buy-preset-note" class="hint hidden"></p>
     <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="buy-error" class="error hidden"></p>
   </section>
 
@@ -436,7 +470,10 @@
     <p class="muted" data-i18n="sell.description1">Sell is powered by Transak, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
     <p class="muted" data-i18n="sell.description2">Transak opens in a new tab and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.</p>
     <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to Transak</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="sell-error" class="error hidden"></p>
   </section>
 
@@ -518,7 +555,10 @@
         <button id="btn-swap-execute" class="primary" disabled data-i18n="common.swap">Swap</button>
       </div>
     </div>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="swap-status" class="hint hidden"></p>
     <p id="swap-error" class="error hidden"></p>
 
@@ -579,7 +619,10 @@
     </div>
     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <!-- ACCOUNT (optional encrypted backup/sync via username+password) -->
@@ -621,7 +664,10 @@
 
     <p id="account-status" class="hint hidden"></p>
     <p id="account-error" class="error hidden"></p>
-    <button class="link back-btn" data-back="screen-settings">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span>Back</span>
+    </button>
   </section>
 
   <section id="screen-feedback" class="screen hidden">
@@ -636,7 +682,10 @@
     <div id="feedback-list"></div>
     <p id="feedback-empty" class="muted hidden" data-i18n="feedback.empty">No requests yet -- be the first!</p>
     <p class="muted" data-i18n="feedback.contactLine">Prefer email? Reach us at msandersod@gmail.com</p>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <section id="screen-contacts" class="screen hidden">
@@ -662,7 +711,10 @@
     <div class="tokens-header"><span class="tokens-title" data-i18n="wc.sessionsTitle">CONNECTED DAPPS</span></div>
     <div id="wc-sessions-list"></div>
     <p id="wc-sessions-empty" class="muted" data-i18n="wc.sessionsEmpty">No dapps connected yet.</p>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
   </section>
 
   <section id="screen-import-key" class="screen hidden">
@@ -670,7 +722,10 @@
     <p class="muted small" data-i18n="importKey.description">This adds a separate account to this wallet from a raw private key, not from your recovery phrase -- back it up on its own, since your recovery phrase won't restore it. Never share a private key with anyone; anyone who has it can spend everything in that account.</p>
     <input type="text" id="import-key-input" data-i18n-placeholder="importKey.placeholder" placeholder="0x private key" />
     <button id="btn-import-key-submit" class="primary" data-i18n="import.submitBtn">Import</button>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="import-key-error" class="error hidden"></p>
   </section>
 
@@ -680,7 +735,10 @@
     <input type="text" id="add-watch-address" data-i18n-placeholder="addWatch.addressPlaceholder" placeholder="0x..." />
     <input type="text" id="add-watch-label" data-i18n-placeholder="addWatch.labelPlaceholder" placeholder="Label (optional)" />
     <button id="btn-add-watch-submit" class="primary" data-i18n="addWatch.submitBtn">Add</button>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="add-watch-error" class="error hidden"></p>
   </section>
 
@@ -694,7 +752,10 @@
     <input type="text" id="approval-check-spender" data-i18n-placeholder="approvals.spenderPlaceholder" placeholder="Spender address (0x...)" />
     <button id="btn-approval-check" class="secondary" data-i18n="approvals.checkBtn">Check allowance</button>
     <div id="approval-check-result" class="tx-details hidden"></div>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="approvals-error" class="error hidden"></p>
   </section>
 
@@ -708,7 +769,10 @@
     <input type="text" id="net-router" data-i18n-placeholder="addNetwork.routerPlaceholder" placeholder="Verified swap router address (optional)" />
     <p class="warn" data-i18n="addNetwork.routerWarning">Only fill in the router address if you've personally verified it against the project's official docs or the chain's block explorer. Leave blank if unsure -- swapping will simply be disabled for this network until you add one.</p>
     <button id="btn-add-network-submit" class="primary" data-i18n="addNetwork.addBtn">Add</button>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="add-network-error" class="error hidden"></p>
   </section>
 
@@ -717,7 +781,10 @@
     <input type="password" id="view-seed-password" data-i18n-placeholder="viewSeed.passwordPlaceholder" placeholder="Enter password to reveal" />
     <button id="btn-view-seed-submit" class="primary" data-i18n="viewSeed.revealBtn">Reveal</button>
     <div id="view-seed-display" class="mnemonic-box hidden"></div>
-    <button class="link back-btn" data-back="screen-settings" data-i18n="common.back">Back</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-settings" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
     <p id="view-seed-error" class="error hidden"></p>
   </section>
 
@@ -725,7 +792,10 @@
     <h2 data-i18n="reset.title">Reset wallet</h2>
     <p class="warn" data-i18n="reset.warning">This deletes the encrypted wallet from this browser. Make sure you have your recovery phrase backed up -- this cannot be undone.</p>
     <button id="btn-reset-confirm" class="danger" data-i18n="reset.confirmBtn">Yes, delete everything</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.cancel">Cancel</button>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Cancel">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.cancel">Cancel</span>
+    </button>
   </section>
 
   <!-- APPROVAL SCREENS (opened as separate popup window for dapp requests) -->

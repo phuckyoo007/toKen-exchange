@@ -1272,6 +1272,62 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .decoded-tx .decoded-arg .muted { flex-shrink: 0; }
 
 .back-btn { align-self: flex-start; }
+
+/* Floating "jackpot chip" back button, pinned to the top corner of the
+   screen instead of sitting inline in the flow. Several screens run long
+   (Prices, Activity, Settings) and a back-btn buried at the bottom of a
+   scrolled list is a lot of scrolling to reach -- this floats above the
+   content the whole time so there's always an obvious, one-tap way out.
+   `position: fixed` (not sticky) is deliberate: #app has `overflow: hidden`
+   for its rounded corners, and that silently defeats position:sticky
+   descendants (the scroll happens on the page/body, not on #app's own
+   scrollport, so a sticky child never sees a scroll event to react to) --
+   fixed anchors to the real viewport instead and isn't affected by that.
+   Same gold coin-gradient as .primary so it reads as part of the same
+   "jackpot pill" button family, plus a slow glow pulse so it doesn't just
+   blend into the screen behind it. */
+.top-back-btn {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 50;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px 8px 12px;
+  background: linear-gradient(180deg, #fff6df 0%, var(--gold-bright) 32%, var(--gold) 68%, var(--gold-deep) 100%);
+  color: var(--gold-ink);
+  border: 1.5px solid #8a6a10;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.55);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.01em;
+  animation: topBackBtnGlow 2.6s ease-in-out infinite;
+}
+.top-back-btn:hover { filter: brightness(1.08); }
+.top-back-btn-coin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--gold-ink); color: var(--gold-bright);
+  font-size: 12px; font-weight: 900; line-height: 1;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+}
+@keyframes topBackBtnGlow {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.55), 0 0 0 rgba(243,212,136,0); }
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.55), 0 0 13px rgba(243,212,136,0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .top-back-btn { animation: none; }
+}
+/* Above 460px wide, #app-frame stops filling the viewport and becomes a
+   centered floating card (see body.tm-web-wallet #app-frame above), with
+   #app itself inset 18px inside that frame's own 32px top offset --
+   realign the fixed button from the browser window's corner to that
+   card's inner edge (still a 10px inset from #app, matching the mobile
+   default) so it reads as part of the app instead of floating off in the
+   page margin. */
+@media (min-width: 461px) {
+  body.tm-web-wallet .top-back-btn { top: 60px; left: calc(50% - 195px + 10px); }
+  html[dir="rtl"] body.tm-web-wallet .top-back-btn { left: auto; right: calc(50% - 195px + 10px); }
+}
+html[dir="rtl"] .top-back-btn { left: auto; right: 10px; }
+
 pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(--font-mono); }
 
 /* ---------------- support chat ---------------- */
@@ -1304,6 +1360,20 @@ pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: var(
   cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .support-chip:hover { background: var(--bg-hover); border-color: var(--gold-deep); }
+
+/* Add Token's "quick add" shortcuts -- same chip look as the support-chip
+   suggestions above, reused here for the handful of stablecoins verified
+   in KNOWN_STABLECOIN_ADDRESSES on whichever network is currently selected. */
+.quick-add-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 2px; }
+.quick-add-label { color: var(--text-muted); font-size: 11.5px; margin-right: 2px; }
+.quick-add-chip {
+  background: var(--bg-raised); border: 1px solid var(--line-strong);
+  color: var(--gold); border-radius: 20px;
+  padding: 6px 12px; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.quick-add-chip:hover { background: var(--bg-hover); border-color: var(--gold-deep); }
+.quick-add-chip:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
 .support-input-row { display: flex; gap: 8px; }
 .support-input-row input { flex: 1; }
 .support-input-row button { flex-shrink: 0; }
@@ -1534,6 +1604,10 @@ body.tm-web-wallet #splash-tagline .footer-lock { color: var(--gold-deep); font-
 .price-id .price-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .price-row .price-id .price-symbol,
 html[dir="rtl"] .price-row .price-id .price-symbol { margin: 0; font-size: 11px; letter-spacing: 0.02em; }
+.price-net-tag {
+  color: var(--success); font-size: 10px; margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .price-right { flex-shrink: 0; gap: 6px; }
 .price-quote { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .price-quote .price-change,

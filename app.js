@@ -1010,9 +1010,50 @@ function resetAddTokenScreen() {
   $("add-token-address").value = "";
   $("add-token-preview").classList.add("hidden");
   delete $("add-token-preview").dataset.address;
+  renderAddTokenQuick();
 }
 
-$("btn-token-lookup").addEventListener("click", async () => {
+// Same handful of hand-verified addresses used to rescue a coin-detail dead
+// end (see KNOWN_STABLECOIN_ADDRESSES) also means Add Token doesn't have to
+// start from a blank "paste a contract address" field every time -- if one
+// of those stablecoins is verified on the network you're already on, a
+// single tap fills the field and runs the exact same on-chain lookup below,
+// so you still see and confirm what's about to be added, no shortcuts
+// around that step.
+function renderAddTokenQuick() {
+  const container = $("add-token-quick");
+  if (!container) return;
+  container.innerHTML = "";
+  if (!currentNetwork) {
+    container.classList.add("hidden");
+    return;
+  }
+  const symbols = Object.keys(KNOWN_STABLECOIN_ADDRESSES).filter(
+    (sym) => KNOWN_STABLECOIN_ADDRESSES[sym][currentNetwork.chainId]
+  );
+  if (!symbols.length) {
+    container.classList.add("hidden");
+    return;
+  }
+  const label = document.createElement("span");
+  label.className = "quick-add-label";
+  label.textContent = TM_I18N.t("addToken.quickAddLabel");
+  container.appendChild(label);
+  symbols.forEach((sym) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "quick-add-chip";
+    chip.textContent = TM_I18N.t("addToken.quickAddChip", { symbol: sym });
+    chip.addEventListener("click", () => {
+      $("add-token-address").value = KNOWN_STABLECOIN_ADDRESSES[sym][currentNetwork.chainId];
+      runTokenLookup();
+    });
+    container.appendChild(chip);
+  });
+  container.classList.remove("hidden");
+}
+
+async function runTokenLookup() {
   hideError("add-token-error");
   $("add-token-preview").classList.add("hidden");
   try {
@@ -1031,7 +1072,9 @@ $("btn-token-lookup").addEventListener("click", async () => {
   } catch (e) {
     showError("add-token-error", e.message);
   }
-});
+}
+
+$("btn-token-lookup").addEventListener("click", runTokenLookup);
 
 $("btn-token-confirm-add").addEventListener("click", async () => {
   hideError("add-token-error");
@@ -1157,7 +1200,20 @@ function renderCurrencyRow(r) {
   const row = document.createElement("div");
   row.className = "price-row";
   const pegSymbol = TM_PRICES.FIAT_STABLECOIN_PEG[r.code.toLowerCase()];
-  const nameHtml = `<span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span></span></span>`;
+  // If this currency's pegged stablecoin is one of the ones hand-verified in
+  // KNOWN_STABLECOIN_ADDRESSES (see the coin-detail dead-end fix above),
+  // show which of the wallet's own networks it's actually on right here in
+  // the list -- before tapping in only to find out, the way EURC-on-OP-
+  // Mainnet did. Purely informational: this never adds anything itself.
+  const knownAddresses = pegSymbol && KNOWN_STABLECOIN_ADDRESSES[pegSymbol];
+  let availableTag = "";
+  if (knownAddresses && currentNetworks && currentNetworks.length) {
+    const names = currentNetworks.filter((n) => knownAddresses[n.chainId]).map((n) => n.name);
+    if (names.length) {
+      availableTag = `<span class="price-net-tag">${escapeHtml(TM_I18N.t("prices.availableOn", { networks: names.join(", ") }))}</span>`;
+    }
+  }
+  const nameHtml = `<span class="price-left">${tokenIconHtml(r.code)}<span class="price-id"><span class="price-name">${escapeHtml(r.name)}</span><span class="price-symbol">${escapeHtml(r.code)}</span>${availableTag}</span></span>`;
   const quoteHtml = `<span class="price-right"><span class="price-quote"><span class="price-usd">${TM_PRICES.formatMoney(r.rate, currentCurrency, { price: true })}</span></span></span>`;
   if (pegSymbol) {
     // Currencies with a known, well-established pegged stablecoin (see
@@ -1235,15 +1291,73 @@ async function refreshPrices() {
 // price + 24h change, a price chart with a few time ranges, market stats, a
 // short description, and a Swap button. Swap here means "swap INTO this
 // coin": it is only offered when the coin exists on the selected network as
-// the native coin or as a token the person has added (matched by symbol) --
-// this wallet never guesses a token contract address. The Swap screen then
-// lets them choose which of their own holdings to pay with.
+// the native coin, as a token the person has already added (matched by
+// symbol), or -- see KNOWN_STABLECOIN_ADDRESSES below -- as one of a small
+// number of verified stablecoin contracts this wallet ships with. Outside
+// that short list, this wallet never guesses a token contract address. The
+// Swap screen then lets them choose which of their own holdings to pay with.
 let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null };
 
 function normalizeCoinSymbol(s) {
   const up = String(s || "").toUpperCase();
   return up === "MATIC" ? "POL" : up; // Polygon's native coin was renamed
 }
+
+// A person looking at a coin like EURC often has no way to know which of
+// this wallet's networks it's even deployed on -- and unlike the "native
+// coin elsewhere" / "already tracked elsewhere" checks below, an EURC page
+// gives no automatic clue, because nothing about it has been added to this
+// wallet on ANY network yet. Rather than leave that a permanent dead end,
+// this is a short, hand-verified allowlist of well-known stablecoin
+// contracts on the networks this wallet supports -- used only to suggest
+// "switch to X and we'll add it for you", never to skip the same live
+// on-chain lookup (TM_LOOKUP_TOKEN) that a manual Add Token does. Same rule
+// as the swapRouter addresses in lib/networks.js: an address only goes in
+// this list once it's been checked against the token issuer's own official
+// docs or a block explorer's "verified contract" page -- never a guess.
+//   - EURC (Circle): confirmed against developers.circle.com/stablecoins/
+//     eurc-contract-addresses on 2026-09-27, cross-checked against the
+//     BaseScan/Etherscan pages for each address.
+//   - USDC (Circle): confirmed against developers.circle.com/stablecoins/
+//     usdc-contract-addresses on 2026-09-27, cross-checked against
+//     Etherscan/BaseScan/PolygonScan listings for each address. That same
+//     page doesn't list BSC as a supported network for native USDC at all
+//     (only "USDC.e" bridged versions circulate there, which is a
+//     different, unofficial contract) -- BSC is deliberately left out of
+//     this entry rather than guessed.
+//   - USDT (Tether): confirmed against Tether's own tether.to/en/
+//     supported-protocols page on 2026-09-27 -- Ethereum only. Left off
+//     Arbitrum, Optimism, Polygon and BSC on purpose: Tether's own page
+//     doesn't list a directly-issued USDT for any of them, and what shows
+//     up on those chains' own explorers under names like "Bridged USDT" or
+//     the newer "USDT0" cross-chain standard is a genuinely different,
+//     separately-migrated contract -- exactly the kind of ambiguity this
+//     list exists to avoid guessing through.
+//   - JPYC and BRZ were both researched and deliberately left OUT: multiple
+//     different contracts share each name across explorers (at least one
+//     Etherscan listing for BRZ is explicitly labeled "Old BRZ Token",
+//     implying a newer one exists), with no single official page clearly
+//     naming the current one the way Circle's and Tether's own docs do for
+//     the entries above. Add either one only after finding that kind of
+//     unambiguous, issuer-published confirmation.
+// Extend this list the same way if another stablecoin needs it -- keyed by
+// uppercase symbol, then by chainId.
+const KNOWN_STABLECOIN_ADDRESSES = {
+  EURC: {
+    1: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", // Ethereum Mainnet
+    8453: "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42", // Base
+  },
+  USDC: {
+    1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // Ethereum Mainnet
+    8453: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Base
+    137: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", // Polygon (native, not the older bridged USDC.e)
+    42161: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // Arbitrum One (native, not the older bridged USDC.e)
+    10: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", // OP Mainnet (native, not the older bridged USDC.e)
+  },
+  USDT: {
+    1: "0xdAC17F958D2ee523a2206206994597C13D831ec7", // Ethereum Mainnet
+  },
+};
 
 // Native coin + tracked tokens on the selected network, with balances.
 async function getHeldAssets() {
@@ -1675,6 +1789,29 @@ async function loadCoinSwapState(gen) {
       // Best-effort -- if this lookup fails for any reason, fall through to
       // the normal dead-end note below instead of blocking the screen.
     }
+    // Last resort before the dead end: not native anywhere, not already
+    // tracked anywhere -- but if it's one of the handful of stablecoins in
+    // KNOWN_STABLECOIN_ADDRESSES, this wallet already knows a verified
+    // contract for it on one of its OTHER networks, even though the person
+    // has never added it themselves. This is the EURC-on-OP-Mainnet case:
+    // EURC simply isn't deployed on Optimism at all, so no amount of
+    // switching helps there, but it *is* deployed on Base -- worth pointing
+    // at directly instead of leaving them to go find that out on their own.
+    const knownAddresses = KNOWN_STABLECOIN_ADDRESSES[want];
+    if (knownAddresses) {
+      const knownElsewhereChainId = Object.keys(knownAddresses)
+        .map(Number)
+        .find((chainId) => chainId !== currentNetwork.chainId && currentNetworks.some((n) => n.chainId === chainId));
+      const knownElsewhere = currentNetworks.find((n) => n.chainId === knownElsewhereChainId);
+      if (knownElsewhere) {
+        coinDetail.switchNetworkTarget = { ...knownElsewhere, knownTokenAddress: knownAddresses[knownElsewhere.chainId] };
+        showNote(TM_I18N.t("coin.swapUnavailableKnownElsewhere", { symbol: c.symbol, network: knownElsewhere.name }));
+        const switchBtn = $("btn-coin-switch-network");
+        switchBtn.textContent = TM_I18N.t("coin.addOnNetworkBtn", { network: knownElsewhere.name });
+        switchBtn.classList.remove("hidden");
+        return;
+      }
+    }
     $("btn-coin-switch-network").classList.add("hidden");
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
     return;
@@ -1708,9 +1845,30 @@ $("btn-coin-switch-network").addEventListener("click", async () => {
   try {
     await sendMsg("TM_SELECT_NETWORK", { chainId: net.chainId });
     await refreshMain(); // same call the main screen's own network picker uses
-    // Re-run the swap-availability check now that currentNetwork has
-    // changed -- the coin being viewed is almost always this network's own
-    // native coin now, so this normally just enables Swap.
+    if (net.knownTokenAddress) {
+      // Came from the KNOWN_STABLECOIN_ADDRESSES fallback -- the coin isn't
+      // native here and hasn't been tracked here before, so switching
+      // networks alone wouldn't actually make it swappable. Add it the same
+      // way Add Token would, including the same live on-chain read
+      // (TM_LOOKUP_TOKEN) to confirm what's actually deployed at this
+      // address on THIS network before trusting the hardcoded symbol/
+      // decimals -- belt-and-braces on top of the address already being
+      // hand-verified. Best-effort: if this fails (already added in the
+      // meantime, RPC hiccup, etc.) just fall through to the normal
+      // re-check below instead of blocking the screen.
+      try {
+        const info = await sendMsg("TM_LOOKUP_TOKEN", { tokenAddress: net.knownTokenAddress });
+        await sendMsg("TM_ADD_TRACKED_TOKEN", {
+          tokenAddress: net.knownTokenAddress,
+          symbol: info.symbol,
+          decimals: info.decimals,
+          name: info.name,
+        });
+        await refreshTokens();
+      } catch (e) {}
+    }
+    // Re-run the swap-availability check now that currentNetwork (and
+    // possibly the tracked-token list) has changed.
     loadCoinSwapState(coinDetail.gen);
   } finally {
     btn.disabled = false;
