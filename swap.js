@@ -99,6 +99,91 @@ async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, sl
   return { tx, quotedAmountOutWei: amountOutWei, minAmountOutWei: amountOutMin };
 }
 
+// ---------------------------------------------------------------- AGGREGATOR
+// Client-side wrapper around this project's own backend endpoint
+// (/api/swap-quote, see swap-quote-api.js at the repo root), which itself
+// proxies to 0x's Swap API (https://api.0x.org/swap/allowance-holder/quote).
+// Absolute URL, not a relative fetch -- this file is shared between the
+// website and the Chrome extension, and a relative "/api/..." path only
+// resolves correctly on the website's own origin (see the same pattern in
+// lib/transak-config.js and lib/coinbase-onramp-config.js).
+//
+// Was previously called from wallet-engine.js's TM_SWAP_QUOTE handler but
+// never actually defined here -- every swap attempt with a selected account
+// was throwing "TM_SWAP.tryAggregatorQuote is not a function" before ever
+// reaching the plain router quote below, which is why swaps were failing
+// across the board (not just for illiquid/custom tokens like a freshly
+// deployed one 0x has no route for).
+//
+// Returns null whenever an aggregator-routed quote isn't available for any
+// reason at all (feature not configured, no liquidity/route for this pair,
+// an unsupported chain, a bad response, or any network failure) -- this
+// function NEVER throws. The caller relies on that: a null return means
+// "fall back to the plain on-chain router quote" (getQuote() above), which
+// is also exactly the right behavior for a token 0x has no liquidity data
+// for at all.
+const SWAP_QUOTE_ENDPOINT = "https://web-wallet-production.up.railway.app/api/swap-quote";
+
+async function tryAggregatorQuote({ network, tokenIn, tokenOut, amountInWei, taker, slippageBps }) {
+  try {
+    if (!network || !network.chainId || !taker) return null;
+    const sellToken = isNative(tokenIn) ? NATIVE_PSEUDO_ADDRESS : tokenIn;
+    const buyToken = isNative(tokenOut) ? NATIVE_PSEUDO_ADDRESS : tokenOut;
+    const params = new URLSearchParams({
+      chainId: String(network.chainId),
+      sellToken,
+      buyToken,
+      sellAmount: amountInWei.toString(),
+      taker,
+      slippageBps: String(slippageBps || 100),
+    });
+    let res;
+    try {
+      res = await fetch(`${SWAP_QUOTE_ENDPOINT}?${params.toString()}`);
+    } catch (e) {
+      return null; // offline/unreachable -- just fall back to the router quote
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.configured || !data.ok || !data.liquidityAvailable) return null;
+    if (!data.transaction || !data.buyAmount || !data.minBuyAmount) return null;
+    return {
+      allowanceTarget: data.allowanceTarget || null,
+      transaction: data.transaction,
+      amountOutWei: ethers.BigNumber.from(data.buyAmount),
+      minAmountOutWei: ethers.BigNumber.from(data.minBuyAmount),
+    };
+  } catch (e) {
+    return null; // never let an aggregator hiccup break the whole swap flow
+  }
+}
+
+// Broadcasts the raw transaction the backend's /api/swap-quote call already
+// prepared via 0x (transaction.to/data/value/gas/gasPrice, saved on
+// lastSwapRoute.transaction by TM_SWAP_QUOTE) -- this is what actually
+// carries out an aggregator-routed swap once TM_SWAP_ALLOWANCE/
+// TM_SWAP_APPROVE have made sure the sell token is approved for
+// lastSwapRoute.spender. Was called from wallet-engine.js's TM_SWAP_EXECUTE
+// case but, like tryAggregatorQuote above, never actually defined here --
+// every aggregator-quoted swap was silently falling through to a plain
+// router execution (see the try/catch around this call in TM_SWAP_EXECUTE)
+// while still being charged the higher aggregator fee rate, since that fee
+// is sent before this call happens. Fixing this means that fallback goes
+// back to being the rare edge case it was designed for (a stale quote/gas
+// mismatch) instead of the thing that happens on every single aggregator
+// swap.
+//
+// signer: ethers.Wallet connected to the network provider
+async function executeAggregatorSwap({ signer, transaction }) {
+  if (!transaction || !transaction.to || !transaction.data) {
+    throw new Error("Aggregator swap is missing its prepared transaction -- request a fresh quote and try again.");
+  }
+  const txRequest = { to: transaction.to, data: transaction.data };
+  if (transaction.value) txRequest.value = ethers.BigNumber.from(transaction.value);
+  if (transaction.gas) txRequest.gasLimit = ethers.BigNumber.from(transaction.gas);
+  if (transaction.gasPrice) txRequest.gasPrice = ethers.BigNumber.from(transaction.gasPrice);
+  return signer.sendTransaction(txRequest); // caller awaits tx.wait() if it wants confirmation, same as executeSwap() above
+}
+
 if (typeof self !== "undefined") {
   self.TM_SWAP = {
     NATIVE_PSEUDO_ADDRESS,
@@ -109,6 +194,8 @@ if (typeof self !== "undefined") {
     sendApprove,
     executeSwap,
     applySlippage,
+    tryAggregatorQuote,
+    executeAggregatorSwap,
     ERC20_ABI,
   };
 }
