@@ -1133,7 +1133,7 @@ async function refreshPrices() {
 // the native coin or as a token the person has added (matched by symbol) --
 // this wallet never guesses a token contract address. The Swap screen then
 // lets them choose which of their own holdings to pay with.
-let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null };
+let coinDetail = { coin: null, days: 7, gen: 0, chartGen: 0, chartPoints: [], swapTarget: null, switchNetworkTarget: null };
 
 function normalizeCoinSymbol(s) {
   const up = String(s || "").toUpperCase();
@@ -1350,6 +1350,7 @@ async function openCoinDetail(c, fromScreen) {
   const gen = ++coinDetail.gen;
   coinDetail.coin = c;
   coinDetail.swapTarget = null;
+  coinDetail.switchNetworkTarget = null;
   $("coin-back").dataset.back = fromScreen || "screen-prices";
   hideError("coin-error");
   $("coin-icon").innerHTML = tokenIconHtml(c.symbol, c.image);
@@ -1371,6 +1372,7 @@ async function openCoinDetail(c, fromScreen) {
   if (buyBtn) buyBtn.textContent = TM_I18N.t("coin.buyBtn", { symbol: c.symbol });
   $("coin-holding").classList.add("hidden");
   $("coin-swap-note").classList.add("hidden");
+  $("btn-coin-switch-network").classList.add("hidden");
   document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
   showScreen("screen-coin");
   loadCoinChart(gen);
@@ -1521,9 +1523,28 @@ async function loadCoinSwapState(gen) {
   const want = normalizeCoinSymbol(c.symbol);
   const match = held.find((a) => normalizeCoinSymbol(a.symbol) === want);
   if (!match) {
+    // Very often the real fix isn't "this network doesn't support this
+    // coin" at all -- it's that the coin being viewed is actually some
+    // OTHER network's own native coin (POL on Polygon, BNB on BSC, etc).
+    // Checking that first means someone looking at POL while on Ethereum
+    // Mainnet gets pointed straight at "switch to Polygon" instead of a
+    // dead end, with Buy (always shown, see openCoinDetail) still there
+    // as a fallback in case that's not actually what they meant.
+    const nativeElsewhere = currentNetworks.find(
+      (n) => n.chainId !== currentNetwork.chainId && normalizeCoinSymbol(n.nativeCurrency.symbol) === want
+    );
+    if (nativeElsewhere) {
+      coinDetail.switchNetworkTarget = nativeElsewhere;
+      showNote(TM_I18N.t("coin.swapUnavailableSwitchNetwork", { symbol: c.symbol, network: nativeElsewhere.name }));
+      const switchBtn = $("btn-coin-switch-network");
+      switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: nativeElsewhere.name });
+      switchBtn.classList.remove("hidden");
+      return;
+    }
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
     return;
   }
+  $("btn-coin-switch-network").classList.add("hidden");
   coinDetail.swapTarget = match;
   if (Number(match.balance) > 0) {
     const holding = $("coin-holding");
@@ -1542,6 +1563,23 @@ $("btn-coin-swap").addEventListener("click", () => {
   if (!m) return;
   setupSwapScreen({ toKey: m.key });
   showScreen("screen-swap");
+});
+
+$("btn-coin-switch-network").addEventListener("click", async () => {
+  const net = coinDetail.switchNetworkTarget;
+  if (!net) return;
+  const btn = $("btn-coin-switch-network");
+  btn.disabled = true;
+  try {
+    await sendMsg("TM_SELECT_NETWORK", { chainId: net.chainId });
+    await refreshMain(); // same call the main screen's own network picker uses
+    // Re-run the swap-availability check now that currentNetwork has
+    // changed -- the coin being viewed is almost always this network's own
+    // native coin now, so this normally just enables Swap.
+    loadCoinSwapState(coinDetail.gen);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 $("btn-coin-buy").addEventListener("click", () => {
