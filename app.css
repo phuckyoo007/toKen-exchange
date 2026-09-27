@@ -805,8 +805,42 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 
 .network-picker { margin-top: auto; padding-top: 2px; }
 .network-picker label { margin-top: 0; margin-bottom: 3px; }
-.network-select-row { display: flex; align-items: center; gap: 8px; }
-.network-select-row select { flex: 1; }
+/* Now a <button> that opens the neon-sign sheet below, styled to match the
+   same box every other input/select on this screen uses so it doesn't
+   stand out as a different kind of control. */
+.network-select-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 11px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--bg-inset); color: var(--text);
+  font-size: 13px; font-family: inherit; cursor: pointer; text-align: left;
+}
+.network-select-row:hover, .network-select-row:focus-visible { border-color: var(--gold); }
+.network-picker-trigger-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-picker-chevron { color: var(--text-muted); flex-shrink: 0; }
+
+/* ---------------- network sign sheet ---------------- */
+.network-picker-panel { background: var(--bg-inset); }
+.network-sign-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  overflow-y: auto; padding-bottom: 4px;
+}
+.network-sign-item {
+  background: transparent; border: none; padding: 0; cursor: pointer;
+  border-radius: 16px; position: relative; display: flex; flex-direction: column; align-items: stretch;
+}
+.network-sign-item:disabled { opacity: 0.6; cursor: not-allowed; }
+.network-sign-svg { width: 100%; height: auto; display: block; }
+.network-sign-item.selected::after {
+  content: ""; position: absolute; inset: 0; border-radius: 16px;
+  border: 2px solid var(--gold-bright); box-shadow: 0 0 10px rgba(243, 212, 136, 0.5);
+  pointer-events: none;
+}
+.network-sign-caption {
+  display: block; margin-top: 2px; font-size: 10.5px; color: var(--text-faint); text-align: center;
+}
+@media (max-width: 380px) {
+  .network-sign-grid { grid-template-columns: 1fr; }
+}
 
 .balance-box {
   text-align: center; padding: 20px 12px;

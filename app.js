@@ -417,15 +417,11 @@ async function refreshMain() {
   addAccountOpt.textContent = TM_I18N.t("main.addAccountOption");
   accSel.appendChild(addAccountOpt);
 
-  const netSel = $("network-select");
-  netSel.innerHTML = "";
-  currentNetworks.forEach((n) => {
-    const opt = document.createElement("option");
-    opt.value = n.chainId;
-    opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
-    if (n.chainId === currentNetwork.chainId) opt.selected = true;
-    netSel.appendChild(opt);
-  });
+  $("network-picker-trigger-label").textContent = currentNetwork.name;
+  // Only re-render if the sheet's already open (e.g. this refresh came from
+  // something else, like adding a custom network) -- openNetworkPicker()
+  // always builds it fresh, so there's nothing to keep in sync otherwise.
+  if (!$("network-picker-sheet").classList.contains("hidden")) renderNetworkPickerGrid();
 
   $("network-badge").innerHTML = networkDotHtml(currentNetwork.key) + `<span>${escapeHtml(currentNetwork.name)}</span>`;
   $("network-badge").classList.remove("hidden");
@@ -599,10 +595,119 @@ $("send-to").addEventListener("input", (e) => {
   }
 });
 
-$("network-select").addEventListener("change", async (e) => {
-  await sendMsg("TM_SELECT_NETWORK", { chainId: Number(e.target.value) });
-  await refreshMain();
-});
+// ---------------------------------------------------------------- NETWORK PICKER (neon sign sheet)
+// The same glowing-sign look approved for the app's six main networks,
+// reused here as the actual way you switch networks -- a bottom sheet of
+// lit signs instead of a plain <select>. A network the user added
+// themselves (TM_ADD_NETWORK) has no hand-drawn icon, so it falls back to
+// its first letter in its own hashed dot color (networkDotColor already
+// gives every custom network a consistent, distinct color rather than a
+// plain "unknown" gray) instead of breaking or being left off the list.
+const NETWORK_SIGN_ICONS = {
+  ethereum: '<polygon points="140,20 178,60 140,138 102,60" stroke-width="2.5"/><polygon points="140,32 140,126" stroke-width="1.5"/><polygon points="102,60 178,60" stroke-width="1.2" opacity="0.7"/>',
+  base: '<defs><linearGradient id="baseHexGrad" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stop-color="#4fe0c0"/><stop offset="100%" stop-color="#5c8bff"/></linearGradient></defs><path d="M114,45 L140,30 L166,45 L166,81 L140,96 L114,81 Z" stroke="url(#baseHexGrad)" stroke-width="3"/><circle cx="140" cy="63" r="22" fill="#ffffff" stroke="none"/><line x1="120" y1="65" x2="160" y2="65" stroke="#0f1c33" stroke-width="3.4" stroke-linecap="round"/><circle cx="150" cy="53" r="4.2" fill="#0f1c33" stroke="none"/>',
+  polygon: '<path d="M120,50 L140,38 L160,50 L160,74 L140,86 L120,74 Z" stroke-width="2.5"/><path d="M140,50 L152,57 L152,71 L140,78 L128,71 L128,57 Z" stroke-width="2"/>',
+  arbitrum: '<path d="M140,36 L118,90 L132,90 L140,68 L148,90 L162,90 Z" stroke-width="2.5"/><path d="M140,36 L152,90" stroke-width="1.5" opacity="0.7"/>',
+  bsc: '<rect x="128" y="51" width="24" height="24" transform="rotate(45 140 63)" stroke-width="2.5"/><rect x="136" y="59" width="8" height="8" transform="rotate(45 140 63)" fill="#ffcf5c"/>',
+  optimism: '<circle cx="140" cy="63" r="26" stroke-width="3"/><text x="140" y="72" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="30" stroke-width="2.5">O</text>',
+};
+
+// The app's own six networks get their approved short marquee labels
+// (matching the reference art); anything else -- a custom network the
+// user added -- falls back to its real name, sized down and truncated if
+// it's long, rather than assuming every network name is a short brand word.
+const NETWORK_SIGN_LABELS = {
+  ethereum: ["ETHEREUM", "MAINNET"],
+  base: ["BASE", ""],
+  polygon: ["POLYGON", ""],
+  arbitrum: ["ARBITRUM", ""],
+  bsc: ["BNB", ""],
+  optimism: ["OPTIMISM", ""],
+};
+
+function networkSignLabel(network) {
+  if (NETWORK_SIGN_LABELS[network.key]) return NETWORK_SIGN_LABELS[network.key];
+  let name = (network.name || "?").toUpperCase();
+  if (name.length > 20) name = name.slice(0, 19) + "…";
+  return [name, ""];
+}
+
+function networkSignIconSvg(network) {
+  if (NETWORK_SIGN_ICONS[network.key]) return NETWORK_SIGN_ICONS[network.key];
+  const letter = (network.name || "?").trim().charAt(0).toUpperCase() || "?";
+  return `<circle cx="140" cy="63" r="26" stroke-width="3"/><text x="140" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="30" stroke-width="2.5">${escapeHtml(letter)}</text>`;
+}
+
+function neonSignFontSize(text) {
+  const len = text.length;
+  if (len <= 6) return 30;
+  if (len <= 9) return 24;
+  if (len <= 13) return 19;
+  return 15;
+}
+
+function neonSignSvg(name1, name2, iconSvg, iconColor) {
+  const big = neonSignFontSize(name1);
+  const small = name2 ? neonSignFontSize(name2) - 4 : 0;
+  return `
+  <svg viewBox="0 0 280 140" class="network-sign-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="nsGlowCyan" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="nsGlowPink" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="nsGlowIcon" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect x="10" y="10" width="260" height="86" rx="16" fill="none" stroke="#ff5ec4" stroke-width="2.5" filter="url(#nsGlowPink)" opacity="0.9"/>
+    <rect x="10" y="10" width="260" height="86" rx="16" fill="none" stroke="#5ef2ff" stroke-width="1.2" opacity="0.9"/>
+    <g filter="url(#nsGlowIcon)" opacity="0.95" stroke="${iconColor}" fill="none">${iconSvg}</g>
+    <text x="140" y="${name2 ? 42 : 52}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="${big}" letter-spacing="1"
+          fill="#aef3ff" stroke="#5ef2ff" stroke-width="1" filter="url(#nsGlowCyan)">${escapeHtml(name1)}</text>${name2 ? `
+    <text x="140" y="88" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="${small}" letter-spacing="3"
+          fill="#ffc2ea" stroke="#ff5ec4" stroke-width="1" filter="url(#nsGlowPink)">${escapeHtml(name2)}</text>` : ""}
+  </svg>`;
+}
+
+function closeNetworkPicker() {
+  $("network-picker-sheet").classList.add("hidden");
+}
+
+function renderNetworkPickerGrid() {
+  const grid = $("network-sign-grid");
+  grid.innerHTML = "";
+  currentNetworks.forEach((n) => {
+    const [name1, name2] = networkSignLabel(n);
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "network-sign-item" + (currentNetwork && n.chainId === currentNetwork.chainId ? " selected" : "");
+    item.setAttribute("aria-label", n.name);
+    item.innerHTML =
+      neonSignSvg(name1, name2, networkSignIconSvg(n), networkDotColor(n.key)) +
+      (n.swapRouter ? "" : `<span class="network-sign-caption">${escapeHtml(TM_I18N.t("addToken.swapUnavailableSuffix"))}</span>`);
+    item.addEventListener("click", async () => {
+      if (currentNetwork && n.chainId === currentNetwork.chainId) {
+        closeNetworkPicker();
+        return;
+      }
+      Array.from(grid.querySelectorAll(".network-sign-item")).forEach((el) => (el.disabled = true));
+      try {
+        await sendMsg("TM_SELECT_NETWORK", { chainId: n.chainId });
+        await refreshMain();
+        closeNetworkPicker();
+      } catch (e) {
+        showError("main-error", e.message);
+        Array.from(grid.querySelectorAll(".network-sign-item")).forEach((el) => (el.disabled = false));
+      }
+    });
+    grid.appendChild(item);
+  });
+}
+
+function openNetworkPicker() {
+  renderNetworkPickerGrid();
+  $("network-picker-sheet").classList.remove("hidden");
+}
+
+$("network-picker-trigger").addEventListener("click", openNetworkPicker);
+$("network-picker-close").addEventListener("click", closeNetworkPicker);
 
 $("btn-copy-address").addEventListener("click", () => {
   navigator.clipboard.writeText(currentStatus.selectedAddress || "");
@@ -1511,10 +1616,12 @@ async function loadCoinSwapState(gen) {
   const note = $("coin-swap-note");
   const showNote = (text) => { note.textContent = text; note.classList.remove("hidden"); };
   if (!currentNetwork || !currentStatus || !currentStatus.selectedAddress) {
+    $("btn-coin-switch-network").classList.add("hidden");
     showNote(TM_I18N.t("coin.swapNeedsWallet"));
     return;
   }
   if (!currentNetwork.swapRouter) {
+    $("btn-coin-switch-network").classList.add("hidden");
     showNote(TM_I18N.t("coin.swapNoRouter"));
     return;
   }
@@ -1541,6 +1648,34 @@ async function loadCoinSwapState(gen) {
       switchBtn.classList.remove("hidden");
       return;
     }
+    // Not anyone's native coin either -- but if it's already sitting in
+    // your tracked-token list on one of your OTHER networks (added there
+    // earlier, or just being viewed from the wrong network right now),
+    // that's a far more useful fix to offer than "add it here from
+    // scratch". Tracked tokens are stored per network, so this can be read
+    // directly without switching away from the network you're actually on.
+    try {
+      const stored = await chrome.storage.local.get("tm_tracked_tokens");
+      if (gen !== coinDetail.gen) return;
+      const byChain = stored["tm_tracked_tokens"] || {};
+      const trackedElsewhere = currentNetworks.find((n) => {
+        if (n.chainId === currentNetwork.chainId) return false;
+        const tokens = byChain[n.chainId] || [];
+        return tokens.some((t) => normalizeCoinSymbol(t.symbol) === want);
+      });
+      if (trackedElsewhere) {
+        coinDetail.switchNetworkTarget = trackedElsewhere;
+        showNote(TM_I18N.t("coin.swapUnavailableSwitchNetworkTracked", { symbol: c.symbol, network: trackedElsewhere.name }));
+        const switchBtn = $("btn-coin-switch-network");
+        switchBtn.textContent = TM_I18N.t("coin.switchNetworkBtn", { network: trackedElsewhere.name });
+        switchBtn.classList.remove("hidden");
+        return;
+      }
+    } catch (e) {
+      // Best-effort -- if this lookup fails for any reason, fall through to
+      // the normal dead-end note below instead of blocking the screen.
+    }
+    $("btn-coin-switch-network").classList.add("hidden");
     showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
     return;
   }
@@ -2823,17 +2958,13 @@ function populateCurrencySelect() {
 
 document.addEventListener("tm-language-changed", () => {
   // Re-render already-rendered dynamic text that data-i18n's static markup
-  // scan can't reach: the network dropdown's per-option "(swap unavailable)"
-  // suffix, and the support chat's topic chips if that screen has been
-  // opened already. Past chat messages intentionally stay in whatever
-  // language they were sent/answered in, like a real chat history would.
-  if (currentNetworks && currentNetworks.length && currentNetwork) {
-    const netSel = $("network-select");
-    Array.from(netSel.options).forEach((opt) => {
-      const n = currentNetworks.find((net) => String(net.chainId) === opt.value);
-      if (n) opt.textContent = n.name + (n.swapRouter ? "" : TM_I18N.t("addToken.swapUnavailableSuffix"));
-    });
-  }
+  // scan can't reach: the network sheet's per-item "(swap unavailable)"
+  // caption (only if it's actually open right now -- openNetworkPicker()
+  // always builds it fresh otherwise), and the support chat's topic chips
+  // if that screen has been opened already. Past chat messages intentionally
+  // stay in whatever language they were sent/answered in, like a real chat
+  // history would.
+  if (!$("network-picker-sheet").classList.contains("hidden")) renderNetworkPickerGrid();
   if ($("support-chips") && $("support-chips").children.length) renderSupportChips();
 });
 

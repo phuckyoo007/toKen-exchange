@@ -240,13 +240,29 @@
 
     <div class="network-picker">
       <label data-i18n="main.networkLabel">Network</label>
-      <div class="network-select-row">
+      <button type="button" id="network-picker-trigger" class="network-select-row">
         <span id="network-select-dot" class="network-dot"></span>
-        <select id="network-select"></select>
-      </div>
+        <span id="network-picker-trigger-label" class="network-picker-trigger-label"></span>
+        <span class="network-picker-chevron" aria-hidden="true">&#9662;</span>
+      </button>
     </div>
     <p id="main-error" class="error hidden"></p>
   </section>
+
+  <!-- Network switcher -- the same LED-sign look as the reference art,
+       reused as the actual way you pick a network instead of a plain
+       dropdown. Lives outside #screen-main (like the swap asset picker
+       lives outside its own screen) since it's really an app-wide overlay,
+       not part of any one screen's own content. -->
+  <div id="network-picker-sheet" class="asset-picker hidden">
+    <div class="asset-picker-panel network-picker-panel">
+      <div class="asset-picker-head">
+        <span data-i18n="main.networkLabel">Network</span>
+        <button type="button" class="asset-picker-close" id="network-picker-close" aria-label="Close">&#10005;</button>
+      </div>
+      <div class="network-sign-grid" id="network-sign-grid"></div>
+    </div>
+  </div>
 
   <!-- ACTIVITY (moved into #cube-stage as a cube face at runtime -- see
        mountCubeNav() in app.js -- but lives here in the markup like any
