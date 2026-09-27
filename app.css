@@ -433,15 +433,35 @@ a.activity-entry { text-decoration: none; color: inherit; cursor: pointer; }
   padding: 12px 12px 10px;
   flex-shrink: 0;
 }
+/* A little illuminated marquee sign for the current network -- fits the
+   "TOKEN EXCHANGE" jackpot-sign branding in the footer/logo. Gold neon
+   glow (text-shadow + box-shadow) on a dark recessed background reads as
+   "lit up" without needing any extra font or asset; the occasional brief
+   dip in the flicker keyframes is a nod to a real neon sign never being
+   perfectly steady, kept short/rare so it doesn't feel like a broken
+   light or distract from the balance above it. */
 #network-badge {
   font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 12.5px; letter-spacing: 0.01em;
-  padding: 4px 12px; border-radius: 20px;
-  background: var(--bg-raised); color: var(--text);
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  display: flex; align-items: center; gap: 6px;
+  font-weight: 700;
+  font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 8px 20px; border-radius: 999px;
+  background: radial-gradient(ellipse at center, #241b0c 0%, var(--bg-inset) 75%);
+  color: var(--gold-bright);
+  border: 1.5px solid var(--gold-deep);
+  box-shadow:
+    0 0 6px rgba(243, 212, 136, 0.55),
+    0 0 16px rgba(221, 172, 77, 0.35),
+    inset 0 0 10px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 0 4px var(--gold-bright), 0 0 12px rgba(243, 212, 136, 0.65);
+  display: flex; align-items: center; gap: 7px;
+  animation: ledSignFlicker 4s ease-in-out infinite;
+}
+@keyframes ledSignFlicker {
+  0%, 92%, 100% { filter: brightness(1); }
+  93% { filter: brightness(0.7); }
+  94% { filter: brightness(1.1); }
+  95% { filter: brightness(0.8); }
+  96% { filter: brightness(1); }
 }
 /* A network's own brand color as a small dot -- Ethereum's periwinkle,
    Base's blue, Polygon's purple, etc. -- next to its name wherever it's
