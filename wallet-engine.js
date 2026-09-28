@@ -295,6 +295,48 @@ async function getProviderFor(network) {
   return new ethers.providers.JsonRpcProvider(url);
 }
 
+// getProviderFor() picks ONE RPC URL and commits to it. pickHealthyRpcUrl()
+// only proves that URL can serve a cheap read (eth_getBalance) -- it says
+// nothing about whether that same node will reliably accept a raw signed
+// transaction, which is a separate, write-specific failure mode public RPC
+// nodes hit more often (rate limits, brief outages, malformed responses).
+// When that happens ethers throws SERVER_ERROR/NETWORK_ERROR/TIMEOUT (surfaced
+// to the user via friendlyErrorMessage() as "Couldn't get a response from the
+// network"), and until now there was no fallback -- the whole call just
+// failed, even though network.rpcUrls usually lists two or three other nodes.
+//
+// withRpcFailover() re-runs `action` against each of the network's RPC URLs
+// in turn (the cached "healthy" one first, since it's usually fine and
+// avoids extra latency) until one succeeds. It only moves on to the next URL
+// for errors that look like a node/transport problem -- a revert,
+// insufficient funds, a rejected signature, a bad nonce, etc. would fail
+// identically on every node, so retrying those elsewhere would just be noise
+// (and for a nonce-type error could make things worse), so those are
+// rethrown immediately instead.
+const RPC_FAILOVER_RETRYABLE_TEXT = /invalid response|server_error|processing response error|network error|timeout|etimedout/i;
+function isRpcFailoverRetryable(e) {
+  const code = e && e.code ? String(e.code) : "";
+  if (code === "SERVER_ERROR" || code === "NETWORK_ERROR" || code === "TIMEOUT") return true;
+  return RPC_FAILOVER_RETRYABLE_TEXT.test(String((e && e.message) || e || ""));
+}
+async function withRpcFailover(network, action) {
+  const urls = network.rpcUrls || [];
+  if (urls.length === 0) throw new Error("This network has no RPC URLs configured.");
+  const first = await pickHealthyRpcUrl(network);
+  const ordered = [first, ...urls.filter((u) => u !== first)];
+  let lastError;
+  for (const url of ordered) {
+    try {
+      return await action(new ethers.providers.JsonRpcProvider(url));
+    } catch (e) {
+      lastError = e;
+      if (!isRpcFailoverRetryable(e)) throw e;
+      // otherwise fall through and try the next RPC URL
+    }
+  }
+  throw lastError;
+}
+
 async function rpcPassthrough(network, method, params) {
   const urls = network.rpcUrls && network.rpcUrls.length ? network.rpcUrls : [undefined];
   let lastError;
@@ -1090,14 +1132,15 @@ async function handleMessage(msg) {
 
           case "TM_SWAP_ALLOWANCE": {
             const network = await getActiveNetwork();
-            const provider = await getProviderFor(network);
             const meta = await getSelectedAccountMeta();
             const routeKey = swapRouteKey(network, msg.tokenAddress);
             const spender =
               lastSwapRoute && lastSwapRoute.key === routeKey && lastSwapRoute.kind === "aggregator" && lastSwapRoute.spender
                 ? lastSwapRoute.spender
                 : network.swapRouter;
-            const allowance = await TM_SWAP.getAllowance({ provider, tokenAddress: msg.tokenAddress, owner: meta.address, spender });
+            const allowance = await withRpcFailover(network, (provider) =>
+              TM_SWAP.getAllowance({ provider, tokenAddress: msg.tokenAddress, owner: meta.address, spender })
+            );
             sendResponse({ ok: true, allowanceWei: allowance.toString(), spender });
             break;
           }
@@ -1107,13 +1150,15 @@ async function handleMessage(msg) {
             const network = await getActiveNetwork();
             const meta = await getSelectedAccountMeta();
             assertNotSanctioned(meta.address, "account");
-            const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(await getProviderFor(network));
             const routeKey = swapRouteKey(network, msg.tokenAddress);
             const spender =
               lastSwapRoute && lastSwapRoute.key === routeKey && lastSwapRoute.kind === "aggregator" && lastSwapRoute.spender
                 ? lastSwapRoute.spender
                 : network.swapRouter;
-            const tx = await TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender, amountWei: ethers.BigNumber.from(msg.amountWei) });
+            const tx = await withRpcFailover(network, (provider) => {
+              const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(provider);
+              return TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender, amountWei: ethers.BigNumber.from(msg.amountWei) });
+            });
             sendResponse({ ok: true, txHash: tx.hash });
             break;
           }
