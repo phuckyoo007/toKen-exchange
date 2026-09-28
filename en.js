@@ -66,6 +66,7 @@
     "main.livePricesTitle": "Live Prices",
     "main.predictionsTitle": "Trending Markets",
     "main.currenciesCardTitle": "Currencies",
+    "main.exchangesCardTitle": "Hottest Exchanges",
 
     "tokens.loadError": "Couldn't load balance",
     "tokens.removeTitle": "Remove",
@@ -142,6 +143,13 @@
     "predictions.empty": "No trending markets right now.",
     "predictions.cardUnavailable": "Markets unavailable right now.",
     "predictions.volSuffix": "24h vol",
+
+    "exchanges.title": "Hottest Exchanges",
+    "exchanges.description": "CoinGecko's trust-score ranking of centralized crypto exchanges, refreshed automatically -- informational only. Token Exchange is self-custody and never routes trades through any of these; nothing about your wallet is sent to look this up.",
+    "exchanges.loading": "Loading...",
+    "exchanges.empty": "No exchange data available right now.",
+    "exchanges.cardUnavailable": "Exchanges unavailable right now.",
+    "exchanges.foundedYear": "Est. {year}",
 
     "buy.title": "Buy crypto",
     "buy.description1": "Buy is powered by Transak, a separate third-party service -- Token Exchange never touches your payment details.",

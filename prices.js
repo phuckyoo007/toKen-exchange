@@ -515,6 +515,48 @@ async function getFiatRates(currency) {
   return out;
 }
 
+// "Hottest" exchanges: CoinGecko's own keyless /exchanges endpoint, which
+// ranks centralized exchanges by a trust score it computes from liquidity,
+// API/data coverage, regulation, and other factors -- the same ranking
+// CoinGecko's own "Exchanges" page is built from. No API key, no backend
+// proxy, same as every other lookup in this file. CoinGecko already returns
+// this list sorted by trust_score_rank (1 = most trusted); sorted again
+// client-side as a safety net in case that ever changes. Cached the same
+// way as the other lookups above, so "keep it updated" just means this
+// re-fetches on its own the next time it's asked for, no polling needed.
+let topExchangesCache = { fetchedAt: 0, data: null };
+
+async function getTopExchanges(count) {
+  const now = Date.now();
+  if (!topExchangesCache.data || now - topExchangesCache.fetchedAt >= CACHE_TTL_MS) {
+    let res;
+    try {
+      res = await fetch(`${COINGECKO_BASE}/exchanges?per_page=100&page=1`);
+    } catch (e) {
+      throw new Error("Couldn't reach CoinGecko for exchange rankings. Check your internet connection.");
+    }
+    if (!res.ok) throw new Error(`CoinGecko exchanges request failed (HTTP ${res.status}).`);
+    const json = await res.json();
+    const list = Array.isArray(json) ? json : [];
+    const mapped = list
+      .filter((x) => x && x.name)
+      .map((x) => ({
+        id: x.id,
+        name: x.name,
+        image: x.image || null,
+        country: x.country || null,
+        yearEstablished: x.year_established || null,
+        trustScore: typeof x.trust_score === "number" ? x.trust_score : null,
+        trustScoreRank: typeof x.trust_score_rank === "number" ? x.trust_score_rank : null,
+        volume24hBtc: typeof x.trade_volume_24h_btc === "number" ? x.trade_volume_24h_btc : null,
+        url: x.url || null,
+      }))
+      .sort((a, b) => (a.trustScoreRank == null ? 999 : a.trustScoreRank) - (b.trustScoreRank == null ? 999 : b.trustScoreRank));
+    topExchangesCache = { fetchedAt: now, data: mapped };
+  }
+  return topExchangesCache.data.slice(0, count || 25);
+}
+
 // Returns the live price of the given network's native coin (in the given
 // display currency), or null if this wallet doesn't have a verified
 // CoinGecko id for that network (e.g. a user-added custom network).
@@ -585,6 +627,7 @@ if (typeof self !== "undefined") {
     formatMoneyCompact,
     getNativePriceForNetwork,
     getTokenPricesByContract,
+    getTopExchanges,
     COINGECKO_IDS,
     NETWORK_NATIVE_COINGECKO_ID,
     NETWORK_COINGECKO_PLATFORM,

@@ -1623,6 +1623,20 @@ html[dir="rtl"] .price-row .price-id .price-symbol { margin: 0; font-size: 11px;
   color: var(--success); font-size: 10px; margin-top: 1px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* Hottest Exchanges rows: exchange names ("Coinbase Exchange") run longer
+   than the coin/currency names .price-name is normally sized for, so they'd
+   ellipsis-truncate under the rule above -- let them wrap to a second line
+   instead. The rank number gets its own small fixed-width badge rather than
+   competing with the name for that already-tight space. */
+.exchange-row .price-id .price-name {
+  overflow: visible; text-overflow: clip; white-space: normal;
+}
+.exchange-rank {
+  flex-shrink: 0; width: 22px; text-align: center;
+  color: var(--text-muted); font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .price-right { flex-shrink: 0; gap: 6px; }
 .price-quote { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .price-quote .price-change,

@@ -315,6 +315,7 @@ async function refreshMain() {
   refreshNfts(); // not awaited -- same reasoning as the balance above
   refreshMainPricesCard(); // not awaited -- same reasoning as the balance above
   refreshMainCurrenciesCard(); // not awaited -- same reasoning as the balance above
+  refreshMainExchangesCard(); // not awaited -- same reasoning as the balance above
 }
 
 async function refreshBalance() {
@@ -583,6 +584,7 @@ $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices
 // markets) now opens the Prices screen straight to its Currencies tab --
 // see the Currencies-card note above refreshMainCurrenciesCard().
 $("btn-goto-currencies-card").addEventListener("click", () => { showScreen("screen-prices"); setPricesTab("currencies"); });
+$("btn-goto-exchanges-card").addEventListener("click", () => { showScreen("screen-exchanges"); refreshExchanges(); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
 $("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
@@ -1297,11 +1299,39 @@ function syncSwapAsset(side) {
   scheduleSwapAutoQuote();
 }
 
+// "To" suggestions beyond what's already held: someone swapping FROM a
+// coin they hold TO a stablecoin they don't hold yet (and haven't added as
+// a tracked token) previously had no way to even find it in the "To"
+// picker -- it only ever listed what getHeldAssets() returned. This adds a
+// zero-balance entry for each of KNOWN_STABLECOIN_ADDRESSES's hand-verified
+// addresses on the CURRENT network only (never a guessed address), so they
+// show up in the "To" list the same as anything actually held -- that list
+// already allows picking a zero-balance asset, this just gives it more to
+// offer. Purely additive and de-duplicated by address: if the symbol is
+// already held or already tracked (even at zero balance), the real entry
+// from getHeldAssets() wins and the suggestion for that symbol is skipped.
+// Never affects the "From" side, which still only lists positive balances.
+function suggestedStablecoinAssets(held, network) {
+  if (!network) return [];
+  const heldAddresses = new Set(held.filter((a) => a.address).map((a) => a.address.toLowerCase()));
+  const out = [];
+  Object.keys(KNOWN_STABLECOIN_ADDRESSES).forEach((symbol) => {
+    const address = KNOWN_STABLECOIN_ADDRESSES[symbol][network.chainId];
+    if (!address || heldAddresses.has(address.toLowerCase())) return;
+    // decimals here is cosmetic only (the picker just shows "0" either way)
+    // -- the real quote/approve/execute path always fetches the live
+    // decimals from the token contract itself (see scheduleSwapAutoQuote's
+    // TM_GET_TOKEN_BALANCE call), so this never affects swap math.
+    out.push({ key: address, address, symbol, decimals: 6, balance: "0" });
+  });
+  return out;
+}
+
 async function populateSwapSelects(pre) {
   const myGen = ++swapPopulateGen;
   const held = await getHeldAssets();
   if (myGen !== swapPopulateGen) return;
-  swapState.held = held;
+  swapState.held = held.concat(suggestedStablecoinAssets(held, currentNetwork));
   const toKey = (pre && pre.toKey) || swapState.toKey;
   // "From" only offers what the person actually holds; the coin being
   // bought is never offered as its own source.
@@ -1843,6 +1873,82 @@ async function refreshMainCurrenciesCard() {
     rates.slice(0, MAIN_CURRENCIES_CARD_COUNT).forEach((r) => list.appendChild(renderCurrencyRow(r)));
   } catch (e) {
     list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("prices.cardUnavailable")}</div>`;
+  }
+}
+
+// Read-only "hottest exchanges" list from CoinGecko's own trust-score
+// ranking (see getTopExchanges() in lib/prices.js) -- same keyless public
+// API this app already uses for coin/currency prices, no backend of ours
+// involved. "Keep it updated" just means this re-fetches (subject to
+// prices.js's own short cache) every time the card or screen is shown,
+// same as Live Prices and Currencies above -- no separate polling needed.
+function formatExchangeVolume(btc) {
+  if (btc == null) return null;
+  if (btc >= 1000) return `${(btc / 1000).toFixed(1)}K BTC`;
+  return `${btc.toFixed(1)} BTC`;
+}
+
+function renderExchangeRow(ex, rank) {
+  const row = document.createElement("div");
+  // "exchange-row" is a scoping hook (see app.css) so a long exchange name
+  // ("Coinbase Exchange") wraps instead of ellipsis-truncating the way a
+  // short coin/currency name does in this same .price-row layout -- and so
+  // the rank number gets its own fixed-width badge instead of eating into
+  // the name's already-tight space.
+  row.className = "price-row exchange-row";
+  const metaBits = [];
+  if (ex.country) metaBits.push(escapeHtml(ex.country));
+  if (ex.yearEstablished) metaBits.push(TM_I18N.t("exchanges.foundedYear", { year: ex.yearEstablished }));
+  const metaText = metaBits.join(" · ");
+  const volText = formatExchangeVolume(ex.volume24hBtc);
+  const linkLabel = TM_I18N.t("prices.viewCoin", { name: ex.name });
+  row.innerHTML = `
+    <a class="price-link" href="${ex.url ? escapeHtml(ex.url) : "#"}" target="_blank" rel="noopener noreferrer" aria-label="${linkLabel}" title="${linkLabel}">
+      <span class="price-left"><span class="exchange-rank">#${rank}</span>${tokenIconHtml(ex.name, ex.image)}<span class="price-id"><span class="price-name">${escapeHtml(ex.name)}</span><span class="price-symbol">${metaText}</span></span></span>
+      <span class="price-right"><span class="price-quote"><span class="price-usd">${volText ? `${volText} ${TM_I18N.t("predictions.volSuffix")}` : ""}</span></span></span>
+    </a>
+  `;
+  return row;
+}
+
+async function refreshExchanges() {
+  hideError("exchanges-error");
+  $("exchanges-status").innerHTML = coinSpinnerHtml(TM_I18N.t("exchanges.loading"));
+  $("exchanges-status").classList.remove("hidden");
+  try {
+    const exchanges = await TM_PRICES.getTopExchanges(25);
+    const list = $("exchanges-list");
+    list.innerHTML = "";
+    if (!exchanges.length) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = TM_I18N.t("exchanges.empty");
+      list.appendChild(p);
+    } else {
+      exchanges.forEach((ex, i) => list.appendChild(renderExchangeRow(ex, i + 1)));
+    }
+    $("exchanges-status").classList.add("hidden");
+  } catch (e) {
+    $("exchanges-status").classList.add("hidden");
+    showError("exchanges-error", e.message);
+  }
+}
+
+const MAIN_EXCHANGES_CARD_COUNT = 4;
+async function refreshMainExchangesCard() {
+  const list = $("exchanges-card-list");
+  if (!list) return;
+  list.innerHTML = `<div class="price-row skeleton">${coinSpinnerHtml(TM_I18N.t("exchanges.loading"))}</div>`;
+  try {
+    const exchanges = await TM_PRICES.getTopExchanges(MAIN_EXCHANGES_CARD_COUNT);
+    list.innerHTML = "";
+    if (!exchanges.length) {
+      list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("exchanges.cardUnavailable")}</div>`;
+    } else {
+      exchanges.forEach((ex, i) => list.appendChild(renderExchangeRow(ex, i + 1)));
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("exchanges.cardUnavailable")}</div>`;
   }
 }
 
