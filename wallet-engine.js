@@ -352,19 +352,47 @@ function isRpcFailoverRetryable(e) {
   if (code === "SERVER_ERROR" || code === "NETWORK_ERROR" || code === "TIMEOUT") return true;
   return RPC_FAILOVER_RETRYABLE_TEXT.test(String((e && e.message) || e || ""));
 }
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Free public RPC nodes (the only kind this wallet uses -- see networks.js)
+// don't just go down outright; far more often they hand back a transient
+// rate-limit or a one-off hiccup that clears itself within a second. The
+// original version of this loop tried each configured URL exactly once and
+// gave up the instant all of them had a bad moment at the same time -- which
+// reads to the user as "Couldn't reach the network" even though every node
+// would very likely have worked half a second later. This now gives each
+// URL one quick same-node retry after a short delay before moving on, and if
+// the whole list still comes up empty, makes one more full pass after a
+// slightly longer pause (nodes that were simultaneously rate-limited on the
+// first pass are usually clear by the second). Genuinely non-retryable
+// errors (a revert, a rejected signature, bad nonce, etc.) still bail out
+// immediately via isRpcFailoverRetryable() -- this only adds patience for
+// the node/transport-flakiness case.
+const RPC_FAILOVER_ROUNDS = 2;
+const RPC_FAILOVER_RETRY_DELAY_MS = 500;
+const RPC_FAILOVER_ROUND_DELAY_MS = 1200;
 async function withRpcFailover(network, action) {
   const urls = network.rpcUrls || [];
   if (urls.length === 0) throw new Error("This network has no RPC URLs configured.");
   const first = await pickHealthyRpcUrl(network);
   const ordered = [first, ...urls.filter((u) => u !== first)];
   let lastError;
-  for (const url of ordered) {
-    try {
-      return await action(makeProvider(url, network));
-    } catch (e) {
-      lastError = e;
-      if (!isRpcFailoverRetryable(e)) throw e;
-      // otherwise fall through and try the next RPC URL
+  for (let round = 0; round < RPC_FAILOVER_ROUNDS; round++) {
+    if (round > 0) await sleep(RPC_FAILOVER_ROUND_DELAY_MS);
+    for (const url of ordered) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          return await action(makeProvider(url, network));
+        } catch (e) {
+          lastError = e;
+          if (!isRpcFailoverRetryable(e)) throw e;
+          if (attempt === 0) await sleep(RPC_FAILOVER_RETRY_DELAY_MS);
+          // otherwise fall through and try the next RPC URL (or, on the
+          // last URL of the last round, fall out of both loops below)
+        }
+      }
     }
   }
   throw lastError;

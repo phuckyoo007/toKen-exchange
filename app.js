@@ -147,15 +147,34 @@ const TRUST_WALLET_CHAIN_FOLDER = {
   arbitrum: "arbitrum",
   optimism: "optimism",
 };
+// This wallet's own launched tokens are never going to show up in a
+// third-party asset repo, no matter how long a listing request sits in
+// review -- so instead of leaving them permanently stuck on the colored-
+// initials fallback, their logos are embedded directly as inline SVG data
+// URIs (self-contained, no extra network request, can't 404). Keyed by
+// "<networkKey>:<checksummed contract address>".
+const CUSTOM_TOKEN_LOGOS = {
+  "base:0xCe2DcdD5F60033240aB504C929742Ab9B8d9da07": // NOVA
+    "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTYgMjU2Ij4KICA8ZGVmcz4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0iYmciIGN4PSI1MCUiIGN5PSI0MiUiIHI9Ijc1JSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMzYTI0NzIiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI1NSUiIHN0b3AtY29sb3I9IiMyNDE0NTQiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMTMwYTMwIi8+CiAgICA8L3JhZGlhbEdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJzdGFyIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZjZkOCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjQ1JSIgc3RvcC1jb2xvcj0iI2ZmZDc2YSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlOGE4MzgiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3ciIGN4PSI1MCUiIGN5PSI1MCUiIHI9IjUwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmU5YTgiIHN0b3Atb3BhY2l0eT0iMC41NSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNmZmU5YTgiIHN0b3Atb3BhY2l0eT0iMCIvPgogICAgPC9yYWRpYWxHcmFkaWVudD4KICA8L2RlZnM+CiAgPGNpcmNsZSBjeD0iMTI4IiBjeT0iMTI4IiByPSIxMjgiIGZpbGw9InVybCgjYmcpIi8+CiAgPGNpcmNsZSBjeD0iMTI4IiBjeT0iMTI4IiByPSI5MiIgZmlsbD0idXJsKCNnbG93KSIvPgogIDwhLS0gc21hbGwgZGlzdGFudCBzcGFya2xlcyAtLT4KICA8ZyBmaWxsPSIjZmZmZmZmIj4KICAgIDxjaXJjbGUgY3g9IjcwIiBjeT0iNjYiIHI9IjIuNiIgb3BhY2l0eT0iMC44NSIvPgogICAgPGNpcmNsZSBjeD0iMTkwIiBjeT0iODIiIHI9IjIiIG9wYWNpdHk9IjAuNyIvPgogICAgPGNpcmNsZSBjeD0iMjAwIiBjeT0iMTY4IiByPSIyLjYiIG9wYWNpdHk9IjAuOCIvPgogICAgPGNpcmNsZSBjeD0iNjIiIGN5PSIxODIiIHI9IjIiIG9wYWNpdHk9IjAuNjUiLz4KICAgIDxjaXJjbGUgY3g9IjEyOCIgY3k9IjQ2IiByPSIxLjgiIG9wYWNpdHk9IjAuNiIvPgogIDwvZz4KICA8IS0tIG1haW4gZm91ci1wb2ludCBub3ZhIGJ1cnN0IC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDEyOCwxMjgpIj4KICAgIDxwYXRoIGQ9Ik0wLC03OCBDMTAsLTMwIDE0LC0xNCA2MiwtMTAgQzE0LC02IDEwLDEwIDAsNTggQy0xMCwxMCAtMTQsLTYgLTYyLC0xMCBDLTE0LC0xNCAtMTAsLTMwIDAsLTc4IFoiIGZpbGw9InVybCgjc3RhcikiLz4KICAgIDxwYXRoIGQ9Ik0wLC03OCBDMTAsLTMwIDE0LC0xNCA2MiwtMTAgQzE0LC02IDEwLDEwIDAsNTggQy0xMCwxMCAtMTQsLTYgLTYyLC0xMCBDLTE0LC0xNCAtMTAsLTMwIDAsLTc4IFoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZjhlNiIgc3Ryb2tlLW9wYWNpdHk9IjAuNCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgIDwhLS0gc21hbGwgY3Jvc3Mgc3BhcmtsZSByb3RhdGVkIGZvciBhIHNlY29uZGFyeSB0d2lua2xlIC0tPgogICAgPGcgdHJhbnNmb3JtPSJyb3RhdGUoNDUpIj4KICAgICAgPHBhdGggZD0iTTAsLTMwIEM0LC0xMiA1LC01IDI0LC00IEM1LC0zIDQsNCAwLDIyIEMtNCw0IC01LC0zIC0yNCwtNCBDLTUsLTUgLTQsLTEyIDAsLTMwIFoiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuODUiLz4KICAgIDwvZz4KICA8L2c+Cjwvc3ZnPgo=",
+};
 function trustWalletLogoUrl(networkKey, address) {
   const folder = TRUST_WALLET_CHAIN_FOLDER[networkKey];
-  if (!folder || !address) return null;
+  // No contract address means the native coin (ETH, BNB, POL, ...) -- Trust
+  // Wallet keys that by the chain folder's own info/logo.png, not under
+  // assets/<address>/ like an ERC-20 token, so it needs its own branch
+  // rather than falling through the `!address` check below to nothing.
+  if (!address) {
+    return folder ? `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/info/logo.png` : null;
+  }
   let checksummed;
   try {
     checksummed = ethers.utils.getAddress(address);
   } catch (e) {
     return null;
   }
+  const custom = CUSTOM_TOKEN_LOGOS[`${networkKey}:${checksummed}`];
+  if (custom) return custom;
+  if (!folder) return null;
   return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${checksummed}/logo.png`;
 }
 
@@ -1296,7 +1315,11 @@ function renderSwapAssetBtn(side, asset, customAddress) {
   const iconSlot = $(`swap-${side}-icon`);
   const symbolEl = $(`swap-${side}-symbol`);
   if (asset) {
-    const img = asset.key === "native" ? null : trustWalletLogoUrl(currentNetwork && currentNetwork.key, asset.address);
+    // trustWalletLogoUrl() now resolves a real logo for the native coin too
+    // (asset.address is "" for native, which it treats as "look up the
+    // chain's own info/logo.png" -- see the comment there), so this no
+    // longer needs to special-case native into an initials-only null.
+    const img = trustWalletLogoUrl(currentNetwork && currentNetwork.key, asset.address);
     iconSlot.innerHTML = tokenIconHtml(asset.symbol, img);
     symbolEl.textContent = asset.symbol;
   } else if (customAddress) {
@@ -1385,7 +1408,9 @@ function openAssetPicker(side) {
     const row = document.createElement("button");
     row.type = "button";
     row.className = "asset-picker-row";
-    const img = a.key === "native" ? null : trustWalletLogoUrl(currentNetwork && currentNetwork.key, a.address);
+    // See the matching comment above (renderSwapAsset) -- native coins now
+    // get a real logo from trustWalletLogoUrl() too.
+    const img = trustWalletLogoUrl(currentNetwork && currentNetwork.key, a.address);
     row.innerHTML =
       tokenIconHtml(a.symbol, img) +
       `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(a.symbol)}</span>` +
