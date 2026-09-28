@@ -3478,3 +3478,29 @@ function renderActivity() {
     activateSplashHome();
   }
 })();
+// Moves the copyright line off the global footer (was showing on
+// every screen) so it only appears on the Settings page, and
+// changes the text from your last name to "Token Exchange".
+// Self-contained: does not touch or depend on any other code in
+// the file, so it's safe to paste at the end regardless of what
+// else is in app.js.
+// ============================================================
+(function () {
+  function fixCopyrightPlacement() {
+    var globalCopyright = document.querySelector("#app-footer .footer-copyright");
+    if (globalCopyright) globalCopyright.remove();
+
+    var settingsScreen = document.getElementById("screen-settings");
+    if (settingsScreen && !settingsScreen.querySelector(".settings-copyright")) {
+      var span = document.createElement("span");
+      span.className = "footer-copyright settings-copyright";
+      span.innerHTML = "&copy; 2026 Token Exchange";
+      settingsScreen.appendChild(span);
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fixCopyrightPlacement);
+  } else {
+    fixCopyrightPlacement();
+  }
+})();
