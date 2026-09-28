@@ -2038,7 +2038,12 @@ function formatExchangeVolume(btc) {
 
 function renderExchangeRow(ex, rank) {
   const row = document.createElement("div");
-  row.className = "price-row";
+  // "exchange-row" is a scoping hook (see app.css) so a long exchange name
+  // ("Coinbase Exchange") wraps instead of ellipsis-truncating the way a
+  // short coin/currency name does in this same .price-row layout -- and so
+  // the rank number gets its own fixed-width badge instead of eating into
+  // the name's already-tight space.
+  row.className = "price-row exchange-row";
   const metaBits = [];
   if (ex.country) metaBits.push(escapeHtml(ex.country));
   if (ex.yearEstablished) metaBits.push(TM_I18N.t("exchanges.foundedYear", { year: ex.yearEstablished }));
@@ -2047,7 +2052,7 @@ function renderExchangeRow(ex, rank) {
   const linkLabel = TM_I18N.t("prices.viewCoin", { name: ex.name });
   row.innerHTML = `
     <a class="price-link" href="${ex.url ? escapeHtml(ex.url) : "#"}" target="_blank" rel="noopener noreferrer" aria-label="${linkLabel}" title="${linkLabel}">
-      <span class="price-left">${tokenIconHtml(ex.name, ex.image)}<span class="price-id"><span class="price-name">#${rank} ${escapeHtml(ex.name)}</span><span class="price-symbol">${metaText}</span></span></span>
+      <span class="price-left"><span class="exchange-rank">#${rank}</span>${tokenIconHtml(ex.name, ex.image)}<span class="price-id"><span class="price-name">${escapeHtml(ex.name)}</span><span class="price-symbol">${metaText}</span></span></span>
       <span class="price-right"><span class="price-quote"><span class="price-usd">${volText ? `${volText} ${TM_I18N.t("predictions.volSuffix")}` : ""}</span></span></span>
     </a>
   `;
