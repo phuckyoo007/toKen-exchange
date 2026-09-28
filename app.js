@@ -1530,6 +1530,21 @@ function openAssetPicker(side) {
 $("swap-from-asset-btn").addEventListener("click", () => openAssetPicker("from"));
 $("swap-to-asset-btn").addEventListener("click", () => openAssetPicker("to"));
 $("swap-picker-close").addEventListener("click", closeAssetPicker);
+
+// The flip (⇅) button between the two panels had no click handler at all --
+// it was just a static, permanently-disabled icon in the markup, which is
+// why tapping it did nothing. Swapping fromKey/toKey and reusing
+// syncSwapAsset() for both sides gives it the same behavior as picking each
+// asset manually (updates the pill buttons, re-checks balance, clears the
+// stale quote, and reschedules a fresh one for the new direction).
+$("swap-flip-btn").addEventListener("click", () => {
+  const prevFromKey = swapState.fromKey;
+  const prevToKey = swapState.toKey;
+  swapState.fromKey = prevToKey;
+  swapState.toKey = prevFromKey;
+  syncSwapAsset("from");
+  syncSwapAsset("to");
+});
 $("swap-picker-custom-btn").addEventListener("click", () => {
   const side = swapState.pickerSide;
   const addr = (prompt(TM_I18N.t("common.tokenAddressPlaceholderParen")) || "").trim();
