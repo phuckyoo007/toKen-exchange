@@ -223,6 +223,14 @@
       <div id="currencies-card-list" class="prices-card-list"></div>
     </div>
 
+    <div class="prices-card">
+      <div class="prices-card-header">
+        <span class="prices-card-title" data-i18n="main.exchangesCardTitle">Hottest Exchanges</span>
+        <button id="btn-goto-exchanges-card" class="link" data-i18n="common.seeAll">See all</button>
+      </div>
+      <div id="exchanges-card-list" class="prices-card-list"></div>
+    </div>
+
     <div class="tokens-section">
       <div class="tokens-header">
         <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
@@ -440,6 +448,19 @@
     <div id="predictions-list" class="prices-list"></div>
     <p id="predictions-error" class="error hidden"></p>
     <p id="predictions-status" class="hint hidden"></p>
+    <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
+      <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
+      <span data-i18n="common.back">Back</span>
+    </button>
+  </section>
+
+  <!-- EXCHANGES (read-only) -->
+  <section id="screen-exchanges" class="screen hidden">
+    <h2 data-i18n="exchanges.title">Hottest Exchanges</h2>
+    <p class="muted" data-i18n="exchanges.description">CoinGecko's trust-score ranking of centralized crypto exchanges, refreshed automatically -- informational only. Token Exchange is self-custody and never routes trades through any of these; nothing about your wallet is sent to look this up.</p>
+    <div id="exchanges-list" class="prices-list"></div>
+    <p id="exchanges-error" class="error hidden"></p>
+    <p id="exchanges-status" class="hint hidden"></p>
     <button type="button" class="back-btn top-back-btn" data-back="screen-main" aria-label="Back">
       <span class="top-back-btn-coin" aria-hidden="true">&#8592;</span>
       <span data-i18n="common.back">Back</span>
