@@ -1614,7 +1614,6 @@ html[dir="rtl"] .prices-search { background-position: right 11px center; }
 /* Price rows now open the coin screen, so they are buttons, not anchors. */
 button.price-link { background: none; border: 0; padding: 0; font: inherit; text-align: start; width: auto; }
    Fixes: (1) splash/opening-screen bezel now matches the Unlock
-border: none
    card's beveled gold frame instead of the old flat mustard
    border, (2) footer logo at 1.5x size, (3) "TOKEN EXCHANGE"
    splash title gets the same brighten/dim flicker as the
@@ -1631,6 +1630,7 @@ body.tm-web-wallet #splash-screen {
   width: 390px; height: 640px;
   max-width: calc(100% - 24px); max-height: calc(100vh - 64px);
   border-radius: 36px;
+  border: none;
   padding: 18px;
   background: radial-gradient(130% 110% at 50% -12%, #faf6d1 0%, #f4dea2 45%, #c99a5b 68%, #8c6440 88%, #6b4a2c 100%);
   box-shadow:
@@ -1646,6 +1646,7 @@ body.tm-web-wallet #splash-screen {
     width: 100%; height: 100%;
     max-width: 100%; max-height: 100%;
     border-radius: 0;
+    border: none;
     padding: 10px;
     background: radial-gradient(130% 110% at 50% -12%, #faf6d1 0%, #f4dea2 45%, #c99a5b 68%, #8c6440 88%, #6b4a2c 100%);
     box-shadow:
@@ -1675,4 +1676,21 @@ body.tm-web-wallet #splash-screen {
   display: block;
   text-align: center;
   margin-top: 20px;
+}
+
+/* Two separate pages, not one card stacked on top of another: the splash
+   panel and the real app-frame card happen to share the same size/position
+   so the handoff between them reads as continuous, but previously both
+   were simultaneously present in the DOM the whole time the splash was up
+   -- just ordered by z-index. Any drift between the two (a taller unlock
+   screen, a mismatched bezel) let the app-frame card peek out from behind
+   the splash, reading as two stacked cards instead of one. app-frame now
+   stays fully invisible (not just behind) until hideSplash() explicitly
+   reveals it -- see the matching body.classList.add in app.js -- so only
+   one of the two is ever actually visible at a time. */
+body.tm-web-wallet #app-frame {
+  visibility: hidden;
+}
+body.tm-web-wallet.tm-splash-dismissed #app-frame {
+  visibility: visible;
 }

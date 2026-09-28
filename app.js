@@ -2989,6 +2989,12 @@ function hideSplash() {
   el.dataset.hidden = "1";
   clearSplashAutoTimers();
   el.classList.add("splash-hide");
+  // Two genuinely separate pages, not a card sitting on top of another:
+  // the real app-frame card stays fully invisible (not just behind the
+  // splash in z-order) until this exact moment, so there's never a
+  // window where both are visible/peeking at once -- see the matching
+  // CSS rule for body.tm-web-wallet.tm-splash-dismissed #app-frame.
+  document.body.classList.add("tm-splash-dismissed");
   const tagline = $("splash-tagline");
   if (tagline) tagline.remove();
   setTimeout(() => el.remove(), 450);
