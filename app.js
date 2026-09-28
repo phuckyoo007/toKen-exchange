@@ -3,44 +3,6 @@
 // and the "approval" mode popup window opened by the background worker when
 // a dapp requests something (connect, sign, send, add network).
 
-function $(id) { return document.getElementById(id); }
-
-// The one spinning-coin image (popup/img/spinner-coin.png) doubles as the
-// wallet's single "you're waiting on something" cue everywhere -- the
-// startup splash, screen-loading, the balance, and every other in-place
-// loading state below all share it rather than each inventing their own.
-function coinSpinnerHtml(label) {
-  const img = `<img class="inline-coin-spinner" src="img/spinner-coin.png" alt="" />`;
-  return label ? `${img}<span>${escapeHtml(label)}</span>` : img;
-}
-
-// ---------------------------------------------------------------- DISPLAY CURRENCY
-// Which fiat currency price/balance displays are shown in (see Settings) --
-// CoinGecko prices every coin directly in each of these, so switching just
-// means re-requesting with a different vs_currencies code, no separate FX
-// conversion needed. Defaults to USD until TM_PRICES loads (see init()).
-const TM_CURRENCY_KEY = "tm_currency";
-let currentCurrency = "usd";
-
-function loadCurrency() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([TM_CURRENCY_KEY], (res) => {
-      const stored = res[TM_CURRENCY_KEY];
-      currentCurrency = stored && TM_PRICES.SUPPORTED_CURRENCIES[stored] ? stored : TM_PRICES.DEFAULT_CURRENCY;
-      resolve();
-    });
-  });
-}
-
-function currencySymbol() {
-  const info = TM_PRICES.SUPPORTED_CURRENCIES[currentCurrency];
-  return info ? info.symbol : "$";
-}
-
-function formatCurrency(amount) {
-  return TM_PRICES.formatMoney(amount, currentCurrency);
-}
-
 // ---------------------------------------------------------------- PORTFOLIO TOTAL
 // The main screen's hero number used to be just the native coin's USD
 // value. MetaMask and Coinbase Wallet both lead with a combined value
@@ -67,55 +29,6 @@ function renderPortfolioTotal() {
   if ($("balance-usd-label")) $("balance-usd-label").classList.remove("hidden");
 }
 
-// ---------------------------------------------------------------- NETWORK COLORS
-// Each chain's own brand color, the same small colored dot MetaMask (and
-// basically every other multi-chain wallet) shows next to a network's
-// name so the current chain reads at a glance instead of only by text --
-// handy since two networks with similar names (or a long custom one) are
-// otherwise easy to misread in a hurry.
-const NETWORK_DOT_COLORS = {
-  ethereum: "#627EEA",
-  base: "#0052FF",
-  polygon: "#8247E5",
-  bsc: "#F3BA2F",
-  arbitrum: "#28A0F0",
-  optimism: "#FF0420",
-};
-function networkDotColor(key) {
-  if (NETWORK_DOT_COLORS[key]) return NETWORK_DOT_COLORS[key];
-  // A user-added custom network has no known brand color -- fall back to a
-  // color hashed from its key, so it's still a consistent, distinct dot
-  // rather than a plain gray "unknown" marker every time.
-  let h = 0;
-  const str = String(key || "");
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  return `hsl(${h % 360}, 55%, 58%)`;
-}
-function networkDotHtml(key) {
-  return `<span class="network-dot" style="background:${networkDotColor(key)}"></span>`;
-}
-
-// ---------------------------------------------------------------- TOKEN ICONS
-// A colored initials badge per coin/token -- the same role a real logo
-// plays in MetaMask's token list, without fetching one from a third party
-// (a user-added token's contract address would otherwise have to be sent
-// to some logo API just to look it up). Well-known coins get their actual
-// brand color; anything else gets a color hashed from its own symbol, so
-// it's still a consistent, distinct badge rather than a plain gray "?".
-const TOKEN_BRAND_COLORS = {
-  BTC: "#F7931A", ETH: "#627EEA", WETH: "#627EEA", BNB: "#F3BA2F", POL: "#8247E5",
-  MATIC: "#8247E5", SOL: "#14F195", XRP: "#25A6E1", DOGE: "#C2A633", ADA: "#0033AD",
-  USDT: "#26A17B", USDC: "#2775CA", DAI: "#F5AC37", AVAX: "#E84142", LINK: "#2A5ADA",
-  DOT: "#E6007A", TRX: "#EF0027", UNI: "#FF007A", LTC: "#345D9D", SHIB: "#F00500",
-  TON: "#0098EA", WBTC: "#F09242",
-};
-function tokenIconColor(symbol) {
-  const key = String(symbol || "").toUpperCase();
-  if (TOKEN_BRAND_COLORS[key]) return TOKEN_BRAND_COLORS[key];
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return `hsl(${h % 360}, 55%, 46%)`;
-}
 // A real logo (when one is known) is layered on top of the colored-initial
 // circle rather than replacing it -- the initials stay in the DOM as a
 // built-in fallback, and if the image 404s or the host is unreachable, its
@@ -125,11 +38,23 @@ function tokenIconColor(symbol) {
 // back from CoinGecko's own /coins/markets response (see prices.js) -- not
 // arbitrary third-party metadata -- so no extra sanitization is needed
 // beyond the existing HTML-attribute escaping.
+// A logo that fails to load removes itself, revealing the coloured initials
+// underneath. This used to be an inline onerror="" attribute, which the
+// Content-Security-Policy (no inline scripts) blocks -- so it's one delegated
+// listener now. Image "error" events don't bubble, hence capture = true.
+document.addEventListener("error", (e) => {
+  const t = e.target;
+  if (t && t.tagName === "IMG" && t.classList.contains("token-icon-img")) t.remove();
+}, true);
+
 function tokenIconHtml(symbol, imageUrl) {
   const s = String(symbol || "?").trim();
+  // Only ever load logos over https -- rejects javascript:, data: and
+  // protocol-relative values even if an API response were ever tampered with.
+  if (imageUrl && !/^https:\/\//i.test(String(imageUrl))) imageUrl = null;
   const initials = escapeHtml((s.slice(0, 2) || "?").toUpperCase());
   const img = imageUrl
-    ? `<img class="token-icon-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" onerror="this.remove()" />`
+    ? `<img class="token-icon-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" />`
     : "";
   return `<span class="token-icon" style="background:${tokenIconColor(s)}">${initials}${img}</span>`;
 }
@@ -157,82 +82,6 @@ function trustWalletLogoUrl(networkKey, address) {
     return null;
   }
   return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${checksummed}/logo.png`;
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = String(str == null ? "" : str);
-  return div.innerHTML;
-}
-
-function sendMsg(type, payload) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type, ...payload }, (response) => {
-      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      if (!response || !response.ok) return reject(new Error((response && response.error) || "Unknown error"));
-      resolve(response);
-    });
-  });
-}
-
-// ---------------------------------------------------------------- CUBE NAV
-// Home, Activity and Send are the app's three "peer" destinations -- the
-// same three the splash screen's own tab bar already treats as equal
-// starting points (see activateSplashHome() below; Assets is the fourth
-// icon there, but it's always just been screen-main scrolled to the
-// tokens list, not a separate screen, so it stays that way here too).
-// Once inside the app these three now live as three faces of a rotating
-// cube (see cube-nav.js) instead of plain sibling screens that just swap
-// with a hard cut: clicking Send from Home, or hitting Back from Send,
-// turns the cube instead. Every other screen -- Settings, Swap, Buy, Add
-// token, the dapp-approval dialogs, and so on -- still shows/hides exactly
-// like before, as a plain overlay on top of the cube (its own Back button
-// always returns to screen-main, landing back on the cube's Home face).
-const CUBE_FACE_ORDER = ["screen-main", "screen-activity", "screen-send"];
-let cubeNav = null;
-
-function mountCubeNav() {
-  if (cubeNav || !window.CubeNav) return;
-  const stageRoot = $("cube-stage");
-  if (!stageRoot) return;
-  const faces = CUBE_FACE_ORDER.map((id) => ({ id, el: $(id) }));
-  if (faces.some((f) => !f.el)) return;
-  cubeNav = window.CubeNav.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
-  // The cube keeps every face permanently in the DOM (just rotated out of
-  // view) so the 3D transform has something to show on every side -- so
-  // these three stop being ".hidden"-toggled like a normal screen the
-  // moment the cube takes them over. CubeNav's own aria-hidden/inert/dim
-  // handles "not the current face" instead.
-  CUBE_FACE_ORDER.forEach((id) => $(id).classList.remove("hidden"));
-  stageRoot.addEventListener("facechange", updateCubeTabbarActive);
-  updateCubeTabbarActive();
-}
-
-function updateCubeTabbarActive() {
-  const bar = $("cube-tabbar");
-  if (!bar || !cubeNav) return;
-  const activeId = CUBE_FACE_ORDER[cubeNav.index];
-  bar.querySelectorAll(".cube-tab").forEach((btn) => {
-    const goto = btn.dataset.cubeGoto;
-    btn.classList.toggle("active", goto !== "assets" && CUBE_FACE_ORDER[Number(goto)] === activeId);
-  });
-}
-
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach((el) => {
-    if (!CUBE_FACE_ORDER.includes(el.id)) el.classList.add("hidden");
-  });
-  const shell = $("cube-shell");
-  const faceIndex = CUBE_FACE_ORDER.indexOf(id);
-  if (faceIndex >= 0) {
-    mountCubeNav();
-    if (shell) shell.classList.remove("hidden");
-    if (cubeNav) cubeNav.go(faceIndex);
-    else $(id).classList.remove("hidden"); // CubeNav script missing/failed -- fall back to a plain screen
-  } else {
-    if (shell) shell.classList.add("hidden");
-    $(id).classList.remove("hidden");
-  }
 }
 
 // Persistent tab bar for the cube's three faces (plus the Assets shortcut),
@@ -314,7 +163,6 @@ function showError(id, message, raw) {
   el.textContent = raw ? String(message) : friendlyErrorMessage(message);
   el.classList.remove("hidden");
 }
-function hideError(id) { $(id).classList.add("hidden"); }
 
 document.querySelectorAll(".back-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -467,7 +315,6 @@ async function refreshMain() {
   refreshNfts(); // not awaited -- same reasoning as the balance above
   refreshMainPricesCard(); // not awaited -- same reasoning as the balance above
   refreshMainCurrenciesCard(); // not awaited -- same reasoning as the balance above
-  refreshMainExchangesCard(); // not awaited -- same reasoning as the balance above
 }
 
 async function refreshBalance() {
@@ -523,12 +370,6 @@ $("account-select").addEventListener("change", async (e) => {
   await refreshBalance();
   await refreshTokens();
 });
-
-// ---------------------------------------------------------------- IDENTICONS
-function updateAccountIdenticon(address) {
-  const el = $("account-identicon");
-  if (el) el.innerHTML = address ? TM_IDENTICON.svgFor(address, 28) : "";
-}
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 // A loose "this looks like a name, not an address" check -- good enough to
@@ -727,23 +568,6 @@ $("btn-copy-address").addEventListener("click", () => {
   navigator.clipboard.writeText(currentStatus.selectedAddress || "");
 });
 
-// Local, in-page QR rendering (see vendor/qrcode-generator.js) -- no
-// network request of any kind, so showing your own receive address this
-// way can't leak it anywhere.
-function refreshAddressQr() {
-  const box = $("address-qr-box");
-  if (box.classList.contains("hidden")) return;
-  const address = $("address-display").textContent;
-  if (!address) {
-    box.innerHTML = "";
-    return;
-  }
-  const qr = qrcode(0, "M");
-  qr.addData(address);
-  qr.make();
-  box.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
-}
-
 $("btn-toggle-qr").addEventListener("click", () => {
   const box = $("address-qr-box");
   const isHidden = box.classList.toggle("hidden"); // true if "hidden" was just added
@@ -759,7 +583,6 @@ $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices
 // markets) now opens the Prices screen straight to its Currencies tab --
 // see the Currencies-card note above refreshMainCurrenciesCard().
 $("btn-goto-currencies-card").addEventListener("click", () => { showScreen("screen-prices"); setPricesTab("currencies"); });
-$("btn-goto-exchanges-card").addEventListener("click", () => { showScreen("screen-exchanges"); refreshExchanges(); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
 $("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
@@ -1191,9 +1014,9 @@ function renderPriceRow(c) {
   const starred = isWatchlisted(c.symbol);
   // The whole row (logo, name, price) opens the in-app coin screen; the
   // star is a separate button so pinning a coin doesn't navigate away.
-  const linkLabel = TM_I18N.t("prices.viewCoin", { name: c.name });
+  const linkLabel = escapeHtml(TM_I18N.t("prices.viewCoin", { name: c.name }));
   row.innerHTML = `
-    <button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>
+    <button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${escapeHtml(c.symbol)}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>
     <button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button>
   `;
   row.querySelector(".price-link").addEventListener("click", () => {
@@ -1239,7 +1062,7 @@ function renderCurrencyRow(r) {
     // detail screen -- the closest thing to "this currency, as a
     // cryptocurrency". Price/change here start null; openCoinDetail's own
     // loadCoinInfo() fills them in from CoinGecko once the screen opens.
-    const linkLabel = TM_I18N.t("prices.viewPeggedCoin", { currency: r.name, name: pegSymbol });
+    const linkLabel = escapeHtml(TM_I18N.t("prices.viewPeggedCoin", { currency: r.name, name: pegSymbol }));
     row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}">${nameHtml}</button>${quoteHtml}`;
     row.querySelector(".price-link").addEventListener("click", () => {
       openCoinDetail(
@@ -1474,39 +1297,11 @@ function syncSwapAsset(side) {
   scheduleSwapAutoQuote();
 }
 
-// "To" suggestions beyond what's already held: someone swapping FROM a
-// coin they hold TO a stablecoin they don't hold yet (and haven't added as
-// a tracked token) previously had no way to even find it in the "To"
-// picker -- it only ever listed what getHeldAssets() returned. This adds a
-// zero-balance entry for each of KNOWN_STABLECOIN_ADDRESSES's hand-verified
-// addresses on the CURRENT network only (never a guessed address), so they
-// show up in the "To" list the same as anything actually held -- that list
-// already allows picking a zero-balance asset, this just gives it more to
-// offer. Purely additive and de-duplicated by address: if the symbol is
-// already held or already tracked (even at zero balance), the real entry
-// from getHeldAssets() wins and the suggestion for that symbol is skipped.
-// Never affects the "From" side, which still only lists positive balances.
-function suggestedStablecoinAssets(held, network) {
-  if (!network) return [];
-  const heldAddresses = new Set(held.filter((a) => a.address).map((a) => a.address.toLowerCase()));
-  const out = [];
-  Object.keys(KNOWN_STABLECOIN_ADDRESSES).forEach((symbol) => {
-    const address = KNOWN_STABLECOIN_ADDRESSES[symbol][network.chainId];
-    if (!address || heldAddresses.has(address.toLowerCase())) return;
-    // decimals here is cosmetic only (the picker just shows "0" either way)
-    // -- the real quote/approve/execute path always fetches the live
-    // decimals from the token contract itself (see scheduleSwapAutoQuote's
-    // TM_GET_TOKEN_BALANCE call), so this never affects swap math.
-    out.push({ key: address, address, symbol, decimals: 6, balance: "0" });
-  });
-  return out;
-}
-
 async function populateSwapSelects(pre) {
   const myGen = ++swapPopulateGen;
   const held = await getHeldAssets();
   if (myGen !== swapPopulateGen) return;
-  swapState.held = held.concat(suggestedStablecoinAssets(held, currentNetwork));
+  swapState.held = held;
   const toKey = (pre && pre.toKey) || swapState.toKey;
   // "From" only offers what the person actually holds; the coin being
   // bought is never offered as its own source.
@@ -1979,12 +1774,12 @@ function renderMarketRow(m) {
   let metaHtml = "";
   if (m.leadPct != null && m.leadName) {
     const cls = m.leadPct >= 50 ? "up" : "down";
-    metaHtml += `<span class="market-pct ${cls}">${m.leadName} ${m.leadPct}%</span>`;
+    metaHtml += `<span class="market-pct ${cls}">${escapeHtml(m.leadName)} ${escapeHtml(m.leadPct)}%</span>`;
   }
   const volText = formatMarketVolume(m.volume24hr);
-  if (volText) metaHtml += `<span class="market-volume">${volText} ${TM_I18N.t("predictions.volSuffix")}</span>`;
+  if (volText) metaHtml += `<span class="market-volume">${escapeHtml(volText)} ${TM_I18N.t("predictions.volSuffix")}</span>`;
   row.innerHTML = `
-    <span class="market-question">${m.question}</span>
+    <span class="market-question">${escapeHtml(m.question)}</span>
     <span class="market-meta">${metaHtml}</span>
   `;
   return row;
@@ -2048,83 +1843,6 @@ async function refreshMainCurrenciesCard() {
     rates.slice(0, MAIN_CURRENCIES_CARD_COUNT).forEach((r) => list.appendChild(renderCurrencyRow(r)));
   } catch (e) {
     list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("prices.cardUnavailable")}</div>`;
-  }
-}
-
-// ------------------------------------------------------------- EXCHANGES
-// Read-only "hottest exchanges" list from CoinGecko's own trust-score
-// ranking (see getTopExchanges() in lib/prices.js) -- same keyless public
-// API this app already uses for coin/currency prices, no backend of ours
-// involved. "Keep it updated" just means this re-fetches (subject to
-// prices.js's own short cache) every time the card or screen is shown,
-// same as Live Prices and Currencies above -- no separate polling needed.
-function formatExchangeVolume(btc) {
-  if (btc == null) return null;
-  if (btc >= 1000) return `${(btc / 1000).toFixed(1)}K BTC`;
-  return `${btc.toFixed(1)} BTC`;
-}
-
-function renderExchangeRow(ex, rank) {
-  const row = document.createElement("div");
-  // "exchange-row" is a scoping hook (see app.css) so a long exchange name
-  // ("Coinbase Exchange") wraps instead of ellipsis-truncating the way a
-  // short coin/currency name does in this same .price-row layout -- and so
-  // the rank number gets its own fixed-width badge instead of eating into
-  // the name's already-tight space.
-  row.className = "price-row exchange-row";
-  const metaBits = [];
-  if (ex.country) metaBits.push(escapeHtml(ex.country));
-  if (ex.yearEstablished) metaBits.push(TM_I18N.t("exchanges.foundedYear", { year: ex.yearEstablished }));
-  const metaText = metaBits.join(" · ");
-  const volText = formatExchangeVolume(ex.volume24hBtc);
-  const linkLabel = TM_I18N.t("prices.viewCoin", { name: ex.name });
-  row.innerHTML = `
-    <a class="price-link" href="${ex.url ? escapeHtml(ex.url) : "#"}" target="_blank" rel="noopener noreferrer" aria-label="${linkLabel}" title="${linkLabel}">
-      <span class="price-left"><span class="exchange-rank">#${rank}</span>${tokenIconHtml(ex.name, ex.image)}<span class="price-id"><span class="price-name">${escapeHtml(ex.name)}</span><span class="price-symbol">${metaText}</span></span></span>
-      <span class="price-right"><span class="price-quote"><span class="price-usd">${volText ? `${volText} ${TM_I18N.t("predictions.volSuffix")}` : ""}</span></span></span>
-    </a>
-  `;
-  return row;
-}
-
-async function refreshExchanges() {
-  hideError("exchanges-error");
-  $("exchanges-status").innerHTML = coinSpinnerHtml(TM_I18N.t("exchanges.loading"));
-  $("exchanges-status").classList.remove("hidden");
-  try {
-    const exchanges = await TM_PRICES.getTopExchanges(25);
-    const list = $("exchanges-list");
-    list.innerHTML = "";
-    if (!exchanges.length) {
-      const p = document.createElement("p");
-      p.className = "muted";
-      p.textContent = TM_I18N.t("exchanges.empty");
-      list.appendChild(p);
-    } else {
-      exchanges.forEach((ex, i) => list.appendChild(renderExchangeRow(ex, i + 1)));
-    }
-    $("exchanges-status").classList.add("hidden");
-  } catch (e) {
-    $("exchanges-status").classList.add("hidden");
-    showError("exchanges-error", e.message);
-  }
-}
-
-const MAIN_EXCHANGES_CARD_COUNT = 4;
-async function refreshMainExchangesCard() {
-  const list = $("exchanges-card-list");
-  if (!list) return;
-  list.innerHTML = `<div class="price-row skeleton">${coinSpinnerHtml(TM_I18N.t("exchanges.loading"))}</div>`;
-  try {
-    const exchanges = await TM_PRICES.getTopExchanges(MAIN_EXCHANGES_CARD_COUNT);
-    list.innerHTML = "";
-    if (!exchanges.length) {
-      list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("exchanges.cardUnavailable")}</div>`;
-    } else {
-      exchanges.forEach((ex, i) => list.appendChild(renderExchangeRow(ex, i + 1)));
-    }
-  } catch (e) {
-    list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("exchanges.cardUnavailable")}</div>`;
   }
 }
 
@@ -3122,14 +2840,14 @@ async function renderTxDecodeSummary(tx) {
     } catch (e) { /* token lookup failed -- fall back to the raw integer amount set above */ }
     const verbKey = name === "approve" ? "approve.decodedApproveLine" : "approve.decodedTransferLine";
     const amountHtml = isUnlimited
-      ? `<span class="decoded-unlimited">${TM_I18N.t("approve.decodedUnlimited", { symbol: symbol || TM_I18N.t("approve.decodedThisToken") })}</span>`
+      ? `<span class="decoded-unlimited">${TM_I18N.t("approve.decodedUnlimited", { symbol: escapeHtml(symbol || TM_I18N.t("approve.decodedThisToken")) })}</span>`
       : escapeHtml(amountDisplay);
     el.innerHTML = `<p class="decoded-line">${TM_I18N.t(verbKey, { amount: amountHtml, to: `<span class="mono">${escapeHtml(targetArg)}</span>` })}</p>`;
   } else {
     const lines = functionFragment.inputs
       .map((inp, i) => `<div class="decoded-arg"><span class="muted">${escapeHtml(inp.name || `arg${i}`)}:</span><span class="mono small">${escapeHtml(String(args[i]))}</span></div>`)
       .join("");
-    el.innerHTML = `<p class="decoded-line">${TM_I18N.t("approve.decodedGenericIntro", { fn: name })}</p>${lines}`;
+    el.innerHTML = `<p class="decoded-line">${TM_I18N.t("approve.decodedGenericIntro", { fn: escapeHtml(name) })}</p>${lines}`;
     el.classList.remove("hidden");
   }
 }

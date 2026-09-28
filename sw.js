@@ -14,9 +14,10 @@
 // for an app that holds financial/private-key logic, where "always prefer
 // the latest code when we can reach it" matters more than raw speed.
 //
-// CACHE_NAME is versioned by hand. Bump it whenever this list of
-// precached files changes so old caches get cleaned up on activate.
-const CACHE_NAME = "token-exchange-shell-v1";
+// CACHE_NAME is versioned by hand. Bump it whenever PRECACHE_URLS changes so
+// old caches get cleaned up on activate. tests/service-worker.test.js fails if
+// this list drifts from what index.html and app.css actually load.
+const CACHE_NAME = "token-exchange-shell-v3";
 
 const PRECACHE_URLS = [
   "/",
@@ -26,22 +27,85 @@ const PRECACHE_URLS = [
   "/shim.js",
   "/wallet-engine.js",
   "/cube-nav.js",
+  "/sw-register.js",
   "/site.webmanifest",
+  // vendored libraries (copied from node_modules by server.js at start-up)
+  "/vendor/ethers.umd.min.js",
+  "/vendor/walletconnect-sign-client.umd.js",
+  "/vendor/qrcode-generator.js",
+  // app libraries
+  "/lib/identicon.js",
+  "/lib/prices.js",
+  "/lib/polymarket.js",
+  "/lib/transak-config.js",
+  "/lib/i18n.js",
+  "/lib/support-config.js",
+  "/lib/crypto-utils.js",
+  "/lib/wallet.js",
+  "/lib/networks.js",
+  "/lib/swap.js",
+  "/lib/fee-config.js",
+  "/lib/sanctions-list.js",
+  "/lib/walletconnect-config.js",
+  "/lib/account.js",
+  "/lib/feature-requests.js",
+  "/lib/ui-common.js",
+  // translations
+  "/lib/i18n/en.js",
+  "/lib/i18n/ar.js",
+  "/lib/i18n/zh.js",
+  "/lib/i18n/es.js",
+  "/lib/i18n/fr.js",
+  "/lib/i18n/hi.js",
+  "/lib/i18n/pt.js",
+  "/lib/i18n/ja.js",
+  "/lib/i18n/ru.js",
+  // fonts
+  "/fonts/fredoka-400.woff2",
+  "/fonts/fredoka-500.woff2",
+  "/fonts/fredoka-600.woff2",
+  "/fonts/fredoka-700.woff2",
+  // images
+  "/img/splash.jpg",
+  "/img/splash-light.jpg",
+  "/img/spinner-coin.png",
+  "/img/favicon-32.png",
+  "/img/apple-touch-icon.png",
   "/img/icon-192.png",
   "/img/icon-512.png",
   "/img/bg-scene.jpg",
+  "/img/card-banner.jpg",
+  "/img/card-watermark.jpg",
+  "/img/card-watermark-light.jpg",
+  "/img/flag-en.svg",
+  "/img/flag-ar.svg",
+  "/img/flag-zh.svg",
+  "/img/flag-es.svg",
+  "/img/flag-fr.svg",
+  "/img/flag-hi.svg",
+  "/img/flag-pt.svg",
+  "/img/flag-ja.svg",
+  "/img/flag-ru.svg",
 ];
 
 self.addEventListener("install", (event) => {
+  // Add files one by one instead of cache.addAll(): addAll is all-or-nothing,
+  // so a single 404 used to leave the cache empty. Now a missing file only
+  // costs that one file. Install still never fails because of the cache.
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => {
-        // Don't fail install just because one optional asset 404s in a
-        // given deployment -- offline support degrading gracefully beats
-        // the service worker never installing at all.
-      })
+      .then((cache) =>
+        Promise.allSettled(
+          PRECACHE_URLS.map((url) =>
+            fetch(url, { cache: "reload" }).then((res) => {
+              if (!res.ok) throw new Error(url + " " + res.status);
+              return cache.put(url, res);
+            })
+          )
+        )
+      )
+      .catch(() => {})
       .then(() => self.skipWaiting())
   );
 });

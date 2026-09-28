@@ -31,6 +31,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { clientIp } = require("./client-ip");
 
 const IS_PROD =
   process.env.NODE_ENV === "production" ||
@@ -42,7 +43,6 @@ const AUTH_ENABLED = !IS_PROD || !!process.env.DATA_DIR;
 // How many reverse-proxy hops sit in front of this server (Railway = 1). Used
 // to pick the real client IP out of X-Forwarded-For without trusting values a
 // client can forge. Set to 0 if the server is exposed directly.
-const TRUST_PROXY_HOPS = Number.isInteger(+process.env.TRUST_PROXY_HOPS) ? +process.env.TRUST_PROXY_HOPS : 1;
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS_PER_USER = 10;
@@ -138,17 +138,7 @@ const LOGIN_USER_FAIL_LIMIT = 8; // failed attempts per username
 const REGISTER_IP_LIMIT = 10; // per hour
 
 // ------------------------------------------------------------------ helpers
-function clientIp(req) {
-  const fwd = req.headers["x-forwarded-for"];
-  if (fwd && TRUST_PROXY_HOPS > 0) {
-    const parts = String(fwd).split(",").map((s) => s.trim()).filter(Boolean);
-    // The proxy appends the address it saw; anything left of that is whatever
-    // the client chose to send, so count from the right.
-    const idx = parts.length - TRUST_PROXY_HOPS;
-    if (idx >= 0) return parts[idx];
-  }
-  return req.socket.remoteAddress || "unknown";
-}
+// clientIp() lives in ./client-ip.js (shared with the other API files).
 
 function isHttps(req) {
   return !!req.socket.encrypted || String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";

@@ -76,6 +76,8 @@
 
 const { generateJwt } = require("@coinbase/cdp-sdk/auth");
 
+const { clientIp } = require("./client-ip");
+const { applyCors } = require("./cors");
 const COINBASE_CDP_API_KEY_ID = process.env.COINBASE_CDP_API_KEY_ID || "";
 const COINBASE_CDP_API_SECRET = process.env.COINBASE_CDP_API_SECRET || "";
 const ONRAMP_TOKEN_HOST = "api.developer.coinbase.com";
@@ -113,11 +115,7 @@ function withinLimit(ip) {
   return true;
 }
 
-function clientIp(req) {
-  const fwd = req.headers["x-forwarded-for"];
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.socket.remoteAddress || "unknown";
-}
+// clientIp() lives in ./client-ip.js (proxy-aware; ignores forged X-Forwarded-For).
 
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -130,7 +128,6 @@ function sendJson(res, status, obj) {
     // request itself only carries a public wallet address and a network
     // name -- nothing sensitive -- so an open CORS policy here doesn't
     // expose anything.
-    "Access-Control-Allow-Origin": "*",
   });
   res.end(body);
 }
@@ -236,10 +233,10 @@ async function fetchLatestOfframpTransaction(partnerUserRef) {
 function handleCoinbaseOfframpStatusApi(req, res) {
   const [url, queryString] = req.url.split("?");
   if (url !== "/api/coinbase-offramp-status") return false;
+  applyCors(req, res);
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
     });
     res.end();
@@ -286,10 +283,10 @@ function handleCoinbaseOnrampApi(req, res) {
 
   const [url] = req.url.split("?");
   if (url !== "/api/coinbase-onramp-session") return false;
+  applyCors(req, res);
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     });

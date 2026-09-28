@@ -36,6 +36,8 @@
 
 const { URLSearchParams } = require("url");
 
+const { clientIp } = require("./client-ip");
+const { applyCors } = require("./cors");
 const ZEROEX_API_KEY = process.env.ZEROEX_API_KEY || "";
 const ZEROEX_QUOTE_URL = "https://api.0x.org/swap/allowance-holder/quote";
 
@@ -67,11 +69,7 @@ function withinLimit(ip) {
   return true;
 }
 
-function clientIp(req) {
-  const fwd = req.headers["x-forwarded-for"];
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.socket.remoteAddress || "unknown";
-}
+// clientIp() lives in ./client-ip.js (proxy-aware; ignores forged X-Forwarded-For).
 
 function isAggregatorConfigured() {
   return !!ZEROEX_API_KEY;
@@ -88,7 +86,6 @@ function sendJson(res, status, obj) {
     "Content-Length": Buffer.byteLength(body),
     // Same reasoning as moonpay-sign-api.js: lets the extension's
     // chrome-extension:// origin call this same-project API too.
-    "Access-Control-Allow-Origin": "*",
   });
   res.end(body);
 }
@@ -107,10 +104,10 @@ function sendNoRoute(res) {
 function handleSwapQuoteApi(req, res) {
   const [url, queryString] = req.url.split("?");
   if (url !== "/api/swap-quote") return false;
+  applyCors(req, res);
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
     });
     res.end();

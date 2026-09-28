@@ -53,6 +53,8 @@
 // old MoonPay config. Add an entry only after confirming Transak's exact
 // identifier for that chain in their dashboard/docs.
 
+const { clientIp } = require("./client-ip");
+const { applyCors } = require("./cors");
 const TRANSAK_API_KEY = process.env.TRANSAK_API_KEY || "";
 const TRANSAK_API_SECRET = process.env.TRANSAK_API_SECRET || "";
 const TRANSAK_ENVIRONMENT = (process.env.TRANSAK_ENVIRONMENT || "staging").toLowerCase() === "production" ? "production" : "staging";
@@ -164,11 +166,7 @@ function withinLimit(ip) {
   return true;
 }
 
-function clientIp(req) {
-  const fwd = req.headers["x-forwarded-for"];
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.socket.remoteAddress || "unknown";
-}
+// clientIp() lives in ./client-ip.js (proxy-aware; ignores forged X-Forwarded-For).
 
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -179,7 +177,6 @@ function sendJson(res, status, obj) {
     // request only carries a public address, a network name, and currency
     // / crypto-ticker defaults; the response is a single-use URL that only
     // works once.
-    "Access-Control-Allow-Origin": "*",
   });
   res.end(body);
 }
@@ -207,10 +204,10 @@ const CRYPTO_RE = /^[A-Za-z0-9]{1,15}$/;
 function handleTransakApi(req, res) {
   const [url] = req.url.split("?");
   if (url !== "/api/transak-session") return false;
+  applyCors(req, res);
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     });

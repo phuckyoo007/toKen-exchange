@@ -7,6 +7,7 @@ const { handleSwapQuoteApi } = require("./swap-quote-api");
 const { handleAuthApi } = require("./auth-api");
 const { handleCoinbaseOnrampApi } = require("./coinbase-onramp-api");
 const { handleTransakApi } = require("./transak-widget-api");
+const { applySecurityHeaders } = require("./security-headers");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -17,11 +18,11 @@ const FONTS_DIR = path.join(PUBLIC_DIR, "fonts");
 const IMG_DIR = path.join(PUBLIC_DIR, "img");
 const PORT = process.env.PORT || 3000;
 
-const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "manifest.json", "site.webmanifest", "sw.js", "privacy.html", "terms.html", "support.html"];
+const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "sw-register.js", "site.webmanifest", "sw.js", "privacy.html", "terms.html", "support.html"];
 const LIB_FILES = [
 "account.js", "coinbase-onramp-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
 "identicon.js", "networks.js", "onramper-config.js", "polymarket.js", "prices.js",
-"sanctions-list.js", "support-config.js", "swap.js", "transak-config.js", "wallet.js",
+"sanctions-list.js", "support-config.js", "swap.js", "ui-common.js", "transak-config.js", "wallet.js",
 "walletconnect-config.js",
 ];
 const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];
@@ -78,6 +79,7 @@ function main() {
 layoutPublicDir();
 copyVendorFiles();
 const server = http.createServer((req, res) => {
+applySecurityHeaders(req, res);
 if (handleFeatureRequestsApi(req, res)) return;
 if (handleSwapQuoteApi(req, res)) return;
 if (handleAuthApi(req, res)) return;

@@ -13,6 +13,7 @@
 // path to persist across deploys.
 
 const fs = require("fs");
+const { clientIp } = require("./client-ip");
 const path = require("path");
 const crypto = require("crypto");
 
@@ -72,11 +73,7 @@ function sanitize(str, maxLen) {
     .slice(0, maxLen);
 }
 
-function clientIp(req) {
-  const fwd = req.headers["x-forwarded-for"];
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.socket.remoteAddress || "unknown";
-}
+// clientIp() lives in ./client-ip.js (proxy-aware; ignores forged X-Forwarded-For).
 
 function readJsonBody(req, maxBytes, cb) {
   let body = "";

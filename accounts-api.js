@@ -44,6 +44,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { promisify } = require("util");
+const { clientIp } = require("./client-ip");
 const scrypt = promisify(crypto.scrypt);
 
 let DatabaseSync = null;
@@ -127,12 +128,7 @@ function fail(res, status, code, extraHeaders) {
   sendJson(res, status, { error: code }, extraHeaders);
 }
 
-// Railway (and most hosts) append the real client address as the LAST
-// X-Forwarded-For entry; earlier entries can be forged by the client.
-function clientIp(req) {
-  const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((s) => s.trim()).filter(Boolean);
-  return xff.length ? xff[xff.length - 1] : (req.socket && req.socket.remoteAddress) || "unknown";
-}
+// clientIp() lives in ./client-ip.js (proxy-aware; honours TRUST_PROXY_HOPS).
 
 function isHttps(req) {
   return String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https" || !!(req.socket && req.socket.encrypted);

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Token Exchange",
   "short_name": "Token Exchange",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Self-custody Ethereum & Base wallet with a built-in token swap. Your keys never leave your device.",
   "minimum_chrome_version": "111",
   "icons": {
@@ -25,8 +25,7 @@
     "service_worker": "background/background.js"
   },
   "permissions": [
-    "storage",
-    "tabs"
+    "storage"
   ],
   "host_permissions": [
     "http://*/*",

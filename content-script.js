@@ -38,6 +38,11 @@ window.addEventListener("message", (event) => {
 // background worker down into the page.
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type !== "TM_EVENT") return;
+  // background.js sends every event to ALL tabs, tagged with the one origin it
+  // is meant for. Only that origin may see it -- otherwise connecting site A
+  // would hand the user's address (accountsChanged) to every other page open,
+  // including unrelated sites and ads in iframes.
+  if (msg.targetOrigin !== window.location.origin) return;
   window.postMessage(
     { channel: CHANNEL, direction: "from-extension", kind: "event", event: msg.event, data: msg.data },
     "*"
