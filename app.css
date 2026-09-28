@@ -1614,6 +1614,7 @@ html[dir="rtl"] .prices-search { background-position: right 11px center; }
 /* Price rows now open the coin screen, so they are buttons, not anchors. */
 button.price-link { background: none; border: 0; padding: 0; font: inherit; text-align: start; width: auto; }
    Fixes: (1) splash/opening-screen bezel now matches the Unlock
+border: none
    card's beveled gold frame instead of the old flat mustard
    border, (2) footer logo at 1.5x size, (3) "TOKEN EXCHANGE"
    splash title gets the same brighten/dim flicker as the
