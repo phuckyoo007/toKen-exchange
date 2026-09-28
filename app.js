@@ -466,7 +466,7 @@ async function refreshMain() {
   refreshTokens(); // not awaited -- same reasoning as the balance above
   refreshNfts(); // not awaited -- same reasoning as the balance above
   refreshMainPricesCard(); // not awaited -- same reasoning as the balance above
-  refreshMainPredictionsCard(); // not awaited -- same reasoning as the balance above
+  refreshMainCurrenciesCard(); // not awaited -- same reasoning as the balance above
 }
 
 async function refreshBalance() {
@@ -754,7 +754,10 @@ $("btn-settings").addEventListener("click", () => showScreen("screen-settings"))
 $("btn-goto-send").addEventListener("click", () => { setSendSpeed("standard"); showScreen("screen-send"); refreshSendFeePreview(); });
 $("btn-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
 $("btn-goto-prices").addEventListener("click", () => { showScreen("screen-prices"); refreshPrices(); });
-$("btn-goto-predictions").addEventListener("click", () => { showScreen("screen-predictions"); refreshPredictions(); });
+// The home card that used to open screen-predictions (Polymarket trending
+// markets) now opens the Prices screen straight to its Currencies tab --
+// see the Currencies-card note above refreshMainCurrenciesCard().
+$("btn-goto-currencies-card").addEventListener("click", () => { showScreen("screen-prices"); setPricesTab("currencies"); });
 $("btn-goto-buy").addEventListener("click", () => { setupBuyScreen(); showScreen("screen-buy"); });
 $("btn-goto-sell").addEventListener("click", () => { setupSellScreen(); showScreen("screen-sell"); });
 $("btn-goto-add-token").addEventListener("click", () => { resetAddTokenScreen(); showScreen("screen-add-token"); });
@@ -1998,6 +2001,26 @@ async function refreshMainPredictionsCard() {
   }
 }
 
+// The home screen's second card used to be this Polymarket "Trending
+// Markets" preview (still wired above, plus the full screen-predictions
+// page it used to link to) -- it's been swapped out for a Currencies card
+// instead. renderCurrencyRow()/getFiatRates() are the exact same ones the
+// full Prices screen's Currencies tab already uses, so this card and that
+// tab always agree with each other.
+const MAIN_CURRENCIES_CARD_COUNT = 4;
+async function refreshMainCurrenciesCard() {
+  const list = $("currencies-card-list");
+  if (!list) return;
+  list.innerHTML = `<div class="price-row skeleton">${coinSpinnerHtml(TM_I18N.t("prices.loading"))}</div>`;
+  try {
+    const rates = await TM_PRICES.getFiatRates(currentCurrency);
+    list.innerHTML = "";
+    rates.slice(0, MAIN_CURRENCIES_CARD_COUNT).forEach((r) => list.appendChild(renderCurrencyRow(r)));
+  } catch (e) {
+    list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("prices.cardUnavailable")}</div>`;
+  }
+}
+
 // ---------------------------------------------------------------- BUY
 // Buy opens Transak's own widget in an <iframe> embedded right in this
 // screen, instead of bouncing out to a new tab -- Transak is still the one
@@ -2719,6 +2742,7 @@ function clearSwapQuote() {
   delete $("swap-quote-display").dataset.netAmountInWei;
   delete $("swap-quote-display").dataset.amountOutWei;
   delete $("swap-quote-display").dataset.decimalsOut;
+  delete $("swap-quote-display").dataset.needsApproval;
 }
 
 // Looks up a live unit price for a held/custom asset, in currentCurrency.
@@ -2810,13 +2834,17 @@ async function runSwapAutoQuote() {
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
-    $("btn-swap-approve").classList.add("hidden");
+    // Approve is no longer its own visible step/button -- btn-swap-execute's
+    // click handler below checks ds.needsApproval and runs the approve
+    // transaction first, automatically, before executing the swap, so one
+    // tap does both when a fresh allowance is required. btn-swap-approve
+    // stays hidden (its default state in the markup) and unused.
     $("btn-swap-execute").disabled = false;
+    ds.needsApproval = "0";
     if (tokenIn !== TM_NATIVE()) {
       const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
       if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
-        $("btn-swap-approve").classList.remove("hidden");
-        $("btn-swap-execute").disabled = true; // approve first, same sequencing as before
+        ds.needsApproval = "1";
       }
     }
     if (myGen !== swapAutoQuoteGen) return;
@@ -2835,29 +2863,32 @@ async function runSwapAutoQuote() {
   }
 }
 
-$("btn-swap-approve").addEventListener("click", async () => {
-  hideError("swap-error");
-  try {
-    const tokenIn = $("swap-quote-display").dataset.tokenIn;
-    const netAmountInWei = $("swap-quote-display").dataset.netAmountInWei;
-    $("swap-status").textContent = TM_I18N.t("swap.approvingStatus");
-    $("swap-status").classList.remove("hidden");
-    await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: netAmountInWei });
-    $("swap-status").textContent = TM_I18N.t("swap.approvedStatus");
-    $("btn-swap-approve").classList.add("hidden");
-    $("btn-swap-execute").disabled = false;
-  } catch (e) {
-    showError("swap-error", e.message);
-  }
-});
-
+// Approve used to be its own button the person had to notice and tap before
+// Swap would even enable -- two taps, two separate waits, for something
+// that's really one action from the user's point of view ("swap this").
+// Now a single tap on Swap does both, in order, automatically: if the
+// dataset says this token still needs a fresh allowance, it runs the
+// approve transaction first (showing "Approving..." the same as before)
+// and only continues to TM_SWAP_EXECUTE once that succeeds. If approve
+// fails (including the RPC-failover case above), the error shows here and
+// execute never runs -- same safety as before, just no second tap needed
+// on the happy path. btn-swap-approve itself is unused now (stays hidden).
 $("btn-swap-execute").addEventListener("click", async () => {
   hideError("swap-error");
   try {
-    const tokenIn = $("swap-quote-display").dataset.tokenIn;
-    const tokenOut = $("swap-quote-display").dataset.tokenOut;
-    const totalAmountInWei = $("swap-quote-display").dataset.totalAmountInWei;
+    const ds = $("swap-quote-display").dataset;
+    const tokenIn = ds.tokenIn;
+    const tokenOut = ds.tokenOut;
+    const totalAmountInWei = ds.totalAmountInWei;
     const slippageBps = Number($("swap-slippage").value);
+
+    if (ds.needsApproval === "1") {
+      $("swap-status").textContent = TM_I18N.t("swap.approvingStatus");
+      $("swap-status").classList.remove("hidden");
+      await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: ds.netAmountInWei });
+      ds.needsApproval = "0";
+    }
+
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
     const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });

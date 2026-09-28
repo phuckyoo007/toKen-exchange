@@ -65,6 +65,7 @@
     "main.watchOnlyNotice": "You're viewing a watch-only address -- there's no private key for it in this wallet, so Send and Swap are turned off here.",
     "main.livePricesTitle": "Live Prices",
     "main.predictionsTitle": "Trending Markets",
+    "main.currenciesCardTitle": "Currencies",
 
     "tokens.loadError": "Couldn't load balance",
     "tokens.removeTitle": "Remove",
