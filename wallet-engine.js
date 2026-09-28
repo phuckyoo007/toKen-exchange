@@ -290,9 +290,18 @@ async function pickHealthyRpcUrl(network) {
   return urls[0];
 }
 
+// StaticJsonRpcProvider, not the plain JsonRpcProvider -- see the note
+// above withRpcFailover() below for why. This is the actual root cause of
+// the "Couldn't reach the network" (NETWORK_ERROR / "could not detect
+// network") error that survived the RPC-failover fix: it has nothing to do
+// with which node you're talking to.
+function makeProvider(url, network) {
+  return new ethers.providers.StaticJsonRpcProvider(url, { chainId: network.chainId, name: network.name || network.key || "custom" });
+}
+
 async function getProviderFor(network) {
   const url = await pickHealthyRpcUrl(network);
-  return new ethers.providers.JsonRpcProvider(url);
+  return makeProvider(url, network);
 }
 
 // getProviderFor() picks ONE RPC URL and commits to it. pickHealthyRpcUrl()
@@ -313,6 +322,30 @@ async function getProviderFor(network) {
 // identically on every node, so retrying those elsewhere would just be noise
 // (and for a nonce-type error could make things worse), so those are
 // rethrown immediately instead.
+//
+// ROOT CAUSE FOUND (this round): a plain `new ethers.providers.JsonRpcProvider(url)`
+// doesn't just make the one RPC call you asked for -- on first use, ethers
+// silently makes an EXTRA "which chain is this?" call (eth_chainId, falling
+// back to net_version) to auto-detect the network, and only then does your
+// actual call. If that extra probe fails for any reason -- a rate limit, a
+// brief hiccup, anything -- ethers throws exactly "could not detect network"
+// (code NETWORK_ERROR), even though the node would have handled the real
+// call (get allowance, send approve) just fine. This explains why the
+// failover fix from before didn't help: isRpcFailoverRetryable() DOES treat
+// NETWORK_ERROR as retryable (confirmed directly against ethers 5.7.2), so
+// failover was already moving on to the next URL correctly -- it's just
+// that with three RPC URLs each silently making two round-trips instead of
+// one, there were three times as many chances for this specific probe to
+// get unlucky, and it kept doing so. Verified with a mock RPC server that
+// fails eth_chainId but answers everything else fine: a plain
+// JsonRpcProvider throws "could not detect network" 100% of the time
+// against it, even with a network hint passed to its constructor --
+// ethers still re-verifies. ethers.providers.StaticJsonRpcProvider is the
+// one that actually skips the probe when you already know the chain ID
+// (confirmed with the same mock server: zero eth_chainId calls, the real
+// call goes straight through), so every provider built for one of this
+// wallet's own preconfigured networks now goes through makeProvider() above
+// instead of `new ethers.providers.JsonRpcProvider(url)` directly.
 const RPC_FAILOVER_RETRYABLE_TEXT = /invalid response|server_error|processing response error|network error|timeout|etimedout/i;
 function isRpcFailoverRetryable(e) {
   const code = e && e.code ? String(e.code) : "";
@@ -327,7 +360,7 @@ async function withRpcFailover(network, action) {
   let lastError;
   for (const url of ordered) {
     try {
-      return await action(new ethers.providers.JsonRpcProvider(url));
+      return await action(makeProvider(url, network));
     } catch (e) {
       lastError = e;
       if (!isRpcFailoverRetryable(e)) throw e;
