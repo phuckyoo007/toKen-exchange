@@ -1474,11 +1474,39 @@ function syncSwapAsset(side) {
   scheduleSwapAutoQuote();
 }
 
+// "To" suggestions beyond what's already held: someone swapping FROM a
+// coin they hold TO a stablecoin they don't hold yet (and haven't added as
+// a tracked token) previously had no way to even find it in the "To"
+// picker -- it only ever listed what getHeldAssets() returned. This adds a
+// zero-balance entry for each of KNOWN_STABLECOIN_ADDRESSES's hand-verified
+// addresses on the CURRENT network only (never a guessed address), so they
+// show up in the "To" list the same as anything actually held -- that list
+// already allows picking a zero-balance asset, this just gives it more to
+// offer. Purely additive and de-duplicated by address: if the symbol is
+// already held or already tracked (even at zero balance), the real entry
+// from getHeldAssets() wins and the suggestion for that symbol is skipped.
+// Never affects the "From" side, which still only lists positive balances.
+function suggestedStablecoinAssets(held, network) {
+  if (!network) return [];
+  const heldAddresses = new Set(held.filter((a) => a.address).map((a) => a.address.toLowerCase()));
+  const out = [];
+  Object.keys(KNOWN_STABLECOIN_ADDRESSES).forEach((symbol) => {
+    const address = KNOWN_STABLECOIN_ADDRESSES[symbol][network.chainId];
+    if (!address || heldAddresses.has(address.toLowerCase())) return;
+    // decimals here is cosmetic only (the picker just shows "0" either way)
+    // -- the real quote/approve/execute path always fetches the live
+    // decimals from the token contract itself (see scheduleSwapAutoQuote's
+    // TM_GET_TOKEN_BALANCE call), so this never affects swap math.
+    out.push({ key: address, address, symbol, decimals: 6, balance: "0" });
+  });
+  return out;
+}
+
 async function populateSwapSelects(pre) {
   const myGen = ++swapPopulateGen;
   const held = await getHeldAssets();
   if (myGen !== swapPopulateGen) return;
-  swapState.held = held;
+  swapState.held = held.concat(suggestedStablecoinAssets(held, currentNetwork));
   const toKey = (pre && pre.toKey) || swapState.toKey;
   // "From" only offers what the person actually holds; the coin being
   // bought is never offered as its own source.
