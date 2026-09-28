@@ -207,7 +207,7 @@
     "swap.balanceLabel": "Balance: {amount} {symbol}",
     "swap.maxBtn": "Max",
     "swap.quotingHint": "Getting quote…",
-    "swap.rateLabel": "Rate",
+    "swap.rateLabel": "Exchange rate",
     "swap.appFeeShortLabel": "App fee",
     "swap.minReceivedLabel": "Minimum received",
     "swap.selectAssetTitle": "Select asset",
