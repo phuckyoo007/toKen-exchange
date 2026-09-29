@@ -1694,3 +1694,23 @@ body.tm-web-wallet #app-frame {
 body.tm-web-wallet.tm-splash-dismissed #app-frame {
   visibility: visible;
 }
+
+/* --- Polish pass (2026-09-29): legibility, contrast, focus, touch targets --- */
+:root { --text-faint: #9a8f74; } /* was #766c56, 3.7:1 -> 5.9:1 on --bg */
+
+/* raise 10-11px text to a readable size */
+.small, .address-row, #balance-symbol,
+.swap-panel-balance, #app-footer .footer-lock { font-size: 12px; }
+.balance-usd-label, .swap-panel-label,
+.activity-status, .swap-asset-chevron { font-size: 11px; }
+
+/* focus rings for elements that lacked one */
+select:focus-visible, summary:focus-visible,
+.icon-btn:focus-visible, .swap-asset-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* minimum touch targets for the gear and text links */
+.icon-btn { min-width: 40px; min-height: 40px; }
+.link { min-height: 32px; }
