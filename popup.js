@@ -1192,10 +1192,45 @@ $("btn-swap-quote").addEventListener("click", async () => {
       }
     }
     $("swap-quote-display").classList.remove("hidden");
+    renderSwapGasEstimate(tokenIn, $("swap-quote-display").dataset.needsApprove === "1"); // fire-and-forget
   } catch (e) {
     showError("swap-error", e.message);
   }
 });
+
+
+// Network fee row for the swap screen: approve (if needed) + app-fee transfer +
+// swap, priced at the chain's current fees, plus a warning when this account
+// doesn't hold enough of the native coin to pay it. Best-effort, never blocks.
+async function renderSwapGasEstimate(tokenIn, needsApprove) {
+  const lineEl = $("swap-gas-line"), breakdownEl = $("swap-gas-breakdown"), warnEl = $("swap-gas-warning");
+  if (!lineEl) return;
+  lineEl.textContent = "\u2026";
+  breakdownEl.classList.add("hidden");
+  warnEl.classList.add("hidden");
+  try {
+    const est = await sendMsg("TM_SWAP_GAS_ESTIMATE", { tokenIn, needsApprove });
+    const symbol = currentNetwork.nativeCurrency.symbol;
+    const fmtEth = (wei) => {
+      const n = Number(ethers.utils.formatEther(wei));
+      if (n === 0) return "0";
+      if (n < 0.000001) return "<0.000001";
+      return n.toLocaleString(undefined, { maximumSignificantDigits: 2, maximumFractionDigits: 10 });
+    };
+    lineEl.textContent = `${TM_I18N.t("swap.networkFeeLabel")}: \u2248 ${fmtEth(est.totalWei)} ${symbol}`;
+    const gwei = Number(ethers.utils.formatUnits(est.gasPriceWei, "gwei"));
+    breakdownEl.textContent = est.steps.map((s) => `${TM_I18N.t("swap.gasStep_" + s.key)} ${fmtEth(s.feeWei)}`).join(" \u00b7 ")
+      + ` \u00b7 ${TM_I18N.t("swap.gasPriceLabel")} ${gwei.toLocaleString(undefined, { maximumSignificantDigits: 2, maximumFractionDigits: 6 })} gwei`;
+    breakdownEl.classList.remove("hidden");
+    const bal = await sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress }).catch(() => null);
+    if (bal && ethers.BigNumber.from(bal.balanceWei).lt(ethers.BigNumber.from(est.totalWei).mul(12).div(10))) {
+      warnEl.textContent = TM_I18N.t("swap.gasLowEth", { need: fmtEth(est.totalWei), have: fmtEth(bal.balanceWei), symbol });
+      warnEl.classList.remove("hidden");
+    }
+  } catch (e) {
+    lineEl.textContent = `${TM_I18N.t("swap.networkFeeLabel")}: ${TM_I18N.t("swap.gasUnavailable")}`;
+  }
+}
 
 // Single "Swap" button does approve-then-swap as one user action when the
 // router doesn't already have enough allowance -- see the needsApprove note

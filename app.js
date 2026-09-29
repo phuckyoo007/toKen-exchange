@@ -2747,6 +2747,7 @@ async function runSwapAutoQuote() {
     if (myGen !== swapAutoQuoteGen) return;
     $("swap-quoting-hint").classList.add("hidden");
     $("swap-quote-display").classList.remove("hidden");
+    renderSwapGasEstimate(myGen, tokenIn, ds.needsApprove === "1"); // fire-and-forget
 
     // Live USD estimates, best-effort -- never block the quote on these.
     const [priceIn, priceOut] = await Promise.all([getAssetUsdPrice(tokenIn === TM_NATIVE() ? "" : tokenIn), getAssetUsdPrice(tokenOut === TM_NATIVE() ? "" : tokenOut)]);
@@ -2757,6 +2758,56 @@ async function runSwapAutoQuote() {
     if (myGen !== swapAutoQuoteGen) return;
     $("swap-quoting-hint").classList.add("hidden");
     showError("swap-error", e.message);
+  }
+}
+
+
+// ---------------------------------------------------------------- SWAP NETWORK FEE
+// Shows what the whole swap (approve if needed + app-fee transfer + swap) will
+// cost in network fees, and warns when the account can't pay it -- that
+// shortfall is exactly what used to surface as a confusing "couldn't get a
+// response from the network" on Approve. Best-effort: never blocks the swap.
+async function renderSwapGasEstimate(gen, tokenIn, needsApprove) {
+  const lineEl = $("swap-gas-line"), breakdownEl = $("swap-gas-breakdown"), warnEl = $("swap-gas-warning");
+  if (!lineEl) return;
+  lineEl.textContent = "\u2026";
+  breakdownEl.classList.add("hidden");
+  warnEl.classList.add("hidden");
+  try {
+    const est = await sendMsg("TM_SWAP_GAS_ESTIMATE", { tokenIn, needsApprove });
+    if (gen !== swapAutoQuoteGen) return;
+    const symbol = currentNetwork.nativeCurrency.symbol;
+    const fmtEth = (wei) => {
+      const n = Number(ethers.utils.formatEther(wei));
+      if (n === 0) return "0";
+      if (n < 0.000001) return "<0.000001";
+      return n.toLocaleString(undefined, { maximumSignificantDigits: 2, maximumFractionDigits: 10 });
+    };
+    let text = `\u2248 ${fmtEth(est.totalWei)} ${symbol}`;
+    lineEl.textContent = text;
+    const gwei = Number(ethers.utils.formatUnits(est.gasPriceWei, "gwei"));
+    const gweiText = gwei.toLocaleString(undefined, { maximumSignificantDigits: 2, maximumFractionDigits: 6 });
+    breakdownEl.textContent = est.steps.map((s) => `${TM_I18N.t("swap.gasStep_" + s.key)} ${fmtEth(s.feeWei)}`).join(" \u00b7 ")
+      + ` \u00b7 ${TM_I18N.t("swap.gasPriceLabel")} ${gweiText} gwei`;
+    breakdownEl.classList.remove("hidden");
+
+    // fiat + low-balance warning, both best-effort
+    const [price, bal] = await Promise.all([
+      getAssetUsdPrice("").catch(() => null),
+      sendMsg("TM_GET_BALANCE", { address: currentStatus.selectedAddress }).catch(() => null),
+    ]);
+    if (gen !== swapAutoQuoteGen) return;
+    if (price != null) {
+      const fiat = Number(ethers.utils.formatEther(est.totalWei)) * price;
+      lineEl.textContent = `${text} (~${TM_PRICES.formatMoney(fiat, currentCurrency)})`;
+    }
+    if (bal && ethers.BigNumber.from(bal.balanceWei).lt(ethers.BigNumber.from(est.totalWei).mul(12).div(10))) {
+      warnEl.textContent = TM_I18N.t("swap.gasLowEth", { need: fmtEth(est.totalWei), have: fmtEth(bal.balanceWei), symbol });
+      warnEl.classList.remove("hidden");
+    }
+  } catch (e) {
+    if (gen !== swapAutoQuoteGen) return;
+    lineEl.textContent = TM_I18N.t("swap.gasUnavailable");
   }
 }
 

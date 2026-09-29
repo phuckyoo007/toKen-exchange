@@ -807,6 +807,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           break;
         }
 
+        case "TM_SWAP_GAS_ESTIMATE": {
+          // Rough, honest estimate of what the whole swap will cost in network fees:
+          // [approve, if needed] + the 0.5% app-fee transfer + the swap itself.
+          // Gas units are typical ERC-20 / Uniswap-V2 figures (real usage is usually a
+          // bit lower); the price is the chain's current base fee plus a small tip.
+          const network = await getActiveNetwork();
+          const provider = await getProviderFor(network);
+          const feeData = await provider.getFeeData();
+          let gasPrice = feeData.lastBaseFeePerGas && feeData.maxPriorityFeePerGas
+            ? feeData.lastBaseFeePerGas.add(feeData.maxPriorityFeePerGas)
+            : feeData.gasPrice || (await provider.getGasPrice());
+          const nativeIn = TM_SWAP.isNative(msg.tokenIn);
+          const plan = [];
+          if (msg.needsApprove) plan.push({ key: "approve", gasUnits: 55000 });
+          plan.push({ key: "fee", gasUnits: nativeIn ? 21000 : 65000 });
+          plan.push({ key: "swap", gasUnits: nativeIn ? 200000 : 250000 });
+          const steps = plan.map((p) => ({ key: p.key, gasUnits: p.gasUnits, feeWei: gasPrice.mul(p.gasUnits).toString() }));
+          const totalWei = steps.reduce((sum, s) => sum.add(s.feeWei), ethers.BigNumber.from(0));
+          sendResponse({ ok: true, gasPriceWei: gasPrice.toString(), totalWei: totalWei.toString(), steps });
+          break;
+        }
+
         case "TM_SWAP_ALLOWANCE": {
           const network = await getActiveNetwork();
           const provider = await getProviderFor(network);

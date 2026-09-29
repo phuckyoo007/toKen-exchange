@@ -23,3 +23,16 @@ Local mock Base node that enforces the same gas-allowance check: stock ethers fa
 with 0.00003 ETH, patched code sends the approve. With 0 ETH it now says "Not enough
 ETH to pay the network fee". The repo's own *.test.js files can't run from this zip
 (missing helpers/load-libs), before or after these changes.
+
+## Added: "Network fee" row on the Swap screen
+Shows the estimated network fee for the whole swap (approve if needed + 0.5% fee
+transfer + swap) in ETH and your display currency, with a per-step breakdown and the
+current gas price. If the account holds less native coin (ETH on Base) than the fees
+need, a warning appears before you tap Swap.
+- New message TM_SWAP_GAS_ESTIMATE in wallet-engine.js and background.js.
+- Row added to index.html (website) and popup.html/popup.js (extension); app.js renders it.
+- New English strings in en.js (other languages fall back to English).
+- Gas units are typical ERC-20 / Uniswap V2 numbers (approve 55k, fee transfer 65k or
+  21k for native, swap 250k or 200k for native); real usage is usually a bit lower.
+Tested the handler against a mock Base node: ~0.0000022 ETH total at 0.006 gwei.
+UI rendering itself was not run in a browser here.
