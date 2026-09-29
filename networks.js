@@ -44,7 +44,14 @@ const BUILTIN_NETWORKS = [
     chainId: 8453,
     name: "Base",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: ["https://mainnet.base.org", "https://base-rpc.publicnode.com", "https://rpc.ankr.com/base"],
+    // Added a 4th independent, keyless endpoint (2026-09-29) after repeated
+    // "Couldn't get a response from the network" reports on Base swaps --
+    // same reasoning as Ethereum mainnet's 4-URL list above: 3 RPC URLs
+    // that all happen to be congested/rate-limited at the same moment give
+    // withRpcFailover() (see wallet-engine.js/background.js) nothing left
+    // to fall back to. 1rpc.io confirmed live and responding as a real
+    // JSON-RPC endpoint before adding.
+    rpcUrls: ["https://mainnet.base.org", "https://base-rpc.publicnode.com", "https://rpc.ankr.com/base", "https://1rpc.io/base"],
     blockExplorer: "https://basescan.org",
     wrappedNative: "0x4200000000000000000000000000000000000006", // WETH (Base predeploy)
     // Verified via BaseScan (contract labeled "Uniswap: V2 Router02", marked
