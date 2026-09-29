@@ -1180,11 +1180,15 @@ $("btn-swap-quote").addEventListener("click", async () => {
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
-    $("btn-swap-approve").classList.add("hidden");
+    // Same change as the web app's swap screen: no more separate "Approve
+    // token first" button to notice and click -- a single Swap click below
+    // does the approve tx first (if needed) then the swap tx, like
+    // MetaMask's own swap flow does.
+    $("swap-quote-display").dataset.needsApprove = "0";
     if (tokenIn !== TM_NATIVE()) {
       const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
       if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
-        $("btn-swap-approve").classList.remove("hidden");
+        $("swap-quote-display").dataset.needsApprove = "1";
       }
     }
     $("swap-quote-display").classList.remove("hidden");
@@ -1193,28 +1197,28 @@ $("btn-swap-quote").addEventListener("click", async () => {
   }
 });
 
-$("btn-swap-approve").addEventListener("click", async () => {
-  hideError("swap-error");
-  try {
-    const tokenIn = $("swap-quote-display").dataset.tokenIn;
-    const netAmountInWei = $("swap-quote-display").dataset.netAmountInWei;
-    $("swap-status").textContent = TM_I18N.t("swap.approvingStatus");
-    $("swap-status").classList.remove("hidden");
-    await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: netAmountInWei });
-    $("swap-status").textContent = TM_I18N.t("swap.approvedStatus");
-    $("btn-swap-approve").classList.add("hidden");
-  } catch (e) {
-    showError("swap-error", e.message);
-  }
-});
-
+// Single "Swap" button does approve-then-swap as one user action when the
+// router doesn't already have enough allowance -- see the needsApprove note
+// above. If the approve tx itself fails we stop there and show that error;
+// we only move on to TM_SWAP_EXECUTE once the approve has gone through.
 $("btn-swap-execute").addEventListener("click", async () => {
   hideError("swap-error");
+  const ds = $("swap-quote-display").dataset;
+  $("btn-swap-execute").disabled = true;
   try {
-    const tokenIn = $("swap-quote-display").dataset.tokenIn;
-    const tokenOut = $("swap-quote-display").dataset.tokenOut;
-    const totalAmountInWei = $("swap-quote-display").dataset.totalAmountInWei;
+    const tokenIn = ds.tokenIn;
+    const tokenOut = ds.tokenOut;
+    const totalAmountInWei = ds.totalAmountInWei;
+    const netAmountInWei = ds.netAmountInWei;
     const slippageBps = Number($("swap-slippage").value);
+
+    if (ds.needsApprove === "1") {
+      $("swap-status").textContent = TM_I18N.t("swap.approvingStatus");
+      $("swap-status").classList.remove("hidden");
+      await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: netAmountInWei });
+      ds.needsApprove = "0";
+    }
+
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
     const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
@@ -1222,6 +1226,8 @@ $("btn-swap-execute").addEventListener("click", async () => {
     await refreshBalance();
   } catch (e) {
     showError("swap-error", e.message);
+  } finally {
+    $("btn-swap-execute").disabled = false;
   }
 });
 

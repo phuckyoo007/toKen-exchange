@@ -1024,6 +1024,125 @@ $("btn-nft-confirm-add").addEventListener("click", async () => {
   }
 });
 
+// ---- FIND NFTS (auto-detect via this project's own /api/nft-list proxy,
+// see nft-api.js) -- a discovery aid on top of the manual add-by-contract
+// flow above, not a replacement for it: results here are shown live and
+// only added to the tracked list (screen-main's NFTs grid) if the person
+// taps "+ Add" on a specific one. Same untrusted-metadata handling as the
+// manual flow -- images are rendered strictly as <img src>, text strictly
+// as textContent, and wallet-engine.js has already run every image URL
+// through its allowlist sanitizer before this ever sees it. ----
+let findNftsPageKey = null;
+let findNftsAddedKeys = new Set();
+
+function findNftKey(n) { return `${n.contractAddress.toLowerCase()}:${n.tokenId}`; }
+
+async function loadFindNfts(reset) {
+  hideError("find-nfts-error");
+  if (reset) {
+    findNftsPageKey = null;
+    findNftsAddedKeys = new Set();
+    $("find-nfts-grid").innerHTML = "";
+  }
+  const status = $("find-nfts-status");
+  const moreBtn = $("btn-find-nfts-more");
+  moreBtn.classList.add("hidden");
+  if (!currentStatus || !currentStatus.selectedAddress) {
+    status.textContent = "";
+    return;
+  }
+  status.textContent = TM_I18N.t("findNfts.loading");
+  try {
+    const res = await sendMsg("TM_GET_NFTS_FOR_OWNER", { owner: currentStatus.selectedAddress, pageKey: findNftsPageKey });
+    if (!res.configured) {
+      status.textContent = TM_I18N.t("findNfts.notConfigured");
+      return;
+    }
+    if (!res.supported) {
+      status.textContent = TM_I18N.t("findNfts.notSupported");
+      return;
+    }
+    if (!res.nfts.length && !$("find-nfts-grid").children.length) {
+      status.textContent = TM_I18N.t("findNfts.empty");
+      return;
+    }
+    status.textContent = "";
+    renderFindNfts(res.nfts);
+    findNftsPageKey = res.pageKey || null;
+    moreBtn.classList.toggle("hidden", !findNftsPageKey);
+  } catch (e) {
+    showError("find-nfts-error", e.message || TM_I18N.t("findNfts.loadError"));
+    status.textContent = "";
+  }
+}
+
+function renderFindNfts(nfts) {
+  const grid = $("find-nfts-grid");
+  nfts.forEach((n) => {
+    const card = document.createElement("div");
+    card.className = "nft-card";
+
+    if (n.image) {
+      const img = document.createElement("img");
+      img.className = "nft-thumb";
+      img.src = n.image; // already scheme-checked server-side + client-side (http(s) or image data: URI only)
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", () => { img.replaceWith(nftThumbFallback()); });
+      card.appendChild(img);
+    } else {
+      card.appendChild(nftThumbFallback());
+    }
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "nft-name";
+    nameEl.textContent = n.name || n.collectionName || `#${n.tokenId}`;
+    card.appendChild(nameEl);
+
+    const idEl = document.createElement("span");
+    idEl.className = "nft-id";
+    idEl.textContent = `#${n.tokenId}`;
+    card.appendChild(idEl);
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "nft-remove-btn";
+    const key = findNftKey(n);
+    const alreadyAdded = findNftsAddedKeys.has(key);
+    addBtn.textContent = alreadyAdded ? "✓" : "+";
+    addBtn.title = alreadyAdded ? TM_I18N.t("findNfts.addedBtn") : TM_I18N.t("findNfts.addBtn");
+    addBtn.disabled = alreadyAdded;
+    addBtn.addEventListener("click", async () => {
+      addBtn.disabled = true;
+      try {
+        await sendMsg("TM_ADD_TRACKED_NFT", {
+          contractAddress: n.contractAddress,
+          tokenId: n.tokenId,
+          standard: n.standard,
+          name: n.name || n.collectionName || "",
+        });
+        findNftsAddedKeys.add(key);
+        addBtn.textContent = "✓";
+        addBtn.title = TM_I18N.t("findNfts.addedBtn");
+        await refreshNfts();
+      } catch (e) {
+        addBtn.disabled = false; // e.g. "already in your list" -- let them see the error and retry/ignore
+        showError("find-nfts-error", e.message);
+      }
+    });
+    card.appendChild(addBtn);
+
+    grid.appendChild(card);
+  });
+}
+
+$("btn-find-nfts").addEventListener("click", () => {
+  $("find-nfts-grid").innerHTML = "";
+  showScreen("screen-find-nfts");
+  loadFindNfts(true);
+});
+
+$("btn-find-nfts-more").addEventListener("click", () => loadFindNfts(false));
+
 function resetAddTokenScreen() {
   hideError("add-token-error");
   $("add-token-address").value = "";
@@ -2518,6 +2637,7 @@ function clearSwapQuote() {
   delete $("swap-quote-display").dataset.netAmountInWei;
   delete $("swap-quote-display").dataset.amountOutWei;
   delete $("swap-quote-display").dataset.decimalsOut;
+  delete $("swap-quote-display").dataset.needsApprove;
 }
 
 // Looks up a live unit price for a held/custom asset, in currentCurrency.
@@ -2609,13 +2729,18 @@ async function runSwapAutoQuote() {
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
-    $("btn-swap-approve").classList.add("hidden");
+    // We used to surface this as a second, separate "Approve token first"
+    // button the user had to notice and click before "Swap" would even
+    // enable -- confusing, and not how MetaMask's own swap UI works (it
+    // just does the approve tx first, invisibly to the flow, then the swap
+    // tx, behind a single click). ds.needsApprove records what we found so
+    // the single btn-swap-execute handler below can do the same thing.
+    ds.needsApprove = "0";
     $("btn-swap-execute").disabled = false;
     if (tokenIn !== TM_NATIVE()) {
       const allowanceRes = await sendMsg("TM_SWAP_ALLOWANCE", { tokenAddress: tokenIn });
       if (ethers.BigNumber.from(allowanceRes.allowanceWei).lt(quote.netAmountInWei)) {
-        $("btn-swap-approve").classList.remove("hidden");
-        $("btn-swap-execute").disabled = true; // approve first, same sequencing as before
+        ds.needsApprove = "1";
       }
     }
     if (myGen !== swapAutoQuoteGen) return;
@@ -2634,29 +2759,29 @@ async function runSwapAutoQuote() {
   }
 }
 
-$("btn-swap-approve").addEventListener("click", async () => {
-  hideError("swap-error");
-  try {
-    const tokenIn = $("swap-quote-display").dataset.tokenIn;
-    const netAmountInWei = $("swap-quote-display").dataset.netAmountInWei;
-    $("swap-status").textContent = TM_I18N.t("swap.approvingStatus");
-    $("swap-status").classList.remove("hidden");
-    await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: netAmountInWei });
-    $("swap-status").textContent = TM_I18N.t("swap.approvedStatus");
-    $("btn-swap-approve").classList.add("hidden");
-    $("btn-swap-execute").disabled = false;
-  } catch (e) {
-    showError("swap-error", e.message);
-  }
-});
-
+// Single "Swap" button now does approve-then-swap as one user action when
+// the router doesn't already have enough allowance -- see the needsApprove
+// note in runSwapAutoQuote above. If the approve tx itself fails (rejected,
+// out of gas, RPC error, etc.) we stop there and show that error; we only
+// move on to TM_SWAP_EXECUTE once the approve has actually gone through.
 $("btn-swap-execute").addEventListener("click", async () => {
   hideError("swap-error");
+  const ds = $("swap-quote-display").dataset;
+  $("btn-swap-execute").disabled = true;
   try {
-    const tokenIn = $("swap-quote-display").dataset.tokenIn;
-    const tokenOut = $("swap-quote-display").dataset.tokenOut;
-    const totalAmountInWei = $("swap-quote-display").dataset.totalAmountInWei;
+    const tokenIn = ds.tokenIn;
+    const tokenOut = ds.tokenOut;
+    const totalAmountInWei = ds.totalAmountInWei;
+    const netAmountInWei = ds.netAmountInWei;
     const slippageBps = Number($("swap-slippage").value);
+
+    if (ds.needsApprove === "1") {
+      $("swap-status").textContent = TM_I18N.t("swap.approvingStatus");
+      $("swap-status").classList.remove("hidden");
+      await sendMsg("TM_SWAP_APPROVE", { tokenAddress: tokenIn, amountWei: netAmountInWei });
+      ds.needsApprove = "0";
+    }
+
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
     const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
@@ -2667,6 +2792,7 @@ $("btn-swap-execute").addEventListener("click", async () => {
     populateSwapSelects({ toKey: swapState.toKey }).catch(() => {});
   } catch (e) {
     showError("swap-error", e.message);
+    $("btn-swap-execute").disabled = false;
   }
 });
 
