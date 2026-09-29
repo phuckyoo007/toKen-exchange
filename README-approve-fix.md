@@ -1,15 +1,18 @@
 # Fix: swap "Approving..." then "Couldn't get a response from the network"
 
-## Root cause
-Not the network, not Railway (deploy is healthy) and not NOVA. ethers v5's fee
-estimate assumes Ethereum: it adds a fixed 1.5 gwei tip. Base's real base fee is
-~0.005 gwei, so the wallet asked the node to budget ~150x more gas money than the
-approve will actually cost (maxFeePerGas 1.51 gwei vs ~0.011 gwei). The node checks
-"can this account afford gasLimit x maxFeePerGas?", answered "gas required exceeds
-allowance", and the app's error mapper showed that as "Couldn't get a response".
-Any account holding only a little ETH on Base hits this.
+## Root cause (corrected)
+The account had **0 ETH on Base**, so it couldn't pay the gas for the approve
+transaction. The node rejected the gas estimate, and the app's error mapper turned
+that into "Couldn't get a response from the network" -- misleading, and it also
+retried across every RPC as if it were a network flake.
+Separately, ethers v5 assumes Ethereum-sized fees (a fixed 1.5 gwei tip), which makes
+the node demand far more ETH than a Base transaction really costs; that is fixed too,
+but it would not have rescued an account with zero ETH.
+To fix it in practice: add a little ETH on **Base** to the wallet address.
 
 ## Changes
+- Approve now checks the ETH balance first and says "not enough ETH to pay the network fee".
+- Fee row label fixed (it was labelled "Exchange rate"); tiny rates no longer show as "1 NOVA = 0 ETH".
 - wallet-engine.js + background.js: on Base / OP / Arbitrum every provider now returns
   realistic fee data (node's suggested tip, capped at 0.1 gwei). Fixes approve, the
   0.5% fee transfer, the swap, and sends.

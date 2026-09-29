@@ -2712,7 +2712,7 @@ async function runSwapAutoQuote() {
     $("swap-amount-out").classList.add("has-value");
 
     const rate = amountNum > 0 ? Number(amountOutStr) / amountNum : 0;
-    $("swap-rate-line").textContent = `1 ${symbolIn} \u2248 ${rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${symbolOut}`;
+    $("swap-rate-line").textContent = `1 ${symbolIn} \u2248 ${rate.toLocaleString(undefined, { maximumSignificantDigits: 4, maximumFractionDigits: 12 })} ${symbolOut}`;
     $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
       percent: quote.feePercentLabel,
       amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),

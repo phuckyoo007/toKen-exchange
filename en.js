@@ -217,7 +217,7 @@
     "swap.maxBtn": "Max",
     "swap.quotingHint": "Getting quote…",
     "swap.rateLabel": "Rate",
-    "swap.appFeeShortLabel": "Exchange rate",
+    "swap.appFeeShortLabel": "App fee",
     "swap.minReceivedLabel": "Minimum received",
     "swap.networkFeeLabel": "Network fee",
     "swap.gasStep_approve": "Approve",

@@ -335,6 +335,22 @@ function makeProvider(url, network) {
   return applyRealisticL2Fees(provider, network);
 }
 
+
+// Pre-flight for on-chain steps: if the account can't pay the network fee, say so
+// plainly BEFORE asking the node (whose reply used to surface as a vague
+// "couldn't get a response from the network" after several retries).
+async function assertCanPayGas(provider, address, gasUnits) {
+  const fd = await provider.getFeeData();
+  const price = fd.lastBaseFeePerGas && fd.maxPriorityFeePerGas
+    ? fd.lastBaseFeePerGas.add(fd.maxPriorityFeePerGas)
+    : fd.gasPrice || (await provider.getGasPrice());
+  const need = price.mul(gasUnits);
+  const have = await provider.getBalance(address);
+  if (have.lt(need)) {
+    throw new Error("insufficient funds: not enough of this network's coin to pay the network fee (need about " + ethers.utils.formatEther(need) + ")");
+  }
+}
+
 async function getProviderFor(network) {
   const url = await pickHealthyRpcUrl(network);
   return makeProvider(url, network);
@@ -1284,7 +1300,8 @@ async function handleMessage(msg) {
                 : network.swapRouter;
             const tx = await withRpcFailover(network, (provider) => {
               const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta).connect(provider);
-              return TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender, amountWei: ethers.BigNumber.from(msg.amountWei) });
+              return assertCanPayGas(provider, meta.address, 55000).then(() =>
+                TM_SWAP.sendApprove({ signer: wallet, tokenAddress: msg.tokenAddress, spender, amountWei: ethers.BigNumber.from(msg.amountWei) }));
             });
             sendResponse({ ok: true, txHash: tx.hash });
             break;
