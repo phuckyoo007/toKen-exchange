@@ -167,9 +167,45 @@ async function pickHealthyRpcUrl(network) {
   return urls[0]; // every URL failed the check; surface the real error instead of hiding it
 }
 
+// L2 FEE FIX (swap Approve failing on Base): ethers v5's getFeeData() hard-codes
+// a 1.5 gwei priority fee ("tip") and sets maxFeePerGas = 2 x baseFee + 1.5 gwei.
+// On Ethereum that's normal, but Base/OP/Arbitrum base fees are ~0.001-0.01 gwei,
+// so the tip alone makes ethers ask the node to budget ~100-1000x more gas money
+// than the transaction will ever really cost. Nodes run eth_estimateGas with
+// that fee cap and check "can this account afford gasLimit x maxFeePerGas?" --
+// an account holding only a few cents of ETH on Base fails that check with
+// "gas required exceeds allowance (N)" even though the real fee is a fraction of
+// a cent. ethers wraps that as UNPREDICTABLE_GAS_LIMIT, and the old error mapper
+// then showed it as "Couldn't get a response from the network".
+// Every provider built here now returns realistic fee data on those L2s, which
+// fixes Approve, the fee transfer, the swap itself, and plain sends at once.
+const L2_CHAIN_IDS = new Set([8453, 10, 42161]);
+const L2_FALLBACK_TIP_WEI = ethers.BigNumber.from(1000000); // 0.001 gwei
+const L2_MAX_TIP_WEI = ethers.BigNumber.from(100000000); // 0.1 gwei ceiling
+function applyRealisticL2Fees(provider, network) {
+  if (!L2_CHAIN_IDS.has(Number(network.chainId))) return provider;
+  const original = provider.getFeeData.bind(provider);
+  provider.getFeeData = async function () {
+    const fd = await original();
+    if (!fd || !fd.lastBaseFeePerGas) return fd; // chain without EIP-1559 data: leave alone
+    let tip = L2_FALLBACK_TIP_WEI;
+    try {
+      const suggested = ethers.BigNumber.from(await provider.send("eth_maxPriorityFeePerGas", []));
+      if (suggested.gt(0)) tip = suggested;
+    } catch (e) {
+      // node doesn't offer it: the small fallback tip is fine on these chains
+    }
+    if (tip.gt(L2_MAX_TIP_WEI)) tip = L2_MAX_TIP_WEI;
+    const maxFeePerGas = fd.lastBaseFeePerGas.mul(2).add(tip);
+    return { ...fd, maxPriorityFeePerGas: tip, maxFeePerGas };
+  };
+  return provider;
+}
+
 async function getProviderFor(network) {
   const url = await pickHealthyRpcUrl(network);
-  return new ethers.providers.JsonRpcProvider(url);
+  const provider = new ethers.providers.StaticJsonRpcProvider(url, { chainId: network.chainId, name: network.name || network.key || "custom" });
+  return applyRealisticL2Fees(provider, network);
 }
 
 async function getSelectedAccountMeta() {

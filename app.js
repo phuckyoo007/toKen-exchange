@@ -293,13 +293,14 @@ function showScreen(id) {
 // dump rather than a message meant for a person.
 const FRIENDLY_ERROR_PATTERNS = [
   { re: /could not detect network|NETWORK_ERROR/i, text: "Couldn't reach the network. Check your connection and try again." },
-  { re: /insufficient funds/i, text: "Not enough balance to cover this amount plus the network fee." },
+  { re: /insufficient funds|gas required exceeds allowance|exceeds allowance|max fee per gas less than block base fee/i, text: "Not enough of this network's coin (ETH on Base) to pay the network fee. Add a small amount and try again." },
   { re: /user rejected|ACTION_REJECTED/i, text: "That request was cancelled." },
   { re: /nonce has already been used|nonce too low/i, text: "That transaction couldn't be sent right now -- please try again." },
   { re: /replacement (fee|transaction) too low|underpriced/i, text: "Network fees just changed -- please try again." },
   { re: /timeout|ETIMEDOUT/i, text: "The network took too long to respond. Please try again." },
   { re: /rate limit|too many requests|\b429\b/i, text: "Too many requests right now -- please wait a moment and try again." },
   { re: /call_exception|execution reverted/i, text: "The network rejected this request. Double-check the details and try again." },
+  { re: /UNPREDICTABLE_GAS_LIMIT|cannot estimate gas/i, text: "The network wouldn't accept this transaction. Check you have enough ETH for the network fee, then try again." },
   { re: /invalid response|server_error|processing response error/i, text: "Couldn't get a response from the network. Please try again." },
 ];
 function friendlyErrorMessage(raw) {

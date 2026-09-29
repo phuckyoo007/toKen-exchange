@@ -295,8 +295,44 @@ async function pickHealthyRpcUrl(network) {
 // the "Couldn't reach the network" (NETWORK_ERROR / "could not detect
 // network") error that survived the RPC-failover fix: it has nothing to do
 // with which node you're talking to.
+// L2 FEE FIX (swap Approve failing on Base): ethers v5's getFeeData() hard-codes
+// a 1.5 gwei priority fee ("tip") and sets maxFeePerGas = 2 x baseFee + 1.5 gwei.
+// On Ethereum that's normal, but Base/OP/Arbitrum base fees are ~0.001-0.01 gwei,
+// so the tip alone makes ethers ask the node to budget ~100-1000x more gas money
+// than the transaction will ever really cost. Nodes run eth_estimateGas with
+// that fee cap and check "can this account afford gasLimit x maxFeePerGas?" --
+// an account holding only a few cents of ETH on Base fails that check with
+// "gas required exceeds allowance (N)" even though the real fee is a fraction of
+// a cent. ethers wraps that as UNPREDICTABLE_GAS_LIMIT, and the old error mapper
+// then showed it as "Couldn't get a response from the network".
+// Every provider built here now returns realistic fee data on those L2s, which
+// fixes Approve, the fee transfer, the swap itself, and plain sends at once.
+const L2_CHAIN_IDS = new Set([8453, 10, 42161]);
+const L2_FALLBACK_TIP_WEI = ethers.BigNumber.from(1000000); // 0.001 gwei
+const L2_MAX_TIP_WEI = ethers.BigNumber.from(100000000); // 0.1 gwei ceiling
+function applyRealisticL2Fees(provider, network) {
+  if (!L2_CHAIN_IDS.has(Number(network.chainId))) return provider;
+  const original = provider.getFeeData.bind(provider);
+  provider.getFeeData = async function () {
+    const fd = await original();
+    if (!fd || !fd.lastBaseFeePerGas) return fd; // chain without EIP-1559 data: leave alone
+    let tip = L2_FALLBACK_TIP_WEI;
+    try {
+      const suggested = ethers.BigNumber.from(await provider.send("eth_maxPriorityFeePerGas", []));
+      if (suggested.gt(0)) tip = suggested;
+    } catch (e) {
+      // node doesn't offer it: the small fallback tip is fine on these chains
+    }
+    if (tip.gt(L2_MAX_TIP_WEI)) tip = L2_MAX_TIP_WEI;
+    const maxFeePerGas = fd.lastBaseFeePerGas.mul(2).add(tip);
+    return { ...fd, maxPriorityFeePerGas: tip, maxFeePerGas };
+  };
+  return provider;
+}
+
 function makeProvider(url, network) {
-  return new ethers.providers.StaticJsonRpcProvider(url, { chainId: network.chainId, name: network.name || network.key || "custom" });
+  const provider = new ethers.providers.StaticJsonRpcProvider(url, { chainId: network.chainId, name: network.name || network.key || "custom" });
+  return applyRealisticL2Fees(provider, network);
 }
 
 async function getProviderFor(network) {
@@ -347,8 +383,16 @@ async function getProviderFor(network) {
 // wallet's own preconfigured networks now goes through makeProvider() above
 // instead of `new ethers.providers.JsonRpcProvider(url)` directly.
 const RPC_FAILOVER_RETRYABLE_TEXT = /invalid response|server_error|processing response error|network error|timeout|etimedout/i;
+// Deterministic failures: every node would say the same thing, so retrying just
+// burns time and hides the real reason. ethers nests the node's own text inside
+// these (which is why the old text-match below used to misfire on them).
+const RPC_NON_RETRYABLE_CODES = new Set(["UNPREDICTABLE_GAS_LIMIT", "INSUFFICIENT_FUNDS", "CALL_EXCEPTION", "NONCE_EXPIRED", "REPLACEMENT_UNDERPRICED", "ACTION_REJECTED"]);
 function isRpcFailoverRetryable(e) {
   const code = e && e.code ? String(e.code) : "";
+  if (RPC_NON_RETRYABLE_CODES.has(code)) {
+    // ...unless the nested node text is clearly a flaky-node problem, not a verdict on the tx
+    return /internal error|rate limit|too many requests|timeout|unauthorized|api key|\b(429|502|503|504)\b/i.test(String((e && e.message) || ""));
+  }
   if (code === "SERVER_ERROR" || code === "NETWORK_ERROR" || code === "TIMEOUT") return true;
   return RPC_FAILOVER_RETRYABLE_TEXT.test(String((e && e.message) || e || ""));
 }
