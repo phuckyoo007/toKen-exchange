@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- Google Search Console site-ownership verification (added 2026-09-29, needed
+     for Play Console's organization-website verification step). Do not remove --
+     removing it un-verifies the site in Search Console. -->
+<meta name="google-site-verification" content="bdKzCadFwcWCigwMO476SBHx-iC4s6TicKK9M0FYlvU" />
 <title>Token Exchange</title>
 <meta name="description" content="Self-custody multi-chain wallet, as a standalone website. Your keys are encrypted in your own browser and never leave your device." />
 <link rel="manifest" href="site.webmanifest" />
@@ -229,7 +233,10 @@
     <div class="tokens-section">
       <div class="tokens-header">
         <span class="tokens-title" data-i18n="main.nftsTitle">NFTs</span>
-        <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
+        <span class="tokens-header-actions">
+          <button id="btn-find-nfts" class="link" data-i18n="main.findNftsBtn">🔍 Find NFTs</button>
+          <button id="btn-goto-add-nft" class="link" data-i18n="main.addNftBtn">+ Add NFT</button>
+        </span>
       </div>
       <div id="nft-grid" class="nft-grid"></div>
       <div id="nfts-empty" class="empty-state hidden">
@@ -349,6 +356,17 @@
     </div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="add-nft-error" class="error hidden"></p>
+  </section>
+
+  <!-- FIND NFTS (auto-detect via Alchemy, see nft-api.js) -->
+  <section id="screen-find-nfts" class="screen hidden">
+    <h2 data-i18n="findNfts.title">Find NFTs</h2>
+    <p class="muted" data-i18n="findNfts.description">Scans this account's address on the current network and lists what it holds, using Alchemy's NFT API. This only reads public on-chain ownership data -- nothing about your wallet is sent anywhere except the address you're already using.</p>
+    <p id="find-nfts-status" class="muted small"></p>
+    <div id="find-nfts-grid" class="nft-grid"></div>
+    <button id="btn-find-nfts-more" class="secondary hidden" data-i18n="findNfts.loadMore">Load more</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="find-nfts-error" class="error hidden"></p>
   </section>
 
   <!-- PRICES -->
@@ -823,6 +841,7 @@
 <script src="lib/wallet.js"></script>
 <script src="lib/networks.js"></script>
 <script src="lib/swap.js"></script>
+<script src="lib/nft.js"></script>
 <script src="lib/fee-config.js"></script>
 <script src="lib/sanctions-list.js"></script>
 <script src="lib/walletconnect-config.js"></script>
