@@ -43,6 +43,7 @@ const PRECACHE_URLS = [
   "/lib/crypto-utils.js",
   "/lib/wallet.js",
   "/lib/networks.js",
+  "/lib/nft.js",
   "/lib/swap.js",
   "/lib/fee-config.js",
   "/lib/sanctions-list.js",
