@@ -216,3 +216,28 @@ function refreshAddressQr() {
   qr.make();
   box.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
 }
+
+// "Quick add" chips on the Add Token screen: one button per issuer-verified
+// token for the network (see known-tokens.js). Tapping a chip calls onPick(token);
+// it never adds anything by itself -- the normal Look up / confirm step still runs.
+function renderQuickAddChips(chainId, onPick) {
+  const box = $("add-token-quick");
+  if (!box) return;
+  box.innerHTML = "";
+  const tokens = (typeof TM_KNOWN_TOKENS !== "undefined" ? TM_KNOWN_TOKENS.forChain(chainId) : []);
+  box.classList.toggle("hidden", !tokens.length);
+  if (!tokens.length) return;
+  const label = document.createElement("span");
+  label.className = "quick-add-label muted";
+  label.textContent = TM_I18N.t("addToken.quickAddLabel");
+  box.appendChild(label);
+  tokens.forEach((t) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "quick-add-chip";
+    b.textContent = TM_I18N.t("addToken.quickAddChip").replace("{symbol}", t.symbol);
+    b.title = t.name;
+    b.addEventListener("click", () => onPick(t));
+    box.appendChild(b);
+  });
+}

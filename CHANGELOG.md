@@ -14,6 +14,13 @@
   listing; store screenshots and art moved out of the repo; removed `accounts-api.js`.
 - **Build:** `npm run build:extension` replaces the manual copy table; a test checks
   every path in the built extension resolves.
+- **Verified stablecoin addresses:** new shared `known-tokens.js` with USDC, EURC and USDT
+  contracts copied from the issuers' own pages (Circle, Tether) and checked by test
+  (checksum, known chain, pinned values). A chain is listed only where the issuer lists
+  the token, so USDT is on Ethereum, Avalanche and Celo only. Used for "Quick add" chips on
+  the Add Token screen and "Suggested" rows on the swap "To" picker, on the website and in
+  the extension. Nothing is added or swapped automatically; the normal lookup and confirm
+  steps still run. `sw.js` cache bumped to v7.
 - **Docs/CI:** documented `ALCHEMY_API_KEY`; added a GitHub Actions workflow.
 
 

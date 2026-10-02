@@ -337,6 +337,7 @@
   <section id="screen-add-token" class="screen hidden">
     <h2 data-i18n="addToken.title">Add token</h2>
     <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
+    <div id="add-token-quick" class="quick-add hidden"></div>
     <label data-i18n="addToken.addressLabel">Token contract address</label>
     <input type="text" id="add-token-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
     <button id="btn-token-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
@@ -691,6 +692,7 @@
 <script src="../lib/support-config.js"></script>
 <script src="../lib/cube-nav.js"></script>
 <script src="../lib/ui-common.js"></script>
+<script src="../lib/known-tokens.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>

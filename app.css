@@ -1843,3 +1843,9 @@ html[data-theme="light"] #network-badge {
   box-shadow: 0 1px 4px rgba(60,40,10,0.25);
   text-shadow: none;
 }
+
+/* Add Token: issuer-verified quick-add chips (see known-tokens.js) */
+.quick-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.quick-add-label { font-size: 12px; }
+.quick-add-chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-hover); color: inherit; font-size: 12px; cursor: pointer; }
+.quick-add-chip:hover, .quick-add-chip:focus-visible { border-color: currentColor; }

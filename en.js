@@ -268,6 +268,7 @@
     "swap.pickerStarTitle": "Star token",
     "swap.pickerNoMatch": "No matching token on this network.",
     "swap.pickerUseAddress": "Use this token address",
+    "swap.pickerSuggested": "Suggested stablecoins (issuer-verified)",
     "swap.pickerNoSwapHere": "Swapping isn't enabled on this network yet. Pick another network above.",
     "swap.noAssetsHint": "Nothing available here yet.",
     "swap.appFeeLine": "{percent} ({amount} {symbol})",

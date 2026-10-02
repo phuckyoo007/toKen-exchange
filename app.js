@@ -978,6 +978,10 @@ function resetAddTokenScreen() {
   $("add-token-address").value = "";
   $("add-token-preview").classList.add("hidden");
   delete $("add-token-preview").dataset.address;
+  renderQuickAddChips(currentNetwork && currentNetwork.chainId, (t) => {
+    $("add-token-address").value = t.address;
+    $("btn-token-lookup").click();
+  });
 }
 
 $("btn-token-lookup").addEventListener("click", async () => {
@@ -1459,7 +1463,12 @@ function renderAssetPicker(side) {
     });
     list.appendChild(row);
   }
-  if (!items.length && !list.children.length) {
+  // Issuer-verified stablecoins (known-tokens.js) not held yet. Buy side only:
+  // you can't sell what you don't have.
+  const sugg = side === "to" && !pickerShowFavs && typeof TM_KNOWN_TOKENS !== "undefined"
+    ? TM_KNOWN_TOKENS.suggested(currentNetwork.chainId, { heldAddresses: swapState.held.map((a) => a.address), excludeAddress: swapState.fromKey, query })
+    : [];
+  if (!items.length && !sugg.length && !list.children.length) {
     const p = document.createElement("p");
     p.className = "hint";
     p.textContent = TM_I18N.t(q ? "swap.pickerNoMatch" : (pickerShowFavs ? "swap.pickerNoFavs" : "swap.noAssetsHint"));
@@ -1503,6 +1512,26 @@ function renderAssetPicker(side) {
     });
     list.appendChild(row);
   });
+  if (sugg.length) {
+    const h = document.createElement("p");
+    h.className = "hint";
+    h.textContent = TM_I18N.t("swap.pickerSuggested");
+    list.appendChild(h);
+    sugg.forEach((t) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "asset-picker-row";
+      row.innerHTML = tokenIconHtml(t.symbol, trustWalletLogoUrl(currentNetwork && currentNetwork.key, t.address)) +
+        `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(t.symbol)}</span>` +
+        `<span class="asset-picker-row-sub">${escapeHtml(t.name)}</span></span>`;
+      row.addEventListener("click", () => {
+        swapState.toKey = t.address;
+        syncSwapAsset("to");
+        closeAssetPicker();
+      });
+      list.appendChild(row);
+    });
+  }
   fillPickerPrices(items, list);
 }
 
