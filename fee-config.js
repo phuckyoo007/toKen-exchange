@@ -19,19 +19,30 @@ const FEE_NUMERATOR = 500;
 const FEE_DENOMINATOR = 100000;
 const FEE_RECIPIENT = "0x0064118676E6C4daaE92Fa7a89e14a5BD60A20C4";
 
+// Swaps routed through the 0x aggregator: 0x nets its own ~0.15% protocol fee
+// out of the quote it returns, so we skim 0.15% more up front to keep this
+// wallet's own take at the base 0.5%.
+//   650 / 100000 = 0.0065 = 0.65%
+const AGGREGATOR_FEE_NUMERATOR = 650;
+
+function rateFor(opts) {
+  return opts && opts.viaAggregator ? AGGREGATOR_FEE_NUMERATOR : FEE_NUMERATOR;
+}
+
 // Returns { feeWei, netWei } for a given input amount (ethers.BigNumber or
-// anything ethers.BigNumber.from() accepts).
-function computeFee(amountInWei) {
+// anything ethers.BigNumber.from() accepts). Pass { viaAggregator: true } for
+// swaps routed through the 0x aggregator (higher rate, see above).
+function computeFee(amountInWei, opts) {
   const amount = ethers.BigNumber.from(amountInWei);
-  const feeWei = amount.mul(FEE_NUMERATOR).div(FEE_DENOMINATOR);
+  const feeWei = amount.mul(rateFor(opts)).div(FEE_DENOMINATOR);
   const netWei = amount.sub(feeWei);
   return { feeWei, netWei };
 }
 
-function feePercentLabel() {
-  return ((FEE_NUMERATOR / FEE_DENOMINATOR) * 100).toString() + "%";
+function feePercentLabel(opts) {
+  return ((rateFor(opts) / FEE_DENOMINATOR) * 100).toString() + "%";
 }
 
 if (typeof self !== "undefined") {
-  self.TM_FEE = { FEE_NUMERATOR, FEE_DENOMINATOR, FEE_RECIPIENT, computeFee, feePercentLabel };
+  self.TM_FEE = { FEE_NUMERATOR, AGGREGATOR_FEE_NUMERATOR, FEE_DENOMINATOR, FEE_RECIPIENT, computeFee, feePercentLabel };
 }

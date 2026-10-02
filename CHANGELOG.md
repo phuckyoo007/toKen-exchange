@@ -1,4 +1,21 @@
 # Changelog
+## Unreleased
+
+- **Fee:** `computeFee` / `feePercentLabel` now honor `{ viaAggregator }`. Swaps routed
+  through 0x are charged 0.65% (our 0.5% + 0x's ~0.15%); router swaps stay at 0.5%.
+  Three new tests. (`wallet-engine.js` already passed the option; `fee-config.js`
+  ignored it.)
+- **Security:** `app.js` now uses the shared `escapeHtml` from `ui-common.js`, which
+  escapes quotes. The website's old copy did not, so it was unsafe inside HTML attributes.
+- **Dedupe:** 21 helpers removed from `app.js` (about 200 lines); `index.html` loads
+  `lib/ui-common.js` before `app.js`, as `popup.html` already did.
+- **Repo:** restored `tests/`, `tests/helpers/`, `docs/` and `.gitignore`; removed the
+  nested deploy zip, ten README-*.md files, the reference txt and the duplicate
+  listing; store screenshots and art moved out of the repo; removed `accounts-api.js`.
+- **Build:** `npm run build:extension` replaces the manual copy table; a test checks
+  every path in the built extension resolves.
+- **Docs/CI:** documented `ALCHEMY_API_KEY`; added a GitHub Actions workflow.
+
 
 Newest first. This file replaces the per-change README files that used to sit
 in the repo root; nothing from them is lost, it is condensed here.

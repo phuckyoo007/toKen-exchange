@@ -39,7 +39,7 @@ function localRefs(html, attr) {
   let m;
   while ((m = re.exec(html))) {
     const v = m[1];
-    if (/^(https?:|data:|mailto:|tel:|#|blob:|\/\/)/i.test(v)) continue;
+    if (/^(https?:|data:|about:|mailto:|tel:|#|blob:|\/\/)/i.test(v)) continue;
     out.push(v.split("#")[0].split("?")[0]);
   }
   return out.filter(Boolean);

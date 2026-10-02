@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { ROOT, loadBrowserLibs } = require("./helpers/load-libs");
 
 loadBrowserLibs(["ethers.umd.min.js", "fee-config.js"]);
-const { computeFee, feePercentLabel, FEE_NUMERATOR, FEE_DENOMINATOR, FEE_RECIPIENT } = self.TM_FEE;
+const { computeFee, feePercentLabel, FEE_NUMERATOR, AGGREGATOR_FEE_NUMERATOR, FEE_DENOMINATOR, FEE_RECIPIENT } = self.TM_FEE;
 const BN = ethers.BigNumber;
 
 test("rate is exactly 0.5%", () => {
@@ -57,4 +57,30 @@ test("fee recipient is a valid, correctly-checksummed address", () => {
   // getAddress() throws on a mixed-case address whose checksum is wrong, which
   // would mean a typo in the payout address.
   assert.equal(ethers.utils.getAddress(FEE_RECIPIENT), FEE_RECIPIENT);
+});
+
+test("aggregator-routed swaps use the higher rate: 0.65%", () => {
+  assert.equal(AGGREGATOR_FEE_NUMERATOR, 650);
+  assert.equal(feePercentLabel({ viaAggregator: true }), "0.65%");
+  const { feeWei, netWei } = computeFee(1000, { viaAggregator: true });
+  assert.equal(feeWei.toString(), "6"); // 6.5 rounds down
+  assert.equal(netWei.toString(), "994");
+  assert.equal(computeFee(BN.from("1000000000000000000"), { viaAggregator: true }).feeWei.toString(), "6500000000000000");
+});
+
+test("viaAggregator false / missing options keep the base rate", () => {
+  for (const opts of [undefined, {}, { viaAggregator: false }]) {
+    assert.equal(computeFee(1000, opts).feeWei.toString(), "5");
+    assert.equal(feePercentLabel(opts), "0.5%");
+  }
+  assert.ok(AGGREGATOR_FEE_NUMERATOR > FEE_NUMERATOR);
+});
+
+test("aggregator fee + net equals the input and never exceeds 0.65%", () => {
+  for (const s of ["1", "153", "154", "999999", "1000000000000000001"]) {
+    const amt = BN.from(s);
+    const { feeWei, netWei } = computeFee(amt, { viaAggregator: true });
+    assert.ok(feeWei.add(netWei).eq(amt));
+    assert.ok(feeWei.mul(FEE_DENOMINATOR).lte(amt.mul(AGGREGATOR_FEE_NUMERATOR)));
+  }
 });

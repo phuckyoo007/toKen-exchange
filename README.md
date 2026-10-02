@@ -19,21 +19,15 @@ source code. Two things turn that flat pile into something runnable:
   serves it. **The lists at the top of `server.js` are the source of truth for
   what the website ships.** `public/` is never committed.
 - **The Chrome extension.** `manifest.json` is the extension's manifest and
-  expects folders. Build the extension folder like this:
+  expects folders. Build the extension folder with:
 
-  | Root file(s) | Goes in the extension at |
-  |---|---|
-  | `manifest.json` | `manifest.json` |
-  | `background.js` | `background/background.js` |
-  | `content-script.js`, `inject.js` | `content/` |
-  | `popup.html`, `popup.js`, `popup.css` (+ images they use) | `popup/` (images in `popup/img/`) |
-  | `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` | `icons/` |
-  | `ethers.umd.min.js`, `walletconnect-sign-client.umd.js`, `qrcode-generator.js` | `vendor/` |
-  | the shared scripts (`crypto-utils.js`, `wallet.js`, `swap.js`, `prices.js`, `i18n.js`, ...) | `lib/` |
-  | `en.js`, `es.js`, `fr.js`, ... | `lib/i18n/` |
+      npm run build:extension      # -> dist/extension/ (load this unpacked in Chrome)
 
-  The exact `lib/` list is whatever `popup.html` and `background.js` load from
-  `../lib/`.
+  `scripts/build-extension.js` holds the layout (`background/`, `content/`,
+  `popup/`, `icons/`, `vendor/`, `lib/`, `lib/i18n/`). Which shared scripts go
+  in `lib/` is read from what `popup.html` and `background.js` load from
+  `../lib/`, so you never edit a copy table by hand.
+
 
 `app.js` (website) and `popup.js` (extension) are two front-ends that grew from
 the same code and still share a lot of it. Shared code that both pages load
@@ -74,6 +68,7 @@ back to the on-chain router) instead of breaking.
 | `ALLOWED_ORIGINS` | Extra CORS origins, comma-separated (e.g. `chrome-extension://<dev id>,http://localhost:3000` to test an unpacked extension). |
 | `CSP_REPORT_ONLY` | Set to `1` to make the Content-Security-Policy log violations instead of blocking. Debugging aid; remove afterwards. |
 | `ZEROEX_API_KEY` | 0x Swap API key for aggregator swap quotes. |
+| `ALCHEMY_API_KEY` | Alchemy API key for the NFT gallery (`nft-api.js`). Without it the NFT feature stays off. |
 | `TRANSAK_API_KEY`, `TRANSAK_API_SECRET` | Transak Buy/Sell. Secret: never commit. |
 | `TRANSAK_ENVIRONMENT` | `production` or `staging` (default `staging`, so a forgotten variable cannot move real money). Use the key pair that matches. |
 | `TRANSAK_REFERRER_DOMAIN` | Optional. Default `tokenswaphub.org`; must match your Transak dashboard. |
@@ -92,8 +87,7 @@ endpoints only answer browsers on the allowed origins (see `cors.js`).
 ## Not wired in
 
 These files are in the repo but `server.js` does not load them, so they are
-inactive on the live site: `admin-api.js` and `admin.html` (admin console) and
-`accounts-api.js` (an SQLite-based accounts API that `auth-api.js` replaced).
+inactive on the live site: `admin-api.js` and `admin.html` (admin console).
 Finish wiring them up or remove them; do not assume they are running. If you
 do wire them in, they read: `ADMIN_TOKEN` (the admin console's password),
 `ACCOUNTS_ENABLED` (`1` to switch the SQLite accounts API on) and

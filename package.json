@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "build:extension": "node scripts/build-extension.js"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.56.0",
