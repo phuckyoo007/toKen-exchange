@@ -113,6 +113,13 @@ const NETWORK_NATIVE_COINGECKO_ID = {
   bsc: COINGECKO_IDS.BNB,
   arbitrum: COINGECKO_IDS.ETH,
   optimism: COINGECKO_IDS.ETH,
+  robinhood: COINGECKO_IDS.ETH, // Robinhood Chain gas token is ETH
+  avalanche: COINGECKO_IDS.AVAX,
+  linea: COINGECKO_IDS.ETH,
+  scroll: COINGECKO_IDS.ETH,
+  zksync: COINGECKO_IDS.ETH,
+  // mantle / gnosis / celo: unmapped until their CoinGecko ids are verified.
+  // monad: intentionally unmapped until its CoinGecko id is verified (price shows as unavailable).
   // Custom networks (key starts with "custom-") intentionally have no entry
   // here -- we don't know what their native coin actually is, so
   // getNativePriceForNetwork() below returns null for them rather than
@@ -584,6 +591,7 @@ const NETWORK_COINGECKO_PLATFORM = {
   bsc: "binance-smart-chain",
   arbitrum: "arbitrum-one",
   optimism: "optimistic-ethereum",
+  avalanche: "avalanche",
   // Custom networks intentionally unmapped -- see NETWORK_NATIVE_COINGECKO_ID above.
 };
 

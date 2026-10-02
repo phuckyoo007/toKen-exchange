@@ -543,11 +543,17 @@
     <p id="swap-error" class="error hidden"></p>
 
     <div id="swap-asset-picker" class="asset-picker hidden">
-      <div class="asset-picker-panel">
-        <div class="asset-picker-head">
-          <span id="swap-picker-title" data-i18n="swap.selectAssetTitle">Select asset</span>
-          <button type="button" class="asset-picker-close" id="swap-picker-close" aria-label="Close">&#10005;</button>
+      <div class="asset-picker-panel asset-picker-panel-tall">
+        <div class="asset-picker-head asset-picker-head-page">
+          <button type="button" class="asset-picker-close asset-picker-back" id="swap-picker-close" aria-label="Back">&#8249;</button>
+          <span id="swap-picker-title" data-i18n="swap.selectTokenTitle">Select token</span>
+          <span class="asset-picker-head-spacer" aria-hidden="true"></span>
         </div>
+        <div class="asset-picker-searchwrap">
+          <span class="asset-picker-searchicon" aria-hidden="true">&#9906;</span>
+          <input type="text" id="swap-picker-search" class="asset-picker-search" autocomplete="off" spellcheck="false" data-i18n-placeholder="swap.pickerSearchPlaceholder" placeholder="Enter token name or paste address" />
+        </div>
+        <div class="asset-picker-chips" id="swap-picker-chips"></div>
         <div class="asset-picker-list" id="swap-picker-list"></div>
         <button type="button" class="link asset-picker-custom-btn" id="swap-picker-custom-btn" data-i18n="swap.customAddressOption">Other token (paste address)...</button>
       </div>

@@ -127,6 +127,140 @@ const BUILTIN_NETWORKS = [
     swapLabel: "Uniswap V2 (Optimism)",
     builtin: true,
   },
+  {
+    // Robinhood Chain: Arbitrum Orbit L2, mainnet live since 2026-07-01, ETH
+    // for gas. Chain ID / RPC / explorer taken from Robinhood's own docs as
+    // mirrored by several independent providers (Chainstack, QuickNode,
+    // OrbitFlare). The public RPC is free but rate limited.
+    // swapRouter / wrappedNative are null ON PURPOSE: no router address has
+    // been verified on this chain yet, so swaps stay disabled here until one
+    // is confirmed on robinhoodchain.blockscout.com (see the safety note above).
+    key: "robinhood",
+    chainId: 4663,
+    name: "Robinhood Chain",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://rpc.mainnet.chain.robinhood.com"],
+    blockExplorer: "https://robinhoodchain.blockscout.com",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    // Avalanche C-Chain (EVM). Swaps off until a router is verified on-chain.
+    key: "avalanche",
+    chainId: 43114,
+    name: "Avalanche",
+    nativeCurrency: { name: "Avalanche", symbol: "AVAX", decimals: 18 },
+    rpcUrls: ["https://api.avax.network/ext/bc/C/rpc", "https://avalanche-c-chain-rpc.publicnode.com", "https://rpc.ankr.com/avalanche"],
+    blockExplorer: "https://snowtrace.io",
+    wrappedNative: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", // WAVAX
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    // Monad mainnet (EVM L1, launched 2025). Chain ID, RPCs, explorer and the
+    // Wrapped MON address are from docs.monad.xyz (Network Information).
+    // Public RPCs are rate limited, so several independent ones are listed.
+    key: "monad",
+    chainId: 143,
+    name: "Monad",
+    nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+    rpcUrls: ["https://rpc.monad.xyz", "https://rpc1.monad.xyz", "https://rpc2.monad.xyz", "https://rpc3.monad.xyz"],
+    blockExplorer: "https://monadvision.com",
+    wrappedNative: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A", // Wrapped MON
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  // ---- Added 2026-10: six more EVM chains. Chain IDs cross-checked against
+  // Tenderly's, Reown's and MetaMask's published chain lists. Each lists the
+  // chain's own public RPC first plus Tenderly's keyless public gateway as a
+  // fallback (both rate limited). Swaps stay OFF (swapRouter null) and
+  // wrappedNative is null until a router/wrapped-token address is verified on
+  // the chain's own explorer -- see the safety note at the top of this file.
+  {
+    key: "linea",
+    chainId: 59144,
+    name: "Linea",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://rpc.linea.build", "https://linea.gateway.tenderly.co"],
+    blockExplorer: "https://lineascan.build",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    key: "scroll",
+    chainId: 534352,
+    name: "Scroll",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://rpc.scroll.io", "https://scroll-mainnet.gateway.tenderly.co"],
+    blockExplorer: "https://scrollscan.com",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    key: "zksync",
+    chainId: 324,
+    name: "ZKsync Era",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://mainnet.era.zksync.io", "https://zksync.gateway.tenderly.co"],
+    blockExplorer: "https://explorer.zksync.io",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    key: "mantle",
+    chainId: 5000,
+    name: "Mantle",
+    nativeCurrency: { name: "Mantle", symbol: "MNT", decimals: 18 },
+    rpcUrls: ["https://rpc.mantle.xyz", "https://mantle.gateway.tenderly.co"],
+    blockExplorer: "https://mantlescan.xyz",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    key: "gnosis",
+    chainId: 100,
+    name: "Gnosis",
+    nativeCurrency: { name: "xDAI", symbol: "XDAI", decimals: 18 },
+    rpcUrls: ["https://rpc.gnosischain.com", "https://gnosis-chain.gateway.tenderly.co"],
+    blockExplorer: "https://gnosisscan.io",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
+  {
+    key: "celo",
+    chainId: 42220,
+    name: "Celo",
+    nativeCurrency: { name: "Celo", symbol: "CELO", decimals: 18 },
+    rpcUrls: ["https://forno.celo.org", "https://celo.gateway.tenderly.co"],
+    blockExplorer: "https://celoscan.io",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+  },
 ];
 
 // chrome.storage key holding user-added custom networks (array, same shape as
