@@ -841,7 +841,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           plan.push({ key: "swap", gasUnits: nativeIn ? 200000 : 250000 });
           const steps = plan.map((p) => ({ key: p.key, gasUnits: p.gasUnits, feeWei: gasPrice.mul(p.gasUnits).toString() }));
           const totalWei = steps.reduce((sum, s) => sum.add(s.feeWei), ethers.BigNumber.from(0));
-          sendResponse({ ok: true, gasPriceWei: gasPrice.toString(), totalWei: totalWei.toString(), steps });
+          sendResponse({ ok: true, gasPriceWei: gasPrice.toString(), totalWei: totalWei.toString(), steps,
+              baseFeeWei: feeData.lastBaseFeePerGas ? feeData.lastBaseFeePerGas.toString() : null });
           break;
         }
 

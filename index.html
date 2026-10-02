@@ -278,6 +278,7 @@
     <h2 data-i18n="activity.title">Activity</h2>
     <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
     <div id="activity-list"></div>
+    <button type="button" id="btn-export-csv" class="link" data-i18n="activity.exportCsv">Export as CSV</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
   </section>
 
@@ -299,6 +300,7 @@
       <input type="text" id="send-to" data-i18n-placeholder="send.toPlaceholder" placeholder="0x... or name.eth" />
     </div>
     <p id="send-to-resolved" class="muted hidden"></p>
+    <button type="button" id="btn-scan-qr" class="link scan-link" data-i18n="send.scanBtn">Scan QR code</button>
     <label data-i18n="send.amountLabel">Amount</label>
     <input type="text" id="send-amount" data-i18n-placeholder="common.amountPlaceholder" placeholder="0.0" />
     <div id="send-speed-row" class="send-speed-row hidden">
@@ -307,6 +309,7 @@
       <button type="button" class="send-speed-btn" data-speed="fast" data-i18n="send.speedFast">Fast</button>
     </div>
     <p id="send-fee-preview" class="muted hidden"></p>
+    <p id="send-fee-burn" class="muted small hidden"></p>
     <button id="btn-send-submit" class="primary" data-i18n="common.send">Send</button>
     <div id="send-confirm-card" class="send-confirm-card hidden">
       <p id="send-confirm-intro" class="warn"></p>
@@ -546,10 +549,12 @@
         <div class="swap-detail-row"><span data-i18n="swap.minReceivedLabel">Minimum received</span><span id="swap-min-received-line" class="swap-detail-value"></span></div>
         <div class="swap-detail-row"><span data-i18n="swap.networkFeeLabel">Network fee</span><span id="swap-gas-line" class="swap-detail-value"></span></div>
         <p id="swap-gas-breakdown" class="muted small hidden"></p>
+        <p id="swap-gas-burn" class="muted small hidden"></p>
         <p id="swap-gas-warning" class="warn hidden"></p>
         <button id="btn-swap-execute" class="primary" disabled data-i18n="common.swap">Swap</button>
       </div>
     </div>
+    <a id="btn-bridge" class="link bridge-link" href="https://jumper.exchange/" target="_blank" rel="noopener noreferrer" data-i18n="swap.bridgeLink">Moving to another chain? Bridge your funds &#8599;</a>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="swap-status" class="hint hidden"></p>
     <p id="swap-error" class="error hidden"></p>
@@ -614,6 +619,34 @@
         <option value="30" data-i18n="settings.autoLock30">30 minutes</option>
       </select>
       <p class="muted" data-i18n="settings.autoLockHint">Locks the wallet automatically after this much time with no clicks, taps, or keystrokes here -- since a browser tab you leave open otherwise stays unlocked indefinitely.</p>
+    </div>
+    <div class="language-picker">
+      <label for="theme-select" data-i18n="settings.themeLabel">Appearance</label>
+      <select id="theme-select">
+        <option value="dark" data-i18n="settings.themeDark">Dark (default)</option>
+        <option value="light" data-i18n="settings.themeLight">Light</option>
+      </select>
+    </div>
+    <div class="language-picker">
+      <label for="notify-select" data-i18n="settings.notifyLabel">Notifications</label>
+      <select id="notify-select">
+        <option value="off" data-i18n="settings.notifyOff">Off</option>
+        <option value="on" data-i18n="settings.notifyOn">On</option>
+      </select>
+      <p id="notify-hint" class="muted" data-i18n="settings.notifyHint">Alerts you when a transaction confirms, funds arrive, or a price alert fires. Works only while this page is open in your browser.</p>
+    </div>
+    <div class="language-picker">
+      <label for="alert-price" data-i18n="settings.alertLabel">Price alert (native coin)</label>
+      <div class="price-alert-row">
+        <select id="alert-dir">
+          <option value="above" data-i18n="settings.alertAbove">goes above</option>
+          <option value="below" data-i18n="settings.alertBelow">drops below</option>
+        </select>
+        <input id="alert-price" type="text" inputmode="decimal" placeholder="Price" data-i18n-placeholder="settings.alertPlaceholder" />
+        <button type="button" id="btn-add-alert" class="secondary" data-i18n="settings.alertAdd">Add</button>
+      </div>
+      <div id="alert-list"></div>
+      <p class="muted" data-i18n="settings.alertHint">Uses your display currency. Each alert fires once, and only while this page is open.</p>
     </div>
     <button id="btn-lock" class="secondary" data-i18n="settings.lockBtn">Lock wallet</button>
     <button id="btn-goto-reset-2" class="danger" data-i18n="settings.resetBtn">Reset wallet</button>
@@ -839,6 +872,13 @@
 
 </div>
 </div>
+<div id="qr-scan-overlay" class="qr-scan-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="qr-scan-title">
+  <h3 id="qr-scan-title" data-i18n="send.scanTitle">Scan a wallet QR code</h3>
+  <video id="qr-scan-video" playsinline muted></video>
+  <p id="qr-scan-hint" class="muted"></p>
+  <button type="button" id="btn-scan-close" class="secondary" data-i18n="send.scanClose">Close</button>
+</div>
+<div id="tm-toast" class="tm-toast hidden" role="status" aria-live="polite"></div>
 <script src="vendor/ethers.umd.min.js"></script>
 <script src="vendor/walletconnect-sign-client.umd.js"></script>
 <script src="lib/identicon.js"></script>
@@ -869,6 +909,7 @@
 <script src="wallet-engine.js"></script>
 <script src="cube-nav.js"></script>
 <script src="app.js"></script>
+<script src="extras.js"></script>
 <script src="lib/account.js"></script>
 <script src="lib/feature-requests.js"></script>
 <script>

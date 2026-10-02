@@ -52,7 +52,7 @@ function applySecurityHeaders(req, res) {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   // Turn off powerful browser features the wallet never uses. camera/microphone/
   // payment are deliberately NOT listed: the Transak KYC widget needs them.
-  res.setHeader("Permissions-Policy", "geolocation=(), usb=(), serial=(), bluetooth=(), midi=(), accelerometer=(), gyroscope=(), magnetometer=()");
+  res.setHeader("Permissions-Policy", "geolocation=(), camera=(self), usb=(), serial=(), bluetooth=(), midi=(), accelerometer=(), gyroscope=(), magnetometer=()");
   // HSTS only over https (Railway terminates TLS and sets x-forwarded-proto).
   // No includeSubDomains / preload on purpose: they're hard to undo.
   if (isHttps(req)) res.setHeader("Strict-Transport-Security", "max-age=31536000");

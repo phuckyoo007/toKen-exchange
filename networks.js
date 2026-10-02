@@ -261,6 +261,22 @@ const BUILTIN_NETWORKS = [
     swapLabel: null,
     builtin: true,
   },
+  {
+    // Test network: coins here have no real value. No fiat price feed, no
+    // swap router and no Buy/Sell support on purpose.
+    key: "sepolia",
+    chainId: 11155111,
+    name: "Sepolia (testnet)",
+    nativeCurrency: { name: "Sepolia Ether", symbol: "SepoliaETH", decimals: 18 },
+    rpcUrls: ["https://ethereum-sepolia-rpc.publicnode.com", "https://sepolia.drpc.org", "https://rpc.sepolia.org"],
+    blockExplorer: "https://sepolia.etherscan.io",
+    wrappedNative: null,
+    swapRouter: null,
+    swapFactory: null,
+    swapLabel: null,
+    builtin: true,
+    testnet: true,
+  },
 ];
 
 // chrome.storage key holding user-added custom networks (array, same shape as

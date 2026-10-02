@@ -17,7 +17,7 @@
 // CACHE_NAME is versioned by hand. Bump it whenever PRECACHE_URLS changes so
 // old caches get cleaned up on activate. tests/service-worker.test.js fails if
 // this list drifts from what index.html and app.css actually load.
-const CACHE_NAME = "token-exchange-shell-v4";
+const CACHE_NAME = "token-exchange-shell-v6";
 
 const PRECACHE_URLS = [
   "/",
@@ -27,6 +27,7 @@ const PRECACHE_URLS = [
   "/shim.js",
   "/wallet-engine.js",
   "/cube-nav.js",
+  "/extras.js",
   "/sw-register.js",
   "/site.webmanifest",
   // vendored libraries (copied from node_modules by server.js at start-up)

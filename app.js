@@ -2426,6 +2426,33 @@ $("send-asset-select").addEventListener("change", (e) => {
 // show up front. This app never surfaced any fee estimate before. Always
 // paid in the chain's native currency, whether the transfer itself is
 // native or a token.
+// Networks where the EIP-1559 base fee is burned (destroyed), so the
+// "burned" line is accurate. L2s and BNB Chain are left out on purpose --
+// their fee flows differ, and showing a burn number there would mislead.
+function networkBurnsBaseFee() {
+  const key = currentNetwork && currentNetwork.key;
+  return key === "ethereum" || key === "polygon";
+}
+
+// Shows "Of that, ~X ETH is burned" from base fee x gas units. It's an
+// estimate: the base fee moves block to block.
+function renderBurnLine(el, baseFeeWei, gasUnits) {
+  if (!el) return;
+  el.classList.add("hidden");
+  el.textContent = "";
+  if (!networkBurnsBaseFee() || !baseFeeWei || !gasUnits) return;
+  try {
+    const burnWei = ethers.BigNumber.from(baseFeeWei).mul(ethers.BigNumber.from(gasUnits));
+    const n = Number(ethers.utils.formatEther(burnWei));
+    if (!(n > 0)) return;
+    const burn = n < 0.000001
+      ? "<0.000001"
+      : n.toLocaleString(undefined, { maximumSignificantDigits: 2, maximumFractionDigits: 10 });
+    el.textContent = TM_I18N.t("fee.burned", { burn, symbol: currentNetwork.nativeCurrency.symbol });
+    el.classList.remove("hidden");
+  } catch (e) { /* best-effort only */ }
+}
+
 let sendFeePreviewToken = 0; // guards against a slow, stale estimate landing after a newer one
 let lastSendFeeWei = null;
 let sendFeePreviewTimer = null;
@@ -2459,6 +2486,7 @@ function clearSendFeePreview() {
   $("send-speed-row").classList.add("hidden");
   $("send-fee-preview").classList.add("hidden");
   $("send-fee-preview").textContent = "";
+  renderBurnLine($("send-fee-burn"), null, null);
 }
 
 async function estimateSendFeeNow() {
@@ -2514,6 +2542,7 @@ async function estimateSendFeeNow() {
     $("send-fee-preview").textContent = usdText
       ? TM_I18N.t("send.feeEstimate", { fee: feeFormatted, symbol, usd: usdText })
       : TM_I18N.t("send.feeEstimateNoUsd", { fee: feeFormatted, symbol });
+    renderBurnLine($("send-fee-burn"), res.baseFeeWei, res.gasUnits);
   } catch (e) {
     if (myToken !== sendFeePreviewToken) return;
     // Common and expected -- e.g. the amount exceeds the balance, or the
@@ -3001,6 +3030,7 @@ async function renderSwapGasEstimate(gen, tokenIn, needsApprove) {
   lineEl.textContent = "\u2026";
   breakdownEl.classList.add("hidden");
   warnEl.classList.add("hidden");
+  renderBurnLine($("swap-gas-burn"), null, null);
   try {
     const est = await sendMsg("TM_SWAP_GAS_ESTIMATE", { tokenIn, needsApprove });
     if (gen !== swapAutoQuoteGen) return;
@@ -3018,6 +3048,7 @@ async function renderSwapGasEstimate(gen, tokenIn, needsApprove) {
     breakdownEl.textContent = est.steps.map((s) => `${TM_I18N.t("swap.gasStep_" + s.key)} ${fmtEth(s.feeWei)}`).join(" \u00b7 ")
       + ` \u00b7 ${TM_I18N.t("swap.gasPriceLabel")} ${gweiText} gwei`;
     breakdownEl.classList.remove("hidden");
+    renderBurnLine($("swap-gas-burn"), est.baseFeeWei, est.steps.reduce((sum, s) => sum + s.gasUnits, 0));
 
     // fiat + low-balance warning, both best-effort
     const [price, bal] = await Promise.all([
