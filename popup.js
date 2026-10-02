@@ -606,12 +606,30 @@ function syncSwapAsset(side) {
     input.value = sel.value === "native" ? "" : sel.value; // blank = native coin, as the quote code expects
   }
   $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
+  renderSwapPill(side);
+}
+
+// The pill button next to each hidden <select> shows what's currently chosen.
+let swapHeldAssets = [];
+function renderSwapPill(side) {
+  const sel = $(`swap-${side}-select`);
+  const pill = $(`swap-${side}-pill`);
+  if (!sel || !pill) return;
+  pill.removeAttribute("data-i18n");
+  if (sel.value === "custom") {
+    const v = $(`swap-${side}-custom`).value.trim();
+    pill.textContent = v ? `${v.slice(0, 6)}…${v.slice(-4)}` : TM_I18N.t("swap.customAddressOption");
+    return;
+  }
+  const a = swapHeldAssets.find((x) => x.key === sel.value);
+  pill.textContent = a ? a.symbol : TM_I18N.t("swap.selectBtn");
 }
 
 async function populateSwapSelects(pre) {
   const myGen = ++swapPopulateGen;
   const held = await getHeldAssets();
   if (myGen !== swapPopulateGen) return;
+  swapHeldAssets = held;
   const fromSel = $("swap-from-select");
   const toSel = $("swap-to-select");
   const toKey = pre && pre.toKey;
@@ -643,6 +661,198 @@ async function populateSwapSelects(pre) {
 ["from", "to"].forEach((side) => {
   $(`swap-${side}-select`).addEventListener("change", () => syncSwapAsset(side));
 });
+
+// ---- Swap token picker (full page: search, star + network chips, rows) ----
+let pickerSide = null;
+let pickerShowFavs = false;
+let pickerFavs = new Set();
+let pickerPriceGen = 0;
+const TM_FAV_TOKENS_KEY = "tm_fav_tokens";
+
+function loadPickerFavs() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get([TM_FAV_TOKENS_KEY], (res) => {
+        const arr = res && res[TM_FAV_TOKENS_KEY];
+        pickerFavs = new Set(Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : []);
+        resolve();
+      });
+    } catch (e) { resolve(); }
+  });
+}
+function savePickerFavs() {
+  try { chrome.storage.local.set({ [TM_FAV_TOKENS_KEY]: Array.from(pickerFavs) }); } catch (e) { /* best-effort */ }
+}
+function pickerFavId(a) { return `${currentNetwork.chainId}:${String(a.key).toLowerCase()}`; }
+
+function closeAssetPicker() {
+  $("swap-asset-picker").classList.add("hidden");
+  pickerSide = null;
+}
+
+function renderPickerChips(side) {
+  const chips = $("swap-picker-chips");
+  chips.innerHTML = "";
+  const starChip = document.createElement("button");
+  starChip.type = "button";
+  starChip.className = "asset-picker-chip asset-picker-chip-star" + (pickerShowFavs ? " active" : "");
+  starChip.setAttribute("aria-label", TM_I18N.t("swap.pickerStarTitle"));
+  starChip.innerHTML = "&#9733;";
+  starChip.addEventListener("click", () => { pickerShowFavs = !pickerShowFavs; renderAssetPicker(side); });
+  chips.appendChild(starChip);
+  currentNetworks.forEach((n) => {
+    const active = currentNetwork && n.chainId === currentNetwork.chainId;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "asset-picker-chip" + (active && !pickerShowFavs ? " active" : (active ? " current" : ""));
+    b.innerHTML = networkDotHtml(n.key) + `<span>${escapeHtml(n.name)}</span>`;
+    b.addEventListener("click", () => switchNetworkFromPicker(n, side));
+    chips.appendChild(b);
+    if (active && !chips.dataset.scrolled) { chips.dataset.scrolled = "1"; setTimeout(() => b.scrollIntoView({ inline: "center", block: "nearest" }), 0); }
+  });
+}
+
+// A swap only ever runs on ONE chain, so tapping a network chip really
+// switches the wallet to that network (not a cross-chain filter).
+async function switchNetworkFromPicker(n, side) {
+  if (currentNetwork && n.chainId === currentNetwork.chainId) return;
+  const chips = $("swap-picker-chips");
+  chips.classList.add("busy");
+  try {
+    await sendMsg("TM_SELECT_NETWORK", { chainId: n.chainId });
+    await refreshMain();
+    setupSwapScreen();
+    if (currentNetwork.swapRouter) await populateSwapSelects({});
+  } catch (e) {
+    showError("swap-error", e.message);
+  } finally {
+    chips.classList.remove("busy");
+    if (pickerSide) renderAssetPicker(side);
+  }
+}
+
+function renderAssetPicker(side) {
+  renderPickerChips(side);
+  const list = $("swap-picker-list");
+  list.innerHTML = "";
+  const query = $("swap-picker-search").value.trim();
+  const q = query.toLowerCase();
+  if (!(currentNetwork && currentNetwork.swapRouter)) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t("swap.pickerNoSwapHere");
+    list.appendChild(p);
+    return;
+  }
+  const sel = (s) => $(`swap-${s}-select`).value;
+  const otherKey = sel(side === "from" ? "to" : "from");
+  let items = swapHeldAssets.filter((a) => a.key !== otherKey);
+  if (side === "from") items = items.filter((a) => Number(a.balance) > 0);
+  if (pickerShowFavs) items = items.filter((a) => pickerFavs.has(pickerFavId(a)));
+  if (q) items = items.filter((a) => String(a.symbol || "").toLowerCase().includes(q) || String(a.address || "").toLowerCase().includes(q));
+
+  const pick = (a) => {
+    const selEl = $(`swap-${side}-select`);
+    if (Array.from(selEl.options).some((o) => o.value === a.key)) selEl.value = a.key;
+    syncSwapAsset(side);
+    closeAssetPicker();
+  };
+
+  if (/^0x[0-9a-fA-F]{40}$/.test(query) && !items.some((a) => String(a.address).toLowerCase() === q)) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "asset-picker-row";
+    row.innerHTML = tokenIconHtml("?") +
+      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(TM_I18N.t("swap.pickerUseAddress"))}</span>` +
+      `<span class="asset-picker-row-sub">${escapeHtml(query.slice(0, 8))}…${escapeHtml(query.slice(-6))}</span></span>`;
+    row.addEventListener("click", () => {
+      $(`swap-${side}-select`).value = "custom";
+      syncSwapAsset(side);
+      $(`swap-${side}-custom`).value = query;
+      renderSwapPill(side);
+      closeAssetPicker();
+    });
+    list.appendChild(row);
+  }
+  if (!items.length && !list.children.length) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t(q ? "swap.pickerNoMatch" : (pickerShowFavs ? "swap.pickerNoFavs" : "swap.noAssetsHint"));
+    list.appendChild(p);
+  }
+  items.forEach((a) => {
+    const row = document.createElement("div");
+    row.className = "asset-picker-row";
+    row.dataset.key = a.key;
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    const isFav = pickerFavs.has(pickerFavId(a));
+    const explorer = String(currentNetwork.blockExplorer || "");
+    const canInfo = a.address && /^https:\/\//.test(explorer);
+    row.innerHTML =
+      `<span class="token-icon-wrap">${tokenIconHtml(a.symbol)}<span class="token-net-badge" style="background:${networkDotColor(currentNetwork.key)}"></span></span>` +
+      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(a.symbol)}</span>` +
+      `<span class="asset-picker-row-sub">${escapeHtml(currentNetwork.name)}</span></span>` +
+      `<span class="asset-picker-row-right"><span class="asset-picker-row-balance">${escapeHtml(Number(a.balance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>` +
+      `<span class="asset-picker-row-usd"></span></span>` +
+      `<button type="button" class="asset-picker-star${isFav ? " on" : ""}" aria-label="${escapeHtml(TM_I18N.t("swap.pickerStarTitle"))}">${isFav ? "&#9733;" : "&#9734;"}</button>` +
+      `<button type="button" class="asset-picker-info${canInfo ? "" : " invisible"}" aria-label="${escapeHtml(TM_I18N.t("swap.pickerInfoTitle"))}" title="${escapeHtml(TM_I18N.t("swap.pickerInfoTitle"))}" ${canInfo ? "" : "tabindex=\"-1\" disabled"}>i</button>`;
+    row.addEventListener("click", () => pick(a));
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(a); } });
+    row.querySelector(".asset-picker-star").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = pickerFavId(a);
+      if (pickerFavs.has(id)) pickerFavs.delete(id); else pickerFavs.add(id);
+      savePickerFavs();
+      renderAssetPicker(side);
+    });
+    row.querySelector(".asset-picker-info").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (canInfo) window.open(`${explorer.replace(/\/+$/, "")}/token/${encodeURIComponent(a.address)}`, "_blank", "noopener,noreferrer");
+    });
+    list.appendChild(row);
+  });
+  fillPickerPrices(items, list);
+}
+
+// Best-effort value per row; an unreachable price API just leaves it blank.
+async function fillPickerPrices(items, list) {
+  const gen = ++pickerPriceGen;
+  const key = currentNetwork && currentNetwork.key;
+  if (!key) return;
+  try {
+    const held = items.filter((a) => Number(a.balance) > 0);
+    if (!held.length) return;
+    const addrs = held.filter((a) => a.address).map((a) => a.address);
+    const [nativePrice, byAddr] = await Promise.all([
+      TM_PRICES.getNativePriceForNetwork(key, currentCurrency).catch(() => null),
+      addrs.length ? TM_PRICES.getTokenPricesByContract(key, addrs, currentCurrency).catch(() => ({})) : Promise.resolve({}),
+    ]);
+    if (gen !== pickerPriceGen) return;
+    held.forEach((a) => {
+      const price = a.address ? ((byAddr || {})[a.address.toLowerCase()] || {}).price : nativePrice;
+      if (price == null) return;
+      const el = Array.from(list.querySelectorAll(".asset-picker-row")).find((r) => r.dataset.key === a.key);
+      const slot = el && el.querySelector(".asset-picker-row-usd");
+      if (slot) slot.textContent = formatCurrency(Number(a.balance) * price);
+    });
+  } catch (e) { /* best-effort */ }
+}
+
+function openAssetPicker(side) {
+  pickerSide = side;
+  pickerShowFavs = false;
+  $("swap-picker-search").value = "";
+  $("swap-picker-chips").dataset.scrolled = "";
+  renderAssetPicker(side);
+  $("swap-asset-picker").classList.remove("hidden");
+  loadPickerFavs().then(() => { if (pickerSide) renderAssetPicker(pickerSide); });
+}
+
+$("swap-from-asset-btn").addEventListener("click", () => openAssetPicker("from"));
+$("swap-to-asset-btn").addEventListener("click", () => openAssetPicker("to"));
+$("swap-picker-close").addEventListener("click", closeAssetPicker);
+$("swap-picker-search").addEventListener("input", () => { if (pickerSide) renderAssetPicker(pickerSide); });
 
 // ---- Coin screen
 function renderCoinPrice(price, change) {

@@ -80,6 +80,15 @@ const NETWORK_DOT_COLORS = {
   bsc: "#F3BA2F",
   arbitrum: "#28A0F0",
   optimism: "#FF0420",
+  robinhood: "#9BE400",
+  avalanche: "#E84142",
+  monad: "#836EF9",
+  linea: "#61DFFF",
+  scroll: "#FFEEDA",
+  zksync: "#8C8DFC",
+  mantle: "#65B3AE",
+  gnosis: "#04795B",
+  celo: "#FCFF52",
 };
 function networkDotColor(key) {
   if (NETWORK_DOT_COLORS[key]) return NETWORK_DOT_COLORS[key];
@@ -146,6 +155,13 @@ const TRUST_WALLET_CHAIN_FOLDER = {
   bsc: "smartchain",
   arbitrum: "arbitrum",
   optimism: "optimism",
+  avalanche: "avalanchec",
+  linea: "linea",
+  scroll: "scroll",
+  zksync: "zksync",
+  mantle: "mantle",
+  gnosis: "xdai",
+  celo: "celo",
 };
 // This wallet's own launched tokens are never going to show up in a
 // third-party asset repo, no matter how long a listing request sits in
@@ -643,6 +659,15 @@ const NETWORK_SIGN_LABELS = {
   arbitrum: ["ARBITRUM", ""],
   bsc: ["BNB", ""],
   optimism: ["OPTIMISM", ""],
+  robinhood: ["ROBINHOOD", "CHAIN"],
+  avalanche: ["AVALANCHE", ""],
+  monad: ["MONAD", ""],
+  linea: ["LINEA", ""],
+  scroll: ["SCROLL", ""],
+  zksync: ["ZKSYNC", "ERA"],
+  mantle: ["MANTLE", ""],
+  gnosis: ["GNOSIS", ""],
+  celo: ["CELO", ""],
 };
 
 function networkSignLabel(network) {
@@ -1507,43 +1532,215 @@ function closeAssetPicker() {
   swapState.pickerSide = null;
 }
 
-function openAssetPicker(side) {
-  swapState.pickerSide = side;
-  $("swap-picker-title").textContent = TM_I18N.t(side === "from" ? "swap.fromLabel" : "swap.toLabel");
+let pickerPriceGen = 0;
+
+// Starred tokens (the star chip in the picker). Stored as "<chainId>:<token key>"
+// in chrome.storage.local (the website shims it onto localStorage), so a star
+// is per network and per token, never shared between chains.
+const TM_FAV_TOKENS_KEY = "tm_fav_tokens";
+let pickerFavs = new Set();
+let pickerShowFavs = false;
+function loadPickerFavs() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get([TM_FAV_TOKENS_KEY], (res) => {
+        const arr = res && res[TM_FAV_TOKENS_KEY];
+        pickerFavs = new Set(Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : []);
+        resolve();
+      });
+    } catch (e) { resolve(); }
+  });
+}
+function savePickerFavs() {
+  try { chrome.storage.local.set({ [TM_FAV_TOKENS_KEY]: Array.from(pickerFavs) }); } catch (e) { /* best-effort */ }
+}
+function pickerFavId(a) {
+  return `${currentNetwork.chainId}:${String(a.key).toLowerCase()}`;
+}
+
+// Network chips along the top of the picker (the "All / Solana / Ethereum..."
+// row in the reference screenshot). A swap only ever runs on ONE chain, so
+// tapping a chip actually switches the wallet to that network and reloads the
+// list for it -- it isn't a cross-chain filter.
+function renderPickerChips(side) {
+  const chips = $("swap-picker-chips");
+  chips.innerHTML = "";
+  const starChip = document.createElement("button");
+  starChip.type = "button";
+  starChip.className = "asset-picker-chip asset-picker-chip-star" + (pickerShowFavs ? " active" : "");
+  starChip.setAttribute("aria-label", TM_I18N.t("swap.pickerStarTitle"));
+  starChip.setAttribute("aria-pressed", pickerShowFavs ? "true" : "false");
+  starChip.innerHTML = "&#9733;";
+  starChip.addEventListener("click", () => {
+    pickerShowFavs = !pickerShowFavs;
+    renderAssetPicker(side);
+  });
+  chips.appendChild(starChip);
+  currentNetworks.forEach((n) => {
+    const active = currentNetwork && n.chainId === currentNetwork.chainId;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "asset-picker-chip" + (active && !pickerShowFavs ? " active" : (active ? " current" : ""));
+    b.innerHTML = networkDotHtml(n.key) + `<span>${escapeHtml(n.name)}</span>`;
+    b.addEventListener("click", () => switchNetworkFromPicker(n, side));
+    chips.appendChild(b);
+    if (active && !chips.dataset.scrolled) { chips.dataset.scrolled = "1"; setTimeout(() => b.scrollIntoView({ inline: "center", block: "nearest" }), 0); }
+  });
+}
+
+async function switchNetworkFromPicker(n, side) {
+  if (currentNetwork && n.chainId === currentNetwork.chainId) return;
+  const chips = $("swap-picker-chips");
+  chips.classList.add("busy");
+  try {
+    await sendMsg("TM_SELECT_NETWORK", { chainId: n.chainId });
+    await refreshMain();
+    hideError("swap-error");
+    $("swap-amount-in").value = "";
+    clearSwapQuote();
+    const unsupported = !currentNetwork.swapRouter;
+    $("swap-unsupported").classList.toggle("hidden", !unsupported);
+    $("swap-form").classList.toggle("hidden", unsupported);
+    if (!unsupported) {
+      swapState.fromKey = null;
+      swapState.toKey = null;
+      await populateSwapSelects({});
+    }
+  } catch (e) {
+    showError("swap-error", e.message);
+  } finally {
+    chips.classList.remove("busy");
+    if (swapState.pickerSide) renderAssetPicker(side);
+  }
+}
+
+function renderAssetPicker(side) {
+  renderPickerChips(side);
   const list = $("swap-picker-list");
   list.innerHTML = "";
+  const query = $("swap-picker-search").value.trim();
+  const q = query.toLowerCase();
+  const customBtn = $("swap-picker-custom-btn");
+  const swapOk = !!(currentNetwork && currentNetwork.swapRouter);
+  customBtn.classList.toggle("hidden", !swapOk);
+  if (!swapOk) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t("swap.pickerNoSwapHere");
+    list.appendChild(p);
+    return;
+  }
   // From only lists what's actually held (can't sell what you don't have);
   // To lists every held asset, since you can buy into something at zero
   // balance. Either side excludes whatever the OTHER side currently holds.
   const otherKey = side === "from" ? swapState.toKey : swapState.fromKey;
   let items = swapState.held.filter((a) => a.key !== otherKey);
   if (side === "from") items = items.filter((a) => Number(a.balance) > 0);
-  if (!items.length) {
-    const p = document.createElement("p");
-    p.className = "hint";
-    p.textContent = TM_I18N.t("swap.noAssetsHint");
-    list.appendChild(p);
-  }
-  items.forEach((a) => {
+  if (pickerShowFavs) items = items.filter((a) => pickerFavs.has(pickerFavId(a)));
+  if (q) items = items.filter((a) => String(a.symbol || "").toLowerCase().includes(q) || String(a.address || "").toLowerCase().includes(q));
+
+  // A pasted contract address that isn't in the list becomes a one-tap row,
+  // using the exact same custom-address path the old "Other token" button did.
+  if (/^0x[0-9a-fA-F]{40}$/.test(query) && !items.some((a) => String(a.address).toLowerCase() === q)) {
     const row = document.createElement("button");
     row.type = "button";
     row.className = "asset-picker-row";
-    // See the matching comment above (renderSwapAsset) -- native coins now
-    // get a real logo from trustWalletLogoUrl() too.
-    const img = trustWalletLogoUrl(currentNetwork && currentNetwork.key, a.address);
-    row.innerHTML =
-      tokenIconHtml(a.symbol, img) +
-      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(a.symbol)}</span>` +
-      `<span class="asset-picker-row-balance">${escapeHtml(Number(a.balance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span></span>`;
+    row.innerHTML = tokenIconHtml("?", null) +
+      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(TM_I18N.t("swap.pickerUseAddress"))}</span>` +
+      `<span class="asset-picker-row-sub">${escapeHtml(query.slice(0, 8))}…${escapeHtml(query.slice(-6))}</span></span>`;
     row.addEventListener("click", () => {
-      if (side === "from") swapState.fromKey = a.key; else swapState.toKey = a.key;
+      if (side === "from") swapState.fromKey = query; else swapState.toKey = query;
       syncSwapAsset(side);
       closeAssetPicker();
     });
     list.appendChild(row);
+  }
+  if (!items.length && !list.children.length) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t(q ? "swap.pickerNoMatch" : (pickerShowFavs ? "swap.pickerNoFavs" : "swap.noAssetsHint"));
+    list.appendChild(p);
+  }
+  items.forEach((a) => {
+    const row = document.createElement("div");
+    row.className = "asset-picker-row";
+    row.dataset.key = a.key;
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    const img = trustWalletLogoUrl(currentNetwork && currentNetwork.key, a.address);
+    const isFav = pickerFavs.has(pickerFavId(a));
+    const explorer = String(currentNetwork.blockExplorer || "");
+    const canInfo = a.address && /^https:\/\//.test(explorer);
+    row.innerHTML =
+      `<span class="token-icon-wrap">${tokenIconHtml(a.symbol, img)}<span class="token-net-badge" style="background:${networkDotColor(currentNetwork.key)}"></span></span>` +
+      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(a.symbol)}</span>` +
+      `<span class="asset-picker-row-sub">${escapeHtml(currentNetwork.name)}</span></span>` +
+      `<span class="asset-picker-row-right"><span class="asset-picker-row-balance">${escapeHtml(Number(a.balance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>` +
+      `<span class="asset-picker-row-usd"></span></span>` +
+      `<button type="button" class="asset-picker-star${isFav ? " on" : ""}" aria-label="${escapeHtml(TM_I18N.t("swap.pickerStarTitle"))}" aria-pressed="${isFav}">${isFav ? "&#9733;" : "&#9734;"}</button>` +
+      `<button type="button" class="asset-picker-info${canInfo ? "" : " invisible"}" aria-label="${escapeHtml(TM_I18N.t("swap.pickerInfoTitle"))}" title="${escapeHtml(TM_I18N.t("swap.pickerInfoTitle"))}" ${canInfo ? "" : "tabindex=\"-1\" disabled"}>i</button>`;
+    const choose = () => {
+      if (side === "from") swapState.fromKey = a.key; else swapState.toKey = a.key;
+      syncSwapAsset(side);
+      closeAssetPicker();
+    };
+    row.addEventListener("click", choose);
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(); } });
+    row.querySelector(".asset-picker-star").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = pickerFavId(a);
+      if (pickerFavs.has(id)) pickerFavs.delete(id); else pickerFavs.add(id);
+      savePickerFavs();
+      renderAssetPicker(side);
+    });
+    row.querySelector(".asset-picker-info").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (canInfo) window.open(`${explorer.replace(/\/+$/, "")}/token/${encodeURIComponent(a.address)}`, "_blank", "noopener,noreferrer");
+    });
+    list.appendChild(row);
   });
-  $("swap-asset-picker").classList.remove("hidden");
+  fillPickerPrices(items, list);
 }
+
+// Best-effort USD value per row; a rate-limited or unreachable price API just
+// leaves the value blank rather than breaking the list.
+async function fillPickerPrices(items, list) {
+  const gen = ++pickerPriceGen;
+  const key = currentNetwork && currentNetwork.key;
+  if (!key) return;
+  try {
+    const held = items.filter((a) => Number(a.balance) > 0);
+    if (!held.length) return;
+    const addrs = held.filter((a) => a.address).map((a) => a.address);
+    const [nativePrice, byAddr] = await Promise.all([
+      TM_PRICES.getNativePriceForNetwork(key, currentCurrency).catch(() => null),
+      addrs.length ? TM_PRICES.getTokenPricesByContract(key, addrs, currentCurrency).catch(() => ({})) : Promise.resolve({}),
+    ]);
+    if (gen !== pickerPriceGen) return;
+    held.forEach((a) => {
+      const price = a.address ? ((byAddr || {})[a.address.toLowerCase()] || {}).price : nativePrice;
+      if (price == null) return;
+      const el = Array.from(list.querySelectorAll(".asset-picker-row")).find((r) => r.dataset.key === a.key);
+      const slot = el && el.querySelector(".asset-picker-row-usd");
+      if (slot) slot.textContent = formatCurrency(Number(a.balance) * price);
+    });
+  } catch (e) { /* best-effort */ }
+}
+
+function openAssetPicker(side) {
+  swapState.pickerSide = side;
+  $("swap-picker-title").textContent = TM_I18N.t("swap.selectTokenTitle");
+  $("swap-picker-search").value = "";
+  pickerShowFavs = false;
+  $("swap-picker-chips").dataset.scrolled = "";
+  renderAssetPicker(side);
+  $("swap-asset-picker").classList.remove("hidden");
+  loadPickerFavs().then(() => { if (swapState.pickerSide) renderAssetPicker(swapState.pickerSide); });
+}
+
+$("swap-picker-search").addEventListener("input", () => {
+  if (swapState.pickerSide) renderAssetPicker(swapState.pickerSide);
+});
 
 $("swap-from-asset-btn").addEventListener("click", () => openAssetPicker("from"));
 $("swap-to-asset-btn").addEventListener("click", () => openAssetPicker("to"));

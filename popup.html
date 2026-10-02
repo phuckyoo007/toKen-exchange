@@ -458,7 +458,8 @@
     <div id="swap-form">
       <label data-i18n="swap.fromLabel">From</label>
       <div class="swap-row">
-        <select id="swap-from-select">
+        <button type="button" class="swap-asset-btn" id="swap-from-asset-btn"><span id="swap-from-pill" class="swap-asset-pill-label" data-i18n="swap.selectBtn">Select</span><span aria-hidden="true">&#9662;</span></button>
+        <select id="swap-from-select" class="hidden">
           <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
         </select>
         <input type="text" id="swap-from-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
@@ -466,7 +467,8 @@
       </div>
       <label data-i18n="swap.toLabel">To</label>
       <div class="swap-row">
-        <select id="swap-to-select">
+        <button type="button" class="swap-asset-btn" id="swap-to-asset-btn"><span id="swap-to-pill" class="swap-asset-pill-label" data-i18n="swap.selectBtn">Select</span><span aria-hidden="true">&#9662;</span></button>
+        <select id="swap-to-select" class="hidden">
           <option value="" data-i18n="common.nativeCoinOption">Native coin</option>
         </select>
         <input type="text" id="swap-to-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
@@ -492,6 +494,25 @@
     <p id="swap-status" class="hint hidden"></p>
     <p id="swap-error" class="error hidden"></p>
   </section>
+
+  <!-- SWAP TOKEN PICKER: full-page overlay (back arrow, search, star + network
+       chips, token rows). The two hidden <select>s above stay the source of
+       truth for the quote/approve/swap code; this just drives them. -->
+  <div id="swap-asset-picker" class="asset-picker hidden">
+    <div class="asset-picker-panel">
+      <div class="asset-picker-head asset-picker-head-page">
+        <button type="button" class="asset-picker-close asset-picker-back" id="swap-picker-close" aria-label="Back">&#8249;</button>
+        <span id="swap-picker-title" data-i18n="swap.selectTokenTitle">Select token</span>
+        <span class="asset-picker-head-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="asset-picker-searchwrap">
+        <span class="asset-picker-searchicon" aria-hidden="true">&#9906;</span>
+        <input type="text" id="swap-picker-search" class="asset-picker-search" autocomplete="off" spellcheck="false" data-i18n-placeholder="swap.pickerSearchPlaceholder" placeholder="Enter token name or paste address" />
+      </div>
+      <div class="asset-picker-chips" id="swap-picker-chips"></div>
+      <div class="asset-picker-list" id="swap-picker-list"></div>
+    </div>
+  </div>
 
   <!-- SETTINGS -->
   <section id="screen-settings" class="screen hidden">

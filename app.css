@@ -1058,6 +1058,66 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .asset-picker-row-symbol { font-weight: 600; font-size: 13px; }
 .asset-picker-row-balance { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .asset-picker-custom-btn { margin-top: 6px; font-size: 12.5px; }
+#swap-asset-picker { align-items: stretch; background: var(--bg); backdrop-filter: none; }
+.asset-picker-panel-tall {
+  max-height: none; height: 100%; border: none; border-radius: 0;
+  background: var(--bg); padding: 14px 14px 12px;
+}
+.asset-picker-head-page { display: grid; grid-template-columns: 36px 1fr 36px; align-items: center; text-align: center; margin-bottom: 12px; font-size: 15px; }
+.asset-picker-back { font-size: 30px; line-height: 1; text-align: left; padding: 0 4px; }
+.asset-picker-head-spacer { width: 36px; }
+.asset-picker-searchwrap { position: relative; margin: 0 0 12px; }
+.asset-picker-searchicon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%) scaleX(-1);
+  color: var(--text-faint); font-size: 16px; pointer-events: none;
+}
+.asset-picker-searchwrap .asset-picker-search { margin: 0; padding-left: 38px; }
+.asset-picker-search {
+  width: 100%; box-sizing: border-box; margin: 0 0 10px;
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 999px;
+  padding: 10px 14px; color: var(--text); font: inherit; font-size: 13px;
+}
+.asset-picker-search:focus { outline: none; border-color: var(--gold-deep); }
+.asset-picker-chips {
+  display: flex; gap: 8px; overflow-x: auto; padding: 0 0 10px; margin: 0 -2px;
+  scrollbar-width: none; flex-shrink: 0;
+}
+.asset-picker-chips::-webkit-scrollbar { display: none; }
+.asset-picker-chips.busy { opacity: 0.55; pointer-events: none; }
+.asset-picker-chip {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 12px; color: var(--text-muted); font: inherit; font-size: 12.5px;
+  font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.asset-picker-chip:hover { border-color: var(--line-strong); color: var(--text); }
+.asset-picker-chip.active { background: var(--text); border-color: var(--text); color: var(--bg); }
+.asset-picker-chip.current { border-color: var(--gold-deep); color: var(--text); }
+.asset-picker-chip-star { font-size: 15px; padding: 8px 14px; }
+.token-icon-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.token-net-badge {
+  position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px;
+  border-radius: 50%; border: 2px solid var(--bg);
+}
+.asset-picker-star, .asset-picker-info {
+  flex-shrink: 0; background: transparent; border: none; color: var(--text-faint);
+  cursor: pointer; font: inherit; padding: 4px;
+}
+.asset-picker-star { font-size: 17px; line-height: 1; }
+.asset-picker-star.on { color: var(--gold); }
+.asset-picker-star:hover { color: var(--gold-bright); }
+.asset-picker-info {
+  width: 22px; height: 22px; border: 1.5px solid var(--text-faint); border-radius: 50%;
+  font-size: 12px; font-weight: 700; font-style: italic; font-family: Georgia, serif; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.asset-picker-info:hover { color: var(--text); border-color: var(--text); }
+.asset-picker-info.invisible { visibility: hidden; }
+.asset-picker-row-sub { font-size: 11px; color: var(--text-faint); }
+.asset-picker-row-right { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.asset-picker-row-right .asset-picker-row-balance { font-size: 13px; font-weight: 600; color: var(--text); }
+.asset-picker-row-usd { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.asset-picker-row-usd:empty { display: none; }
 
 /* A soft gold glow across the top of a card, fading into the card's own
    solid fill by 44px down -- a small decorative accent, without making

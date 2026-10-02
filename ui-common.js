@@ -60,6 +60,15 @@ const NETWORK_DOT_COLORS = {
   bsc: "#F3BA2F",
   arbitrum: "#28A0F0",
   optimism: "#FF0420",
+  robinhood: "#9BE400",
+  avalanche: "#E84142",
+  monad: "#836EF9",
+  linea: "#61DFFF",
+  scroll: "#FFEEDA",
+  zksync: "#8C8DFC",
+  mantle: "#65B3AE",
+  gnosis: "#04795B",
+  celo: "#FCFF52",
 };
 
 function networkDotColor(key) {
