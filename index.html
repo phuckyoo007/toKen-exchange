@@ -435,27 +435,39 @@
 
   <!-- BUY -->
   <section id="screen-buy" class="screen hidden">
-    <h2 data-i18n="buy.title">Buy crypto</h2>
-    <p class="muted" data-i18n="buy.description1">Buy is powered by Transak, a separate third-party service -- Token Exchange never touches your payment details.</p>
-    <div class="no-third-party-callout">
-      <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip Transak entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
-      <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
+    <div id="buy-intro">
+      <h2 data-i18n="buy.title">Buy crypto</h2>
+      <p class="muted" data-i18n="buy.description1">Buy is powered by Transak, a separate third-party service -- Token Exchange never touches your payment details.</p>
+      <div class="no-third-party-callout">
+        <span data-i18n="buy.noThirdPartyCallout">Already hold some crypto? Skip Transak entirely -- swap it for what you need directly on-chain, no third party, no signup.</span>
+        <button type="button" class="link" id="btn-buy-goto-swap" data-i18n="buy.noThirdPartySwapBtn">Swap instead</button>
+      </div>
+      <p class="muted" data-i18n="buy.description2">Transak's buy flow opens right here in the app, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
+      <p id="buy-preset-note" class="hint hidden"></p>
+      <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
+      <button id="btn-buy-back" class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+      <p id="buy-error" class="error hidden"></p>
     </div>
-    <p class="muted" data-i18n="buy.description2">Transak opens in a new tab, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
-    <p id="buy-preset-note" class="hint hidden"></p>
-    <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-    <p id="buy-error" class="error hidden"></p>
+    <div id="buy-widget" class="transak-widget hidden">
+      <button type="button" class="link" id="btn-buy-close-widget" data-i18n="buy.closeWidgetBtn">← Close</button>
+      <iframe id="buy-iframe" class="transak-iframe" src="about:blank" allow="camera;microphone;payment"></iframe>
+    </div>
   </section>
 
   <!-- SELL -->
   <section id="screen-sell" class="screen hidden">
-    <h2 data-i18n="sell.title">Sell for cash</h2>
-    <p class="muted" data-i18n="sell.description1">Sell is powered by Transak, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
-    <p class="muted" data-i18n="sell.description2">Transak opens in a new tab and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.</p>
-    <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to Transak</button>
-    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
-    <p id="sell-error" class="error hidden"></p>
+    <div id="sell-intro">
+      <h2 data-i18n="sell.title">Sell for cash</h2>
+      <p class="muted" data-i18n="sell.description1">Sell is powered by Transak, the same third-party service Buy uses -- Token Exchange never touches your payout details.</p>
+      <p class="muted" data-i18n="sell.description2">Transak's sell flow opens right here in the app and quotes you a cash payout. It will show you a deposit address to send your crypto to -- once Transak receives it, it converts and pays out to your linked bank account or card.</p>
+      <button id="btn-sell-open" class="primary" data-i18n="sell.continueBtn">Continue to Transak</button>
+      <button id="btn-sell-back" class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+      <p id="sell-error" class="error hidden"></p>
+    </div>
+    <div id="sell-widget" class="transak-widget hidden">
+      <button type="button" class="link" id="btn-sell-close-widget" data-i18n="sell.closeWidgetBtn">← Close</button>
+      <iframe id="sell-iframe" class="transak-iframe" src="about:blank" allow="camera;microphone;payment"></iframe>
+    </div>
   </section>
 
   <!-- SUPPORT -->

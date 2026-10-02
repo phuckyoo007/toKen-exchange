@@ -2155,15 +2155,30 @@ async function refreshMainPredictionsCard() {
 }
 
 // ---------------------------------------------------------------- BUY
-// Buy hands off to Transak in a brand-new tab (see lib/transak-config.js's
-// header comment) -- nothing is embedded in an <iframe> here anymore.
-// Each time the screen is (re)opened, this just clears any stale error and
-// makes sure the button is enabled again.
+// Buy's widget loads right here in an <iframe> (see README-transak-embed.md):
+// tapping "Continue" fetches a fresh, single-use, 5-minute widget URL
+// (same URL that used to open in a new tab) and swaps the intro view for
+// the widget view. Closing -- the widget's own "← Close" link, or either
+// screen's "Back" button -- sets the iframe back to about:blank, which
+// fully unloads whatever Transak had running (including releasing the
+// camera/microphone if a KYC step was mid-flow) and resets to the intro
+// view, so reopening Buy never lands on a stale or expired widget.
+// Scope: website/app only -- the extension's small toolbar popup
+// (popup.html/popup.js) deliberately keeps the new-tab handoff, since
+// Transak's own docs flag the KYC camera step as unreliable inside a popup
+// that can lose focus and auto-close.
+//
 // A specific asset to default Transak's picker to, set by setupBuyScreen()
 // when Buy is opened from a coin-detail screen (see btn-coin-buy above).
 // Null for the plain "Buy crypto" entry point (Settings / main), where
 // Transak's own picker starts from its usual default.
 let buyPresetSymbol = null;
+
+function resetBuyWidget() {
+  $("buy-iframe").src = "about:blank";
+  $("buy-widget").classList.add("hidden");
+  $("buy-intro").classList.remove("hidden");
+}
 
 function setupBuyScreen(presetSymbol) {
   hideError("buy-error");
@@ -2177,6 +2192,7 @@ function setupBuyScreen(presetSymbol) {
       note.classList.add("hidden");
     }
   }
+  resetBuyWidget();
   const btn = $("btn-buy-open");
   if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
 }
@@ -2190,18 +2206,29 @@ $("btn-buy-open").addEventListener("click", async () => {
   try {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
     const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, currentCurrency, buyPresetSymbol);
-    window.open(url, "_blank", "noopener");
+    $("buy-iframe").src = url;
+    $("buy-intro").classList.add("hidden");
+    $("buy-widget").classList.remove("hidden");
   } catch (e) {
     showError("buy-error", e.message);
   } finally {
     btn.disabled = false;
   }
 });
+$("btn-buy-close-widget").addEventListener("click", resetBuyWidget);
+$("btn-buy-back").addEventListener("click", resetBuyWidget);
 
 // ---------------------------------------------------------------- SELL
-// Same new-tab handoff to Transak as Buy above.
+// Same in-app iframe pattern as Buy above.
+function resetSellWidget() {
+  $("sell-iframe").src = "about:blank";
+  $("sell-widget").classList.add("hidden");
+  $("sell-intro").classList.remove("hidden");
+}
+
 function setupSellScreen() {
   hideError("sell-error");
+  resetSellWidget();
   const btn = $("btn-sell-open");
   if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
 }
@@ -2213,13 +2240,17 @@ $("btn-sell-open").addEventListener("click", async () => {
   try {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
     const url = await TM_TRANSAK_CONFIG.buildTransakUrl("SELL", currentNetwork.key, address, currentCurrency);
-    window.open(url, "_blank", "noopener");
+    $("sell-iframe").src = url;
+    $("sell-intro").classList.add("hidden");
+    $("sell-widget").classList.remove("hidden");
   } catch (e) {
     showError("sell-error", e.message);
   } finally {
     btn.disabled = false;
   }
 });
+$("btn-sell-close-widget").addEventListener("click", resetSellWidget);
+$("btn-sell-back").addEventListener("click", resetSellWidget);
 
 // ---------------------------------------------------------------- SETTINGS
 $("btn-add-account").addEventListener("click", async () => {

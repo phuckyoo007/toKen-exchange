@@ -708,6 +708,19 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
   display: flex; align-items: center; gap: 8px;
 }
 
+/* ---------------- Buy/Sell: embedded Transak widget ----------------
+   #buy-widget / #sell-widget hold the iframe Transak's flow actually runs
+   in, swapped in place of the #buy-intro / #sell-intro view. White
+   background because Transak's widget assumes a light host. */
+.transak-widget {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.transak-iframe {
+  width: 100%; height: 560px; max-height: 70vh;
+  border: none; border-radius: 10px;
+  background: #fff;
+}
+
 /* ---------------- send speed (gas) selector ----------------
    Three-way slow/standard/fast toggle shown under the amount field once
    a fee estimate is available. */
