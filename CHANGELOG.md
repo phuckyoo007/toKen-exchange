@@ -1,17 +1,31 @@
 # Changelog
-## Unreleased
 
-- **Swap safety:** (1) the minimum received is now taken from the quote the user saw, not
-  re-quoted at send time, and the swap is not sent if the live price is already below it;
-  (2) slippage is validated (whole basis points, 0-5000) instead of `|| 100`;
-  (3) on the 0x route the chosen slippage was ignored (the quote always used 1%), so the quote
-  now carries the selected slippage, a saved 0x route is reused only for that slippage, and
-  changing the slippage menu fetches a new quote; (4) request and alert ids use
-  `crypto.randomUUID()`. New `tests/swap-wiring.test.js` plus cases in `swap.test.js`.
-- **Security:** sites can no longer switch the wallet's network silently. The extension
-  opens an approval window ("X wants to switch from A to B"); rejecting returns EIP-1193
-  error 4001, and switching to the chain you are already on does not prompt. Strings added
-  in all nine languages; new `tests/switch-network.test.js`.
+## 2026-09-28 — second-pass audit
+
+- **Security (extension):** any website could request transactions, message
+  signatures or `eth_signTypedData_v4`, for any account in the wallet, without
+  ever being connected; `wallet_switchEthereumChain` changed the active network
+  with no prompt either. `background.js` now requires a connected origin for
+  all four (`requireConnectedOrigin`, EIP-1193 error 4100), limited to the
+  account that origin was connected with. The same checks were added for
+  WalletConnect sessions (`assertWcRequestAllowed`): a paired dapp may only act
+  on the chain and account approved at pairing. Typed-data signing is also
+  refused when `domain.chainId` doesn't match the selected network (blocks
+  cross-chain replay/phishing). 15 new tests in `tests/dapp-gate.test.js`. Not
+  run in a loaded extension or against a live WalletConnect pairing: please
+  connect to a dapp, sign, switch network, and try one WalletConnect pairing.
+- **Auto-lock default raised to 21 minutes:** the site's existing inactivity
+  auto-lock defaulted to 5 minutes; people who already chose a value keep it.
+  Added a "21 minutes (default)" option; removed the now-stale "(recommended)"
+  tag from the 5-minute option.
+- **Repo cleanup (again):** the root had re-accumulated an old deploy zip, 11
+  stray README/notes files, 9 unused screenshots/art files, and `CHANGELOG.md`
+  / `play-store-listing.md` living at the root instead of `docs/`. All moved or
+  removed; `tests/repo-clean.test.js` catches this drift again going forward.
+  `build-extension.js` also belongs in `scripts/`, not the repo root (it was
+  loose there); moved.
+
+## Unreleased
 
 - **Fee:** `computeFee` / `feePercentLabel` now honor `{ viaAggregator }`. Swaps routed
   through 0x are charged 0.65% (our 0.5% + 0x's ~0.15%); router swaps stay at 0.5%.
@@ -85,7 +99,8 @@ meant for, but the content script never checked the tag, so connecting to site A
 sent your address to every open page. Pages now only receive events addressed
 to their own origin. `host_permissions` deliberately left as is: the background
 worker fetches custom RPCs, NFT metadata and APIs that rely on it to skip CORS.
-Fixed since: `wallet_switchEthereumChain` now asks first (see Unreleased).
+Noticed, not changed: `wallet_switchEthereumChain` switches the active network
+for any site without a confirmation prompt (MetaMask asks first).
 
 **6. `playwright` removed** (`package.json`, `package-lock.json`)
 Listed as a production dependency but used nowhere; it only slowed installs.

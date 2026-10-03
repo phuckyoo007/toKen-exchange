@@ -61,3 +61,11 @@ test("networkDotColor and tokenIconColor are stable and fall back to a hash colo
   assert.equal(ctx.tc("usdc"), "#2775CA");
   assert.match(ctx.tc("ZZZ"), /^hsl\(\d+, 55%, 46%\)$/);
 });
+
+test("auto-lock: 21 minutes is the default and is a selectable option", () => {
+  const app = read("app.js");
+  assert.match(app, /let currentAutoLockMinutes = 21;/);
+  assert.match(app, /typeof stored === "number" \? stored : 21;/);
+  assert.match(read("index.html"), /<option value="21"[^>]*>/);
+  assert.match(read("en.js"), /"settings\.autoLock21"/);
+});
