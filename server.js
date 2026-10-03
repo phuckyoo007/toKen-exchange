@@ -24,7 +24,7 @@ const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-e
 const LIB_FILES = [
 "account.js", "coinbase-onramp-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
 "identicon.js", "known-tokens.js", "networks.js", "nft.js", "onramper-config.js", "polymarket.js", "token-catalog.js", "prices.js",
-"sanctions-list.js", "support-config.js", "swap.js", "ui-common.js", "transak-config.js", "wallet.js",
+"sanctions-list.js", "support-config.js", "swap.js", "token-scan.js", "token-scan-ui.js", "ui-common.js", "transak-config.js", "wallet.js",
 "walletconnect-config.js",
 ];
 const I18N_FILES = ["ar.js", "en.js", "es.js", "fr.js", "hi.js", "ja.js", "pt.js", "ru.js", "zh.js"];

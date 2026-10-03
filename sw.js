@@ -17,7 +17,7 @@
 // CACHE_NAME is versioned by hand. Bump it whenever PRECACHE_URLS changes so
 // old caches get cleaned up on activate. tests/service-worker.test.js fails if
 // this list drifts from what index.html and app.css actually load.
-const CACHE_NAME = "token-exchange-shell-v9";
+const CACHE_NAME = "token-exchange-shell-v10";
 
 const PRECACHE_URLS = [
   "/",
@@ -55,6 +55,8 @@ const PRECACHE_URLS = [
   "/lib/feature-requests.js",
   "/lib/ui-common.js",
   "/lib/known-tokens.js",
+  "/lib/token-scan.js",
+  "/lib/token-scan-ui.js",
   // translations
   "/lib/i18n/en.js",
   "/lib/i18n/ar.js",

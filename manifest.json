@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Token Exchange",
   "short_name": "Token Exchange",
-  "version": "0.11.2",
+  "version": "1.11.4",
   "description": "Self-custody Ethereum & Base wallet with a built-in token swap. Your keys never leave your device.",
   "minimum_chrome_version": "111",
   "icons": {

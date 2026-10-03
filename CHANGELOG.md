@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased -- swap history + wallet scan
+
+- **Activity -> Swaps tab (extension):** Activity now has Sends | Swaps tabs. Each successful swap
+  is recorded locally (`tm_swap_history`, last 100) and links to the block explorer.
+- **Scan wallet (extension + website):** new "Scan wallet" button next to "+ Add token". It checks
+  the account for the verified stablecoins (`known-tokens.js`) plus the top ~250 CoinGecko-listed
+  tokens on the current network, using Multicall3 (one-by-one fallback), and lists what it holds
+  with Add / Add all. Nothing is added automatically, and unlisted/airdropped tokens are never
+  shown. New message `TM_SCAN_TOKENS` in `background.js` and `wallet-engine.js`; shared code in
+  `token-scan.js` (logic) and `token-scan-ui.js` (screen).
+- **Scan wording is English-only for now** (kept in the `S` object in `token-scan-ui.js`); the
+  Swaps-tab strings are translated in all nine languages.
+- Service worker cache bumped to v10 (two new precached files).
+
 ## Unreleased -- audit follow-up
 
 - **Security (extension):** `wallet_switchEthereumChain` changed the active network with no

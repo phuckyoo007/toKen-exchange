@@ -282,7 +282,10 @@
     <div class="tokens-section">
       <div class="tokens-header">
         <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
-        <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
+        <span class="tokens-header-actions">
+          <button id="btn-scan-tokens" class="link" type="button">🔍 Scan wallet</button>
+          <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
+        </span>
       </div>
       <div id="tokens-list" class="tokens-list"></div>
       <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
@@ -303,8 +306,13 @@
        other screen) -->
   <section id="screen-activity" class="screen hidden">
     <h2 data-i18n="activity.title">Activity</h2>
-    <p class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
+    <p id="activity-subtitle" class="muted" data-i18n="activity.subtitle">A local record of sends made from this wallet on this device -- nothing here is fetched from a server.</p>
+    <div class="activity-tabs" role="tablist">
+      <button type="button" class="activity-tab active" data-activity-tab="sends" data-i18n="activity.tabSends">Sends</button>
+      <button type="button" class="activity-tab" data-activity-tab="swaps" data-i18n="activity.tabSwaps">Swaps</button>
+    </div>
     <div id="activity-list"></div>
+    <div id="swap-history-list" class="hidden"></div>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
   </section>
 
@@ -334,6 +342,18 @@
   </section>
 
   <!-- ADD TOKEN -->
+  <!-- SCAN WALLET FOR TOKENS (see token-scan.js / token-scan-ui.js) -->
+  <section id="screen-scan-tokens" class="screen hidden">
+    <h2>Scan wallet</h2>
+    <p class="muted">Checks this account on the current network for popular, market-listed tokens and lists the ones it holds. Only public balances are read -- nothing is added until you tap Add, and tokens outside that list (including airdropped look-alikes) are never shown.</p>
+    <p id="scan-tokens-status" class="muted small"></p>
+    <div id="scan-tokens-list" class="tokens-list"></div>
+    <button type="button" id="btn-scan-add-all" class="secondary hidden">Add all</button>
+    <button type="button" id="btn-scan-again" class="secondary">Scan again</button>
+    <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
+    <p id="scan-tokens-error" class="error hidden"></p>
+  </section>
+
   <section id="screen-add-token" class="screen hidden">
     <h2 data-i18n="addToken.title">Add token</h2>
     <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
@@ -711,6 +731,8 @@
 <script src="../lib/globe-nav.js"></script>
 <script src="../lib/ui-common.js"></script>
 <script src="../lib/known-tokens.js"></script>
+<script src="../lib/token-scan.js"></script>
 <script src="popup.js"></script>
+<script src="../lib/token-scan-ui.js"></script>
 </body>
 </html>

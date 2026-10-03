@@ -930,6 +930,22 @@ async function handleMessage(msg) {
             break;
           }
 
+          case "TM_SCAN_TOKENS": {
+            // Read-only: checks the candidate contracts the UI sends (known-good tokens only)
+            // for a non-zero balance on the selected account. Adds nothing by itself.
+            if (!Array.isArray(msg.addresses) || !msg.addresses.length) throw new Error("Nothing to scan on this network.");
+            const network = await getActiveNetwork();
+            const provider = await getProviderFor(network);
+            const meta = await getSelectedAccountMeta();
+            if (!meta) throw new Error("No account selected.");
+            const scan = await TM_TOKEN_SCAN.scanBalances(provider, meta.address, msg.addresses);
+            const tracked = await getTrackedTokens(network.chainId);
+            const have = new Set(tracked.map((t) => t.address.toLowerCase()));
+            const found = scan.found.filter((t) => !have.has(t.address.toLowerCase()));
+            sendResponse({ ok: true, checked: scan.checked, found, alreadyTracked: scan.found.length - found.length });
+            break;
+          }
+
           case "TM_LOOKUP_TOKEN": {
             if (!ethers.utils.isAddress(msg.tokenAddress)) {
               throw new Error("That doesn't look like a valid contract address.");

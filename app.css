@@ -1849,3 +1849,13 @@ html[data-theme="light"] #network-badge {
 .quick-add-label { font-size: 12px; }
 .quick-add-chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-hover); color: inherit; font-size: 12px; cursor: pointer; }
 .quick-add-chip:hover, .quick-add-chip:focus-visible { border-color: currentColor; }
+
+/* Scan wallet for tokens */
+.tokens-header-actions { display: inline-flex; align-items: center; gap: 12px; }
+.scan-add-btn {
+  flex-shrink: 0; border: 0; border-radius: 7px; cursor: pointer;
+  background: var(--gold); color: var(--gold-ink);
+  font: inherit; font-weight: 700; font-size: 12px; padding: 6px 12px;
+}
+.scan-add-btn:disabled { opacity: 0.65; cursor: default; }
+#btn-scan-add-all, #btn-scan-again { margin-top: 8px; }

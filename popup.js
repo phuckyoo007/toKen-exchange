@@ -23,7 +23,7 @@ function tokenIconHtml(symbol) {
         const tokensHeader = document.querySelector("#screen-main .tokens-header");
         if (tokensHeader) tokensHeader.scrollIntoView({ block: "start" });
       } else if (goto === "1") {
-        renderActivity();
+        setActivityTab(activityTab);
         showScreen("screen-activity");
       } else if (goto === "2") {
         showScreen("screen-send");
@@ -1576,6 +1576,8 @@ $("btn-swap-execute").addEventListener("click", async () => {
     $("swap-status").classList.remove("hidden");
     const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps, quotedAmountOutWei: ds.amountOutWei });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
+    // Best-effort local history entry -- must never turn a successful swap into an error.
+    recordSwapHistory({ tokenIn, tokenOut, totalAmountInWei, amountOutWei: ds.amountOutWei, txHash: res.txHash, feeTxHash: res.feeTxHash }).catch(() => {});
     await refreshBalance();
   } catch (e) {
     showError("swap-error", e.message);
@@ -1880,7 +1882,7 @@ function activateSplashHome() {
   });
   $("splash-tab-activity").addEventListener("click", () => {
     hideSplash();
-    renderActivity();
+    setActivityTab(activityTab);
     showScreen("screen-activity");
   });
   $("splash-tab-send").addEventListener("click", () => {
@@ -2162,6 +2164,113 @@ function renderActivity() {
     });
   });
 }
+
+// ---- Swap history (Activity -> Swaps tab) ----
+// Local record of swaps made from this device, in chrome.storage.local. Amounts and
+// symbols are stored already formatted so the list never needs the network to draw.
+const TM_SWAP_HISTORY_KEY = "tm_swap_history";
+const TM_SWAP_HISTORY_MAX = 100;
+async function swapAssetInfo(addr) {
+  if (!addr || addr === TM_NATIVE()) return { symbol: currentNetwork.nativeCurrency.symbol, decimals: 18 };
+  try {
+    const info = await sendMsg("TM_GET_TOKEN_BALANCE", { address: currentStatus.selectedAddress, tokenAddress: addr });
+    return { symbol: info.symbol || (addr.slice(0, 6) + "\u2026" + addr.slice(-4)), decimals: info.decimals };
+  } catch (e) {
+    return { symbol: addr.slice(0, 6) + "\u2026" + addr.slice(-4), decimals: 18 };
+  }
+}
+async function recordSwapHistory(s) {
+  const [a, b] = await Promise.all([swapAssetInfo(s.tokenIn), swapAssetInfo(s.tokenOut)]);
+  const entry = {
+    amountIn: ethers.utils.formatUnits(s.totalAmountInWei, a.decimals),
+    assetIn: a.symbol,
+    amountOut: ethers.utils.formatUnits(s.amountOutWei, b.decimals),
+    assetOut: b.symbol,
+    txHash: s.txHash,
+    chainId: currentNetwork.chainId,
+    explorer: String(currentNetwork.blockExplorer || ""),
+    ts: Date.now(),
+  };
+  const res = await chrome.storage.local.get([TM_SWAP_HISTORY_KEY]);
+  const list = Array.isArray(res[TM_SWAP_HISTORY_KEY]) ? res[TM_SWAP_HISTORY_KEY] : [];
+  list.unshift(entry);
+  await chrome.storage.local.set({ [TM_SWAP_HISTORY_KEY]: list.slice(0, TM_SWAP_HISTORY_MAX) });
+}
+function fmtSwapAmount(v) {
+  const n = Number(v);
+  if (!isFinite(n)) return String(v);
+  if (n === 0) return "0";
+  return n.toLocaleString(undefined, { maximumSignificantDigits: 6, maximumFractionDigits: 12 });
+}
+function renderSwapHistory() {
+  chrome.storage.local.get([TM_SWAP_HISTORY_KEY], (res) => {
+    const list = Array.isArray(res[TM_SWAP_HISTORY_KEY]) ? res[TM_SWAP_HISTORY_KEY] : [];
+    const root = $("swap-history-list");
+    root.innerHTML = "";
+    if (!list.length) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = TM_I18N.t("activity.swapsEmpty");
+      root.appendChild(p);
+      return;
+    }
+    list.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "activity-entry";
+
+      const icon = document.createElement("span");
+      icon.className = "activity-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<path d="M7 7h11M18 7l-3-3M18 7l-3 3M17 17H6M6 17l3-3M6 17l3 3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        "</svg>";
+
+      const body = document.createElement("div");
+      body.className = "activity-body";
+      const top = document.createElement("div");
+      top.className = "activity-top";
+      const main = document.createElement("div");
+      main.className = "activity-main";
+      main.textContent = TM_I18N.t("activity.swapLabel", {
+        amountIn: fmtSwapAmount(item.amountIn), assetIn: item.assetIn,
+        amountOut: fmtSwapAmount(item.amountOut), assetOut: item.assetOut,
+      });
+      const status = document.createElement("span");
+      status.className = "activity-status";
+      status.textContent = TM_I18N.t("activity.statusSwapped");
+      top.appendChild(main);
+      top.appendChild(status);
+      const time = document.createElement("div");
+      time.className = "activity-time";
+      time.textContent = new Date(item.ts).toLocaleString();
+      body.appendChild(top);
+      body.appendChild(time);
+
+      // Only link out for a plain https explorer and a well-formed tx hash.
+      const base = String(item.explorer || "").replace(/\/+$/, "");
+      if (/^https:\/\//.test(base) && /^0x[0-9a-fA-F]{64}$/.test(String(item.txHash || ""))) {
+        card.classList.add("clickable");
+        card.title = TM_I18N.t("activity.viewOnExplorer");
+        card.addEventListener("click", () => window.open(`${base}/tx/${item.txHash}`, "_blank", "noopener,noreferrer"));
+      }
+
+      card.appendChild(icon);
+      card.appendChild(body);
+      root.appendChild(card);
+    });
+  });
+}
+let activityTab = "sends";
+function setActivityTab(tab) {
+  activityTab = tab;
+  document.querySelectorAll(".activity-tab").forEach((b) => b.classList.toggle("active", b.dataset.activityTab === tab));
+  $("activity-list").classList.toggle("hidden", tab !== "sends");
+  $("swap-history-list").classList.toggle("hidden", tab !== "swaps");
+  $("activity-subtitle").textContent = TM_I18N.t(tab === "swaps" ? "activity.swapsSubtitle" : "activity.subtitle");
+  if (tab === "swaps") renderSwapHistory(); else renderActivity();
+}
+document.querySelectorAll(".activity-tab").forEach((b) => b.addEventListener("click", () => setActivityTab(b.dataset.activityTab)));
 
 // ---------------------------------------------------------------- ENTRY POINT
 (async function init() {
