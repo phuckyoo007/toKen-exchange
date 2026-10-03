@@ -319,6 +319,22 @@ async function handleDappRequest(method, params, origin) {
         err.code = 4902;
         throw err;
       }
+      // Already on that chain: nothing to change, so nothing to ask.
+      if (found.chainId === network.chainId) return null;
+      // Switching changes which chain every later send, swap and balance uses,
+      // so a site must not do it silently. Rejecting makes this throw, which the
+      // dapp sees as EIP-1193 error 4001 (user rejected).
+      try {
+        await openApprovalPopup(
+          "switchNetwork",
+          { origin, chainId: targetId, fromName: network.name, toName: found.name },
+          origin
+        );
+      } catch (e) {
+        const err = new Error("User rejected the request to switch network.");
+        err.code = 4001;
+        throw err;
+      }
       await TM_NETWORKS.setSelectedNetwork(targetId);
       broadcastEventToOrigin(origin, "chainChanged", ethers.utils.hexValue(targetId));
       return null;

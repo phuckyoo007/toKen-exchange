@@ -1581,6 +1581,15 @@ async function renderApproval(requestId, pending) {
     showScreen("screen-approve-sign");
     $("btn-approve-sign-accept").onclick = () => respondApproval(requestId, true, true);
     $("btn-approve-sign-reject").onclick = () => respondApproval(requestId, false, null, "User rejected signature.");
+  } else if (type === "switchNetwork") {
+    $("approve-switchnet-text").textContent = TM_I18N.t("approve.switchNetText", {
+      origin: payload.origin,
+      from: payload.fromName,
+      to: payload.toName,
+    });
+    showScreen("screen-approve-switchnetwork");
+    $("btn-approve-switchnet-accept").onclick = () => respondApproval(requestId, true, true);
+    $("btn-approve-switchnet-reject").onclick = () => respondApproval(requestId, false, null, "User rejected switching network.");
   } else if (type === "addNetwork") {
     $("approve-addnet-origin").textContent = payload.origin;
     $("approve-addnet-details").innerHTML = `
