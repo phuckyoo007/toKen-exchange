@@ -69,6 +69,7 @@ back to the on-chain router) instead of breaking.
 | `CSP_REPORT_ONLY` | Set to `1` to make the Content-Security-Policy log violations instead of blocking. Debugging aid; remove afterwards. |
 | `ZEROEX_API_KEY` | 0x Swap API key for aggregator swap quotes. |
 | `ALCHEMY_API_KEY` | Alchemy API key for the NFT gallery (`nft-api.js`). Without it the NFT feature stays off. |
+| `ADMIN_TOKEN` | Bearer token for the admin console (`/admin.html`, `admin-api.js`). Without it every `/api/admin/*` route answers 503. |
 | `TRANSAK_API_KEY`, `TRANSAK_API_SECRET` | Transak Buy/Sell. Secret: never commit. |
 | `TRANSAK_ENVIRONMENT` | `production` or `staging` (default `staging`, so a forgotten variable cannot move real money). Use the key pair that matches. |
 | `TRANSAK_REFERRER_DOMAIN` | Optional. Default `tokenswaphub.org`; must match your Transak dashboard. |
@@ -80,18 +81,44 @@ redeploy and are not shared between instances. Run a single instance.
 ## HTTP API (served by `server.js`)
 
 `/api/swap-quote`, `/api/transak-session`, `/api/coinbase-onramp-session`,
-`/api/coinbase-offramp-status`, `/api/feature-requests`, and the account/backup
-routes under `/api/auth/*` and `/api/vault`. The swap, Transak and Coinbase
-endpoints only answer browsers on the allowed origins (see `cors.js`).
+`/api/coinbase-offramp-status`, `/api/feature-requests`, `/api/nft-list`,
+`/api/nft-metadata`, and the account/backup routes under `/api/auth/*` and
+`/api/vault`. The swap, Transak, Coinbase and NFT endpoints only answer
+browsers on the allowed origins (see `cors.js`).
+
+## Admin console
+
+`/admin.html` (logic in `admin.js`) talks to `/api/admin/*` (`admin-api.js`),
+both wired into `server.js`. It operates on the same user store as
+`/api/auth/*` (`auth-api.js`'s `accounts.json`) -- NOT the separate,
+not-wired-in `accounts-api.js` below.
+
+- Set `ADMIN_TOKEN` (a long random string) as a Railway variable to turn it
+  on. Until it's set, every `/api/admin/*` route answers 503 -- there is no
+  default admin password, and the page itself serves either way (it just
+  can't do anything without a token).
+- Visit `/admin.html`, paste the token (kept in `sessionStorage` only --
+  cleared on tab close, never written to disk). From there: see per-user
+  vault version/session count/last-updated (never the encrypted vault
+  itself or anything that unlocks one), sign a user out everywhere, disable
+  or delete an account, and clear a stuck login/IP rate limit.
+- The page is served to anyone who requests it (it's a login gate, like the
+  site itself), but `noindex, nofollow` keeps it out of search engines and
+  every `/api/admin/*` call requires the bearer token, rate-limited at 20
+  bad attempts per 15 minutes per IP.
+- Treat the token like a password: a long random value, not committed
+  anywhere, rotated if you suspect it leaked.
 
 ## Not wired in
 
-These files are in the repo but `server.js` does not load them, so they are
-inactive on the live site: `admin-api.js` and `admin.html` (admin console).
-Finish wiring them up or remove them; do not assume they are running. If you
-do wire them in, they read: `ADMIN_TOKEN` (the admin console's password),
-`ACCOUNTS_ENABLED` (`1` to switch the SQLite accounts API on) and
-`ACCOUNTS_DB_PATH` (where its database file lives; put it on the persistent volume).
+`accounts-api.js` (optional username/password **website** accounts for
+syncing display settings across devices -- a different, lower-stakes system
+than the admin console or the wallet itself; see the file's own header) is
+in the repo but `server.js` does not load it, so it is inactive on the live
+site. Finish wiring it up or remove it; do not assume it is running. If you
+do wire it in, it reads `ACCOUNTS_ENABLED` (`1` to switch it on) and
+`ACCOUNTS_DB_PATH` (where its SQLite file lives; put it on the persistent
+volume).
 
 ## Repo hygiene
 

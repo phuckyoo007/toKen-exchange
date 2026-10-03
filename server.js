@@ -8,6 +8,7 @@ const { handleAuthApi } = require("./auth-api");
 const { handleCoinbaseOnrampApi } = require("./coinbase-onramp-api");
 const { handleTransakApi } = require("./transak-widget-api");
 const { handleNftApi } = require("./nft-api");
+const { handleAdminApi } = require("./admin-api");
 const { applySecurityHeaders } = require("./security-headers");
 
 const ROOT = __dirname;
@@ -19,7 +20,7 @@ const FONTS_DIR = path.join(PUBLIC_DIR, "fonts");
 const IMG_DIR = path.join(PUBLIC_DIR, "img");
 const PORT = process.env.PORT || 3000;
 
-const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "globe-nav.js", "extras.js", "sw-register.js", "site.webmanifest", "sw.js", "privacy.html", "terms.html", "support.html"];
+const TOP_LEVEL_FILES = ["index.html", "app.css", "app.js", "shim.js", "wallet-engine.js", "cube-nav.js", "globe-nav.js", "extras.js", "sw-register.js", "site.webmanifest", "sw.js", "privacy.html", "terms.html", "support.html", "admin.html", "admin.js"];
 const LIB_FILES = [
 "account.js", "coinbase-onramp-config.js", "crypto-utils.js", "fee-config.js", "feature-requests.js", "i18n.js",
 "identicon.js", "known-tokens.js", "networks.js", "nft.js", "onramper-config.js", "polymarket.js", "token-catalog.js", "prices.js",
@@ -87,6 +88,7 @@ if (handleAuthApi(req, res)) return;
 if (handleCoinbaseOnrampApi(req, res)) return;
 if (handleTransakApi(req, res)) return;
 if (handleNftApi(req, res)) return;
+if (handleAdminApi(req, res)) return;
 handler(req, res, { public: PUBLIC_DIR });
 });
 server.listen(PORT, () => console.log("Serving on port " + PORT));
