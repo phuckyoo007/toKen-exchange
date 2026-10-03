@@ -2754,7 +2754,13 @@ function renderSwapMinReceived() {
   $("swap-min-received-line").textContent =
     `${ethers.utils.formatUnits(minWei, Number(ds.decimalsOut) || 18)} ${symbolOut}`;
 }
-$("swap-slippage").addEventListener("change", renderSwapMinReceived);
+$("swap-slippage").addEventListener("change", () => {
+  renderSwapMinReceived();
+  // A 0x quote has its minimum baked into the saved transaction, so a new
+  // slippage choice needs a fresh quote before Swap can be pressed again.
+  clearSwapQuote();
+  scheduleSwapAutoQuote();
+});
 
 let swapAutoQuoteGen = 0;
 let swapAutoQuoteTimer = null;
@@ -2787,7 +2793,7 @@ async function runSwapAutoQuote() {
     // off the top of this before anything is swapped (see TM_SWAP_QUOTE in
     // background.js / lib/fee-config.js).
     const totalAmountInWei = ethers.utils.parseUnits(amountStr, decimalsIn);
-    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
+    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString(), slippageBps: Number($("swap-slippage").value) });
     if (myGen !== swapAutoQuoteGen) return; // superseded by a newer edit
 
     let decimalsOut = 18, symbolOut = (currentNetwork.nativeCurrency && currentNetwork.nativeCurrency.symbol) || "";
@@ -2927,7 +2933,7 @@ $("btn-swap-execute").addEventListener("click", async () => {
 
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
-    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
+    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps, quotedAmountOutWei: ds.amountOutWei });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
     $("swap-amount-in").value = "";
     clearSwapQuote();

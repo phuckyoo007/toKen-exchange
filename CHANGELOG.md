@@ -1,6 +1,13 @@
 # Changelog
 ## Unreleased
 
+- **Swap safety:** (1) the minimum received is now taken from the quote the user saw, not
+  re-quoted at send time, and the swap is not sent if the live price is already below it;
+  (2) slippage is validated (whole basis points, 0-5000) instead of `|| 100`;
+  (3) on the 0x route the chosen slippage was ignored (the quote always used 1%), so the quote
+  now carries the selected slippage, a saved 0x route is reused only for that slippage, and
+  changing the slippage menu fetches a new quote; (4) request and alert ids use
+  `crypto.randomUUID()`. New `tests/swap-wiring.test.js` plus cases in `swap.test.js`.
 - **Security:** sites can no longer switch the wallet's network silently. The extension
   opens an approval window ("X wants to switch from A to B"); rejecting returns EIP-1193
   error 4001, and switching to the chain you are already on does not prompt. Strings added

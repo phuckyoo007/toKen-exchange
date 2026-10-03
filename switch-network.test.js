@@ -41,3 +41,13 @@ test("all nine languages have the switch-network strings", () => {
     assert.match(read(c + ".js"), /"approve\.switchNetText": "[^"]*\{origin\}[^"]*\{from\}[^"]*\{to\}|"approve\.switchNetText": "[^"]*\{from\}[^"]*\{to\}/, c + " text lost its placeholders");
   }
 });
+
+test("request ids use crypto, not Math.random", () => {
+  for (const f of ["background.js", "wallet-engine.js"]) {
+    const src = read(f);
+    const m = src.match(/function newRequestId\(\) \{[\s\S]*?\n\}/);
+    assert.ok(m, f + ": newRequestId not found");
+    assert.ok(!/Math\.random/.test(m[0]), f + ": newRequestId still uses Math.random");
+    assert.match(m[0], /crypto\.randomUUID/);
+  }
+});

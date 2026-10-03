@@ -133,3 +133,38 @@ test("executeAggregatorSwap throws a clear error if the prepared transaction is 
   await assert.rejects(() => S.executeAggregatorSwap({ signer }), /missing its prepared transaction/);
   await assert.rejects(() => S.executeAggregatorSwap({ signer, transaction: { to: "0x1" } }), /missing its prepared transaction/);
 });
+
+test("normalizeSlippageBps: default, valid range, and rejects nonsense", () => {
+  assert.equal(S.normalizeSlippageBps(undefined), 100);
+  assert.equal(S.normalizeSlippageBps(null), 100);
+  assert.equal(S.normalizeSlippageBps("50"), 50);
+  assert.equal(S.normalizeSlippageBps(0), 0);
+  assert.equal(S.normalizeSlippageBps(5000), 5000);
+  for (const bad of [-1, 5001, 10000, 1.5, NaN, "abc", Infinity]) {
+    assert.throws(() => S.normalizeSlippageBps(bad), /Slippage must be between/, "should reject " + bad);
+  }
+});
+
+test("applySlippage can no longer produce a zero or negative minimum from bad input", () => {
+  assert.throws(() => S.applySlippage(1000, 10000), /Slippage/);
+  assert.throws(() => S.applySlippage(1000, -500), /Slippage/);
+  assert.throws(() => S.applySlippage(1000, NaN), /Slippage/);
+});
+
+test("resolveAmountOutMin: with no quote it applies slippage to the live price", () => {
+  assert.equal(S.resolveAmountOutMin({ freshAmountOutWei: 1000, slippageBps: 100 }).toString(), "990");
+});
+
+test("resolveAmountOutMin: the floor comes from the quote the user saw, not the live price", () => {
+  // User saw 1000. Live price is 995 (within 1%): floor stays 990, not 985.
+  assert.equal(S.resolveAmountOutMin({ freshAmountOutWei: 995, quotedAmountOutWei: 1000, slippageBps: 100 }).toString(), "990");
+});
+
+test("resolveAmountOutMin: refuses to send when the live price is already below the user's floor", () => {
+  assert.throws(
+    () => S.resolveAmountOutMin({ freshAmountOutWei: 900, quotedAmountOutWei: 1000, slippageBps: 100 }),
+    /price moved more than your slippage/
+  );
+  // exactly at the floor is still allowed
+  assert.equal(S.resolveAmountOutMin({ freshAmountOutWei: 990, quotedAmountOutWei: 1000, slippageBps: 100 }).toString(), "990");
+});

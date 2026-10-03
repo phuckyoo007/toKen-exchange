@@ -71,20 +71,52 @@ async function sendApprove({ signer, tokenAddress, spender, amountWei }) {
   return tx; // caller awaits tx.wait() if it wants confirmation
 }
 
+// Slippage arrives from the UI / a message, so it is checked before any maths:
+// a whole number of basis points from 0 to 5000 (0%-50%). Missing -> 1% default.
+// Anything else (NaN, negative, fractional, >= 100%) would make the minimum
+// received zero or nonsensical, so it throws instead of being used.
+const MAX_SLIPPAGE_BPS = 5000;
+function normalizeSlippageBps(v) {
+  if (v === undefined || v === null || v === "") return 100;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > MAX_SLIPPAGE_BPS) {
+    throw new Error("Slippage must be between 0% and 50%.");
+  }
+  return n;
+}
+
 // Applies slippage tolerance (basis points, e.g. 100 = 1%) to a quoted output.
 function applySlippage(amountOutWei, slippageBps) {
   const bn = ethers.BigNumber.from(amountOutWei);
-  return bn.mul(10000 - slippageBps).div(10000);
+  return bn.mul(10000 - normalizeSlippageBps(slippageBps)).div(10000);
+}
+
+// Decides the minimum the router must pay out. If the caller has the quote the
+// user actually saw, the minimum is taken from THAT, so a price that moved
+// against the user between quote and send can never be baked into the floor
+// (the old code re-quoted at send time and applied slippage to the worse price).
+// If the live price is already below that floor, throw instead of sending a
+// transaction that would only revert and cost gas.
+function resolveAmountOutMin({ freshAmountOutWei, quotedAmountOutWei, slippageBps }) {
+  const fresh = ethers.BigNumber.from(freshAmountOutWei);
+  if (quotedAmountOutWei === undefined || quotedAmountOutWei === null || quotedAmountOutWei === "") {
+    return applySlippage(fresh, slippageBps);
+  }
+  const min = applySlippage(quotedAmountOutWei, slippageBps);
+  if (fresh.lt(min)) {
+    throw new Error("The price moved more than your slippage setting since the quote, so the swap was not sent. Get a new quote and try again.");
+  }
+  return min;
 }
 
 // signer: ethers.Wallet connected to the network provider
-async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, slippageBps = 100, recipient, deadlineSeconds = 600 }) {
+async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, slippageBps = 100, quotedAmountOutWei, recipient, deadlineSeconds = 600 }) {
   assertSwapSupported(network);
   const router = new ethers.Contract(network.swapRouter, ROUTER_ABI, signer);
   const path = buildPath(network, tokenIn, tokenOut);
   const amounts = await router.getAmountsOut(amountInWei, path);
   const amountOutWei = amounts[amounts.length - 1];
-  const amountOutMin = applySlippage(amountOutWei, slippageBps);
+  const amountOutMin = resolveAmountOutMin({ freshAmountOutWei: amountOutWei, quotedAmountOutWei, slippageBps });
   const deadline = Math.floor(Date.now() / 1000) + deadlineSeconds;
   const to = recipient || (await signer.getAddress());
 
@@ -194,6 +226,8 @@ if (typeof self !== "undefined") {
     sendApprove,
     executeSwap,
     applySlippage,
+    normalizeSlippageBps,
+    resolveAmountOutMin,
     tryAggregatorQuote,
     executeAggregatorSwap,
     ERC20_ABI,

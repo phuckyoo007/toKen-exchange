@@ -1418,6 +1418,7 @@ $("btn-swap-quote").addEventListener("click", async () => {
     $("swap-quote-display").dataset.tokenOut = tokenOut;
     $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
     $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
+    $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei;
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
@@ -1497,7 +1498,7 @@ $("btn-swap-execute").addEventListener("click", async () => {
 
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
-    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
+    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps, quotedAmountOutWei: ds.amountOutWei });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
     await refreshBalance();
   } catch (e) {

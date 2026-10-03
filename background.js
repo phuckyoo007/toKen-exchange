@@ -43,7 +43,7 @@ const APPROVED_ORIGINS_KEY = "tm_approved_origins"; // { [origin]: string[] addr
 const pendingRequests = new Map(); // requestId -> { resolve, reject, type, payload, origin }
 
 function newRequestId() {
-  return "req_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return "req_" + crypto.randomUUID();
 }
 
 async function getApprovedOrigins() {
@@ -947,7 +947,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             tokenIn: msg.tokenIn,
             tokenOut: msg.tokenOut,
             amountInWei: netWei,
-            slippageBps: msg.slippageBps || 100,
+            slippageBps: TM_SWAP.normalizeSlippageBps(msg.slippageBps),
+            quotedAmountOutWei: msg.quotedAmountOutWei,
             recipient: meta.address,
           });
           sendResponse({
