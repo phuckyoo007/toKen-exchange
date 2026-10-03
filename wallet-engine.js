@@ -92,10 +92,14 @@ function swapRouteKey(network, tokenIn) {
 // saved transaction, since that calldata encodes an exact
 // tokenIn/tokenOut/amount. Anything less exact and we fall back to the
 // direct router path instead of risking a swap into the wrong asset.
-function aggregatorRouteMatches(route, network, tokenIn, tokenOut, netAmountInWei) {
+// The slippage tolerance is part of the match too: the saved calldata bakes in
+// the minimum output for the tolerance it was quoted with, so a route quoted at
+// 1% must never be broadcast after the user moved the selector to 0.5%.
+function aggregatorRouteMatches(route, network, tokenIn, tokenOut, netAmountInWei, slippageBps) {
   return !!(
     route &&
     route.kind === "aggregator" &&
+    route.slippageBps === slippageBps &&
     route.chainId === network.chainId &&
     route.tokenIn === (tokenIn || "native").toLowerCase() &&
     route.tokenOut === (tokenOut || "native").toLowerCase() &&
@@ -106,7 +110,8 @@ function aggregatorRouteMatches(route, network, tokenIn, tokenOut, netAmountInWe
 const pendingRequests = new Map(); // requestId -> { resolve, reject, type, payload, origin }
 
 function newRequestId() {
-  return "req_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // Unguessable ids: use the crypto RNG, never a seeded pseudo-random one.
+  return "req_" + crypto.randomUUID();
 }
 
 // ---- tracked (user-added) ERC-20 tokens, per chain ----
@@ -1180,6 +1185,7 @@ async function handleMessage(msg) {
           }
 
           case "TM_SWAP_QUOTE": {
+            const quoteSlippageBps = TM_SWAP.normalizeSlippageBps(msg.slippageBps);
             const network = await getActiveNetwork();
             const provider = await getProviderFor(network);
             const meta = await getSelectedAccountMeta();
@@ -1203,7 +1209,7 @@ async function handleMessage(msg) {
                   tokenOut: msg.tokenOut,
                   amountInWei: aggNetWei,
                   taker: meta.address,
-                  slippageBps: msg.slippageBps || 100,
+                  slippageBps: quoteSlippageBps,
                 })
               : null;
 
@@ -1215,6 +1221,7 @@ async function handleMessage(msg) {
                 tokenOut: (msg.tokenOut || "native").toLowerCase(),
                 netAmountInWei: aggNetWei.toString(),
                 kind: "aggregator",
+                slippageBps: quoteSlippageBps,
                 spender: aggQuote.allowanceTarget || network.swapRouter,
                 transaction: aggQuote.transaction,
                 amountOutWei: aggQuote.amountOutWei.toString(),
@@ -1383,6 +1390,7 @@ async function handleMessage(msg) {
           }
 
           case "TM_SWAP_EXECUTE": {
+            const execSlippageBps = TM_SWAP.normalizeSlippageBps(msg.slippageBps);
             requireUnlocked();
             const network = await getActiveNetwork();
             const meta = await getSelectedAccountMeta();
@@ -1399,10 +1407,25 @@ async function handleMessage(msg) {
             // the base rate. aggregatorRouteMatches() is just comparing
             // against what TM_SWAP_QUOTE already fetched and saved.
             const { feeWei: aggFeeWei, netWei: aggNetWei } = TM_FEE.computeFee(totalWei, { viaAggregator: true });
-            const useAggregator = aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, aggNetWei);
+            const useAggregator = aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, aggNetWei, execSlippageBps);
+            // Same pair and amount, but the tolerance changed after the quote:
+            // do not quietly fall back to a different route and fee than the
+            // one on screen. Ask for a fresh quote instead.
+            if (!useAggregator && aggregatorRouteMatches(lastSwapRoute, network, msg.tokenIn, msg.tokenOut, aggNetWei, lastSwapRoute && lastSwapRoute.slippageBps)) {
+              throw new Error("Slippage tolerance changed since the quote. Get a new quote and try again.");
+            }
             const { feeWei, netWei } = useAggregator
               ? { feeWei: aggFeeWei, netWei: aggNetWei }
               : TM_FEE.computeFee(totalWei, { viaAggregator: false });
+
+            // Router swaps: refuse BEFORE taking the fee if the price has
+            // already moved past the tolerance from the quote the user saw.
+            if (!useAggregator) {
+              await TM_SWAP.assertQuoteStillHolds({
+                network, provider: wallet.provider, tokenIn: msg.tokenIn, tokenOut: msg.tokenOut,
+                amountInWei: netWei, quotedAmountOutWei: msg.quotedAmountOutWei, slippageBps: execSlippageBps,
+              });
+            }
 
             let feeTxHash = null;
             if (feeWei.gt(0)) {
@@ -1457,7 +1480,10 @@ async function handleMessage(msg) {
               tokenIn: msg.tokenIn,
               tokenOut: msg.tokenOut,
               amountInWei: netWei,
-              slippageBps: msg.slippageBps || 100,
+              slippageBps: execSlippageBps,
+              // Only trust the shown quote for a plain router swap; if 0x was
+              // quoted but failed to broadcast, its number is not the router's.
+              quotedAmountOutWei: useAggregator ? undefined : msg.quotedAmountOutWei,
               recipient: meta.address,
             });
             sendResponse({

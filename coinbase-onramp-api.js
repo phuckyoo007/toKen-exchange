@@ -78,6 +78,7 @@ const { generateJwt } = require("@coinbase/cdp-sdk/auth");
 
 const { clientIp } = require("./client-ip");
 const { applyCors } = require("./cors");
+const { readBody: sharedReadBody } = require("./read-body");
 const COINBASE_CDP_API_KEY_ID = process.env.COINBASE_CDP_API_KEY_ID || "";
 const COINBASE_CDP_API_SECRET = process.env.COINBASE_CDP_API_SECRET || "";
 const ONRAMP_TOKEN_HOST = "api.developer.coinbase.com";
@@ -132,22 +133,9 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+// Request-body reading lives in ./read-body.js (shared by every API module).
 function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    let size = 0;
-    req.on("data", (chunk) => {
-      size += chunk.length;
-      if (size > 10000) {
-        reject(new Error("Request body too large."));
-        req.destroy();
-        return;
-      }
-      data += chunk;
-    });
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
+  return sharedReadBody(req, 10 * 1024);
 }
 
 // Every currently-mapped chain (see NETWORK_TO_COINBASE_BLOCKCHAIN) is EVM,
@@ -342,7 +330,7 @@ function handleCoinbaseOnrampApi(req, res) {
       }
     })
     .catch((e) => {
-      sendJson(res, 400, { error: (e && e.message) || "Bad request." });
+      sendJson(res, e && e.status === 413 ? 413 : 400, { error: (e && e.message) || "Bad request." });
     });
 
   return true;

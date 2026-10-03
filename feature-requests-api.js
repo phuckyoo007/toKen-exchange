@@ -14,6 +14,7 @@
 
 const fs = require("fs");
 const { clientIp } = require("./client-ip");
+const { readJson } = require("./read-body");
 const path = require("path");
 const crypto = require("crypto");
 
@@ -75,25 +76,9 @@ function sanitize(str, maxLen) {
 
 // clientIp() lives in ./client-ip.js (proxy-aware; ignores forged X-Forwarded-For).
 
+// Body reading lives in ./read-body.js. Callback style kept for the caller below.
 function readJsonBody(req, maxBytes, cb) {
-  let body = "";
-  let tooLarge = false;
-  req.on("data", (chunk) => {
-    body += chunk;
-    if (body.length > maxBytes) {
-      tooLarge = true;
-      req.destroy();
-    }
-  });
-  req.on("end", () => {
-    if (tooLarge) return cb(new Error("payload too large"));
-    try {
-      cb(null, body ? JSON.parse(body) : {});
-    } catch (e) {
-      cb(new Error("invalid JSON"));
-    }
-  });
-  req.on("error", (e) => cb(e));
+  readJson(req, { maxBytes }).then((data) => cb(null, data), (err) => cb(err));
 }
 
 function sendJson(res, status, obj) {
@@ -123,7 +108,7 @@ function handleFeatureRequestsApi(req, res) {
     }
     readJsonBody(req, 10 * 1024, (err, data) => {
       if (err) {
-        sendJson(res, 400, { error: err.message });
+        sendJson(res, err.status === 413 ? 413 : 400, { error: err.message });
         return;
       }
       const title = sanitize(data.title, MAX_TITLE_LEN);

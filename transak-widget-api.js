@@ -55,6 +55,7 @@
 
 const { clientIp } = require("./client-ip");
 const { applyCors } = require("./cors");
+const { readBody: sharedReadBody } = require("./read-body");
 const TRANSAK_API_KEY = process.env.TRANSAK_API_KEY || "";
 const TRANSAK_API_SECRET = process.env.TRANSAK_API_SECRET || "";
 const TRANSAK_ENVIRONMENT = (process.env.TRANSAK_ENVIRONMENT || "staging").toLowerCase() === "production" ? "production" : "staging";
@@ -181,19 +182,9 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+// Request-body reading lives in ./read-body.js (shared by every API module).
 function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-      if (data.length > 10000) {
-        reject(new Error("Request body too large."));
-        req.destroy();
-      }
-    });
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
+  return sharedReadBody(req, 10 * 1024);
 }
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -279,7 +270,7 @@ function handleTransakApi(req, res) {
         sendJson(res, 502, { error: (e && e.message) || "Could not reach Transak." });
       }
     })
-    .catch((e) => sendJson(res, 400, { error: (e && e.message) || "Bad request." }));
+    .catch((e) => sendJson(res, e && e.status === 413 ? 413 : 400, { error: (e && e.message) || "Bad request." }));
 
   return true;
 }

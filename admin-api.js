@@ -23,6 +23,7 @@
 const crypto = require("crypto");
 const { clientIp } = require("./client-ip");
 const { _test } = require("./auth-api");
+const { readJson } = require("./read-body");
 const db = _test.db;
 const persist = _test.persist;
 const resetLoginFailures = _test.resetLoginFailures;
@@ -69,18 +70,9 @@ function recordFailure(ip) {
   failures.set(ip, arr);
 }
 
+// Body reading lives in ./read-body.js. Admin callers treat any failure as an empty body.
 function readJsonBody(req, cb) {
-  let size = 0;
-  const chunks = [];
-  req.on("data", (c) => {
-    size += c.length;
-    if (size > 8 * 1024) { req.destroy(); return; }
-    chunks.push(c);
-  });
-  req.on("end", () => {
-    try { cb(null, JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}")); }
-    catch (e) { cb(e); }
-  });
+  readJson(req, { maxBytes: 8 * 1024 }).then((data) => cb(null, data), (err) => cb(err));
 }
 
 function activeSessionCounts() {

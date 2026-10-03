@@ -54,6 +54,10 @@ Forgetting one of these is how "works on my machine, broken on the site" happens
 
 Needs Node 22.13 or newer.
 
+`GET /healthz` returns `{"ok":true}` once the server is up (point Railway's health
+check at it). The server also shuts down cleanly on SIGTERM, and logs rather
+than crashes on an error in a single request.
+
 ## Configuration (environment variables)
 
 Set these as Railway variables. Nothing is required to boot; features whose

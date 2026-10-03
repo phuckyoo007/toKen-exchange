@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased -- audit follow-up
+
+- **Security (extension):** `wallet_switchEthereumChain` changed the active network with no
+  prompt, so any connected site could move the wallet to another chain. It now opens a
+  `switchNetwork` approval screen (origin, from, to), answers EIP-1193 4001 on reject, and
+  does not prompt when the wallet is already on that chain. New strings in all nine languages.
+- **Swap -- slippage:** `msg.slippageBps || 100` turned an explicit 0 into 1% and accepted any
+  value. `TM_SWAP.normalizeSlippageBps` now defaults only when the value is missing and
+  rejects anything but a whole number from 1 to 5000, in both the extension worker and the
+  website engine. The 0x route saved at quote time remembers its slippage and is only reused
+  for that same tolerance; if the user changed it after quoting, the swap asks for a fresh
+  quote instead of quietly switching route and fee.
+- **Swap -- the quote the user saw:** both UIs now send `quotedAmountOutWei` with
+  `TM_SWAP_EXECUTE`, and the router path derives its minimum output from it instead of from a
+  fresh quote taken just before sending. If the price has already fallen past the tolerance the
+  swap is refused **before the app fee is taken**. The website re-quotes when the slippage
+  selector changes; the popup hides the stale quote. The quote request now carries the chosen
+  slippage (it used to quote 0x at the default regardless of the selector).
+- **Request ids:** `newRequestId()` uses `crypto.randomUUID()` instead of `Math.random()`.
+- **Server:** `server.js` no longer dies on one bad request or rejected promise (logs, answers
+  500). A missing vendored library or a busy port now prints what to do. Adds `GET /healthz` and
+  a clean shutdown on SIGTERM.
+- **Server:** one shared body reader, `read-body.js`, replaces five copies. Sizes are counted in
+  bytes and an oversized body gets a real 413 instead of a dropped connection. Per-endpoint caps
+  are unchanged (10 KB Transak/Coinbase, 16 KB feature requests, 8 KB admin, 96 KB auth).
+- **Translations:** every non-English file now defines the same 422 strings as `en.js` (each was
+  missing 187 and carried 37 unused ones). The new strings are machine translations -- have a
+  native speaker review them, especially the send-delay and auto-lock hints and the new
+  "Trending Coins" wording. Removed the unused `account.*`, `onboarding.siteNotice*` and
+  `buy.description2Html` strings.
+- **Bug fix (English):** `en.js` lacked `swap.getQuoteBtn`, `swap.netAmountLine` and
+  `swap.estimatedOutLine` (used by the extension), the `findNfts.*` / `main.findNftsBtn` strings
+  and `swap.flipBtnTitle` (used by the website), so English users saw raw key names. Added in
+  all nine languages.
+- **Bug fix (swap fee row):** the website and the extension shared `swap.appFeeLine` with
+  different placeholders. The website row now uses `swap.appFeeValue`; `swap.appFeeLine` is the
+  extension's "App fee ({percent}): {amount}".
+- **Tests:** `tests/slippage.test.js` (validation, shown-quote minimum, refuse-before-fee, against
+  a fake chain), `tests/read-body.test.js`, `tests/i18n.test.js` (keys, FAQ ids, `{placeholders}`
+  and "every key the pages ask for exists in English"). 143 tests pass.
+- **Repo:** removed the nested deploy zip, eleven README-*/notes files, the duplicate store
+  listing and `DELETE-AND-MOVE.txt`; store screenshots live outside the repo; added `.gitignore`
+  and a GitHub Actions workflow. `sw.js` cache bumped to v9. `accounts-api.js` is untouched
+  (the README still documents it as optional and not wired in).
+
 ## 2026-09-28 — second-pass audit
 
 - **Admin console wired in:** `admin-api.js` and `admin.html` existed but

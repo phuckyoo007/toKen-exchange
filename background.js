@@ -43,7 +43,8 @@ const APPROVED_ORIGINS_KEY = "tm_approved_origins"; // { [origin]: string[] addr
 const pendingRequests = new Map(); // requestId -> { resolve, reject, type, payload, origin }
 
 function newRequestId() {
-  return "req_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // Unguessable ids: use the crypto RNG, never a seeded pseudo-random one.
+  return "req_" + crypto.randomUUID();
 }
 
 async function getApprovedOrigins() {
@@ -357,6 +358,20 @@ async function handleDappRequest(method, params, origin) {
       if (!found) {
         const err = new Error("Unrecognized chain ID. Try adding the chain using wallet_addEthereumChain first.");
         err.code = 4902;
+        throw err;
+      }
+      // Already on that chain: nothing to change, nothing to ask.
+      if (found.chainId === network.chainId) return null;
+      // A site must not be able to move the wallet to another network silently
+      // (the user could then sign what they think is a different chain's tx).
+      const approved = await openApprovalPopup(
+          "switchNetwork",
+          { origin, from: network.name, to: found.name, chainId: found.chainId },
+          origin
+      );
+      if (!approved) {
+        const err = new Error("User rejected the request.");
+        err.code = 4001;
         throw err;
       }
       await TM_NETWORKS.setSelectedNetwork(targetId);
@@ -950,6 +965,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // its own transfer, wait for it to confirm (so nonces stay in
           // order and we never swap before the fee is actually paid), then
           // swap only the remainder through the router.
+          const slippageBps = TM_SWAP.normalizeSlippageBps(msg.slippageBps);
           requireUnlocked();
           const network = await getActiveNetwork();
           const meta = await getSelectedAccountMeta();
@@ -958,6 +974,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
           const totalWei = ethers.BigNumber.from(msg.amountInWei);
           const { feeWei, netWei } = TM_FEE.computeFee(totalWei);
+
+          // Refuse BEFORE taking the fee if the price already moved past the
+          // tolerance from the quote the user saw.
+          await TM_SWAP.assertQuoteStillHolds({
+            network, provider: wallet.provider, tokenIn: msg.tokenIn, tokenOut: msg.tokenOut,
+            amountInWei: netWei, quotedAmountOutWei: msg.quotedAmountOutWei, slippageBps,
+          });
 
           let feeTxHash = null;
           if (feeWei.gt(0)) {
@@ -983,7 +1006,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             tokenIn: msg.tokenIn,
             tokenOut: msg.tokenOut,
             amountInWei: netWei,
-            slippageBps: msg.slippageBps || 100,
+            slippageBps,
+            quotedAmountOutWei: msg.quotedAmountOutWei,
             recipient: meta.address,
           });
           sendResponse({

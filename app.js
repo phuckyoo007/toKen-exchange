@@ -2818,7 +2818,13 @@ function renderSwapMinReceived() {
   $("swap-min-received-line").textContent =
     `${ethers.utils.formatUnits(minWei, Number(ds.decimalsOut) || 18)} ${symbolOut}`;
 }
-$("swap-slippage").addEventListener("change", renderSwapMinReceived);
+// The tolerance is baked into the quote (0x calldata carries its own minimum
+// output), so changing it makes the shown quote invalid: drop it and ask for a
+// fresh one at the new tolerance.
+$("swap-slippage").addEventListener("change", () => {
+  clearSwapQuote();
+  scheduleSwapAutoQuote();
+});
 
 let swapAutoQuoteGen = 0;
 let swapAutoQuoteTimer = null;
@@ -2851,7 +2857,7 @@ async function runSwapAutoQuote() {
     // off the top of this before anything is swapped (see TM_SWAP_QUOTE in
     // background.js / lib/fee-config.js).
     const totalAmountInWei = ethers.utils.parseUnits(amountStr, decimalsIn);
-    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
+    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString(), slippageBps: Number($("swap-slippage").value) });
     if (myGen !== swapAutoQuoteGen) return; // superseded by a newer edit
 
     let decimalsOut = 18, symbolOut = (currentNetwork.nativeCurrency && currentNetwork.nativeCurrency.symbol) || "";
@@ -2867,7 +2873,7 @@ async function runSwapAutoQuote() {
 
     const rate = amountNum > 0 ? Number(amountOutStr) / amountNum : 0;
     $("swap-rate-line").textContent = `1 ${symbolIn} \u2248 ${rate.toLocaleString(undefined, { maximumSignificantDigits: 4, maximumFractionDigits: 12 })} ${symbolOut}`;
-    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeLine", {
+    $("swap-fee-line").textContent = TM_I18N.t("swap.appFeeValue", {
       percent: quote.feePercentLabel,
       amount: ethers.utils.formatUnits(quote.feeWei, decimalsIn),
       symbol: symbolIn,
@@ -2991,7 +2997,7 @@ $("btn-swap-execute").addEventListener("click", async () => {
 
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
-    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
+    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps, quotedAmountOutWei: ds.amountOutWei });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
     $("swap-amount-in").value = "";
     clearSwapQuote();

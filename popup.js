@@ -1450,6 +1450,12 @@ function setupSwapScreen(pre) {
   if (!unsupported) populateSwapSelects(pre || {}).catch(() => {});
 }
 
+// A quote is only valid for the tolerance it was taken at; changing it hides the
+// shown quote so the user has to request a fresh one.
+$("swap-slippage").addEventListener("change", () => {
+  $("swap-quote-display").classList.add("hidden");
+});
+
 $("btn-swap-quote").addEventListener("click", async () => {
   hideError("swap-error");
   try {
@@ -1465,7 +1471,7 @@ $("btn-swap-quote").addEventListener("click", async () => {
     // off the top of this before anything is swapped (see TM_SWAP_QUOTE in
     // background.js / lib/fee-config.js).
     const totalAmountInWei = ethers.utils.parseUnits(amountStr || "0", decimalsIn);
-    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString() });
+    const quote = await sendMsg("TM_SWAP_QUOTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei.toString(), slippageBps: Number($("swap-slippage").value) });
 
     let decimalsOut = 18;
     if (tokenOut !== TM_NATIVE()) {
@@ -1486,6 +1492,9 @@ $("btn-swap-quote").addEventListener("click", async () => {
     $("swap-quote-display").dataset.tokenOut = tokenOut;
     $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
     $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
+    // The output the user is being shown; sent back with the swap so the
+    // minimum accepted amount is based on it (see TM_SWAP_EXECUTE).
+    $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei.toString();
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
@@ -1565,7 +1574,7 @@ $("btn-swap-execute").addEventListener("click", async () => {
 
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
-    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
+    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps, quotedAmountOutWei: ds.amountOutWei });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
     await refreshBalance();
   } catch (e) {
@@ -1649,6 +1658,15 @@ async function renderApproval(requestId, pending) {
     showScreen("screen-approve-sign");
     $("btn-approve-sign-accept").onclick = () => respondApproval(requestId, true, true);
     $("btn-approve-sign-reject").onclick = () => respondApproval(requestId, false, null, "User rejected signature.");
+  } else if (type === "switchNetwork") {
+    $("approve-switchnet-text").innerHTML = TM_I18N.t("approve.switchNetText", {
+      origin: `<span class="mono">${escapeHtml(payload.origin)}</span>`,
+      from: `<strong>${escapeHtml(payload.from)}</strong>`,
+      to: `<strong>${escapeHtml(payload.to)}</strong>`,
+    });
+    showScreen("screen-approve-switchnetwork");
+    $("btn-approve-switchnet-accept").onclick = () => respondApproval(requestId, true, true);
+    $("btn-approve-switchnet-reject").onclick = () => respondApproval(requestId, false, null, "User rejected switching network.");
   } else if (type === "addNetwork") {
     $("approve-addnet-origin").textContent = payload.origin;
     $("approve-addnet-details").innerHTML = `

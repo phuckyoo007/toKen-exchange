@@ -71,20 +71,61 @@ async function sendApprove({ signer, tokenAddress, spender, amountWei }) {
   return tx; // caller awaits tx.wait() if it wants confirmation
 }
 
+// Slippage tolerance arrives from the UI as basis points (100 = 1%). Missing
+// means "use the default"; anything else must be a whole number from 1 to
+// 5000. This used to be `msg.slippageBps || 100`, which silently turned an
+// explicit 0 (or any falsy value) into 1% and never rejected a nonsense
+// value such as -500 or 90000.
+const DEFAULT_SLIPPAGE_BPS = 100;
+const MAX_SLIPPAGE_BPS = 5000;
+function normalizeSlippageBps(raw) {
+  if (raw === undefined || raw === null || raw === "") return DEFAULT_SLIPPAGE_BPS;
+  // Only numbers and plain decimal strings count; booleans, arrays, "0x10",
+  // "1e2" and the like are rejected rather than coerced.
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && /^\d+$/.test(raw.trim()) ? Number(raw) : NaN;
+  if (!Number.isInteger(n) || n < 1 || n > MAX_SLIPPAGE_BPS) {
+    throw new Error("Slippage tolerance must be a whole number of basis points from 1 to " + MAX_SLIPPAGE_BPS + ".");
+  }
+  return n;
+}
+
 // Applies slippage tolerance (basis points, e.g. 100 = 1%) to a quoted output.
 function applySlippage(amountOutWei, slippageBps) {
   const bn = ethers.BigNumber.from(amountOutWei);
   return bn.mul(10000 - slippageBps).div(10000);
 }
 
-// signer: ethers.Wallet connected to the network provider
-async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, slippageBps = 100, recipient, deadlineSeconds = 600 }) {
+const PRICE_MOVED_MESSAGE = "The price moved more than your slippage tolerance since the quote. Nothing was swapped -- get a new quote and try again.";
+
+// Checks, BEFORE anything is paid or sent, that the router would still give
+// at least `shown quote - slippage`. Callers run this before taking the app
+// fee so a swap that is going to be refused never costs the user a fee.
+async function assertQuoteStillHolds({ network, provider, tokenIn, tokenOut, amountInWei, quotedAmountOutWei, slippageBps }) {
+  if (quotedAmountOutWei === undefined || quotedAmountOutWei === null) return;
+  assertSwapSupported(network);
+  const router = new ethers.Contract(network.swapRouter, ROUTER_ABI, provider);
+  const amounts = await router.getAmountsOut(amountInWei, buildPath(network, tokenIn, tokenOut));
+  const freshOut = amounts[amounts.length - 1];
+  if (freshOut.lt(applySlippage(quotedAmountOutWei, normalizeSlippageBps(slippageBps)))) {
+    throw new Error(PRICE_MOVED_MESSAGE);
+  }
+}
+
+// signer: ethers.Wallet connected to the network provider.
+// quotedAmountOutWei (optional): the output the user was SHOWN. When given, the
+// minimum accepted output is derived from it, not from a fresh quote taken a
+// moment before sending -- otherwise the tolerance quietly re-bases on
+// whatever the price has become, and the user can receive less than the
+// screen promised.
+async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, slippageBps = DEFAULT_SLIPPAGE_BPS, quotedAmountOutWei, recipient, deadlineSeconds = 600 }) {
   assertSwapSupported(network);
   const router = new ethers.Contract(network.swapRouter, ROUTER_ABI, signer);
   const path = buildPath(network, tokenIn, tokenOut);
   const amounts = await router.getAmountsOut(amountInWei, path);
   const amountOutWei = amounts[amounts.length - 1];
-  const amountOutMin = applySlippage(amountOutWei, slippageBps);
+  const hasShownQuote = quotedAmountOutWei !== undefined && quotedAmountOutWei !== null;
+  const amountOutMin = applySlippage(hasShownQuote ? quotedAmountOutWei : amountOutWei, normalizeSlippageBps(slippageBps));
+  if (amountOutWei.lt(amountOutMin)) throw new Error(PRICE_MOVED_MESSAGE);
   const deadline = Math.floor(Date.now() / 1000) + deadlineSeconds;
   const to = recipient || (await signer.getAddress());
 
@@ -124,7 +165,7 @@ async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, sl
 // for at all.
 const SWAP_QUOTE_ENDPOINT = "https://web-wallet-production.up.railway.app/api/swap-quote";
 
-async function tryAggregatorQuote({ network, tokenIn, tokenOut, amountInWei, taker, slippageBps }) {
+async function tryAggregatorQuote({ network, tokenIn, tokenOut, amountInWei, taker, slippageBps = DEFAULT_SLIPPAGE_BPS }) {
   try {
     if (!network || !network.chainId || !taker) return null;
     const sellToken = isNative(tokenIn) ? NATIVE_PSEUDO_ADDRESS : tokenIn;
@@ -135,7 +176,7 @@ async function tryAggregatorQuote({ network, tokenIn, tokenOut, amountInWei, tak
       buyToken,
       sellAmount: amountInWei.toString(),
       taker,
-      slippageBps: String(slippageBps || 100),
+      slippageBps: String(slippageBps),
     });
     let res;
     try {
@@ -194,6 +235,8 @@ if (typeof self !== "undefined") {
     sendApprove,
     executeSwap,
     applySlippage,
+    normalizeSlippageBps,
+    assertQuoteStillHolds,
     tryAggregatorQuote,
     executeAggregatorSwap,
     ERC20_ABI,

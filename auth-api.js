@@ -32,6 +32,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { clientIp } = require("./client-ip");
+const { readJson } = require("./read-body");
 
 const IS_PROD =
   process.env.NODE_ENV === "production" ||
@@ -155,34 +156,9 @@ function sendJson(req, res, status, obj, extraHeaders) {
   res.end(body);
 }
 
+// Body reading lives in ./read-body.js (errors carry .status: 413, 415 or 400).
 function readJsonBody(req, cb) {
-  const ct = String(req.headers["content-type"] || "");
-  if (!/^application\/json\b/i.test(ct)) return cb(Object.assign(new Error("Content-Type must be application/json."), { status: 415 }));
-  let size = 0;
-  const chunks = [];
-  let aborted = false;
-  req.on("data", (c) => {
-    if (aborted) return;
-    size += c.length;
-    if (size > MAX_BODY_BYTES) {
-      aborted = true;
-      cb(Object.assign(new Error("Request too large."), { status: 413 }));
-      req.destroy();
-      return;
-    }
-    chunks.push(c);
-  });
-  req.on("end", () => {
-    if (aborted) return;
-    try {
-      const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("bad");
-      cb(null, parsed);
-    } catch (e) {
-      cb(Object.assign(new Error("Invalid JSON."), { status: 400 }));
-    }
-  });
-  req.on("error", (e) => { if (!aborted) cb(e); });
+  readJson(req, { maxBytes: MAX_BODY_BYTES, requireJsonContentType: true }).then((data) => cb(null, data), (err) => cb(err));
 }
 
 function parseCookies(req) {

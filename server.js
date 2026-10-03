@@ -64,34 +64,93 @@ console.log("Laid out public/ from flat repo root files.");
 }
 
 function copyVendorFiles() {
-const ethersUmd = require.resolve("ethers/dist/ethers.umd.min.js");
-fs.copyFileSync(ethersUmd, path.join(VENDOR_DIR, "ethers.umd.min.js"));
+  // Each vendored library is copied out of node_modules. If one is missing the
+  // site cannot work, so fail with a message that says what to do instead of a
+  // raw stack trace.
+  const vendored = [
+    ["ethers", () => require.resolve("ethers/dist/ethers.umd.min.js"), "ethers.umd.min.js"],
+    ["@walletconnect/sign-client", () => path.join(path.dirname(require.resolve("@walletconnect/sign-client")), "index.umd.js"), "walletconnect-sign-client.umd.js"],
+    ["qrcode-generator", () => require.resolve("qrcode-generator"), "qrcode-generator.js"],
+  ];
+  for (const [pkg, resolveSrc, destName] of vendored) {
+    try {
+      fs.copyFileSync(resolveSrc(), path.join(VENDOR_DIR, destName));
+    } catch (e) {
+      throw new Error("Could not copy the vendored library from '" + pkg + "' (" + e.message + "). Run `npm install` and try again.");
+    }
+  }
+  console.log("Vendor files copied into", VENDOR_DIR);
+}
 
-const wcMain = require.resolve("@walletconnect/sign-client");
-const wcUmd = path.join(path.dirname(wcMain), "index.umd.js");
-fs.copyFileSync(wcUmd, path.join(VENDOR_DIR, "walletconnect-sign-client.umd.js"));
+// Sends a request to the API modules, then to the static file handler. Its own
+// function so one failing handler is caught in a single place (see main()).
+function routeRequest(req, res) {
+  applySecurityHeaders(req, res);
+  const pathname = String(req.url || "").split("?")[0];
+  if (pathname === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(req.method === "HEAD" ? undefined : JSON.stringify({ ok: true }));
+    return;
+  }
+  if (handleFeatureRequestsApi(req, res)) return;
+  if (handleSwapQuoteApi(req, res)) return;
+  if (handleAuthApi(req, res)) return;
+  if (handleCoinbaseOnrampApi(req, res)) return;
+  if (handleTransakApi(req, res)) return;
+  if (handleNftApi(req, res)) return;
+  if (handleAdminApi(req, res)) return;
+  return handler(req, res, { public: PUBLIC_DIR });
+}
 
-const qr = require.resolve("qrcode-generator");
-fs.copyFileSync(qr, path.join(VENDOR_DIR, "qrcode-generator.js"));
-
-console.log("Vendor files copied into", VENDOR_DIR);
+function failRequest(res, err) {
+  console.error("Unhandled request error:", err && err.stack ? err.stack : err);
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+  res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify({ error: "Internal server error." }));
 }
 
 function main() {
-layoutPublicDir();
-copyVendorFiles();
-const server = http.createServer((req, res) => {
-applySecurityHeaders(req, res);
-if (handleFeatureRequestsApi(req, res)) return;
-if (handleSwapQuoteApi(req, res)) return;
-if (handleAuthApi(req, res)) return;
-if (handleCoinbaseOnrampApi(req, res)) return;
-if (handleTransakApi(req, res)) return;
-if (handleNftApi(req, res)) return;
-if (handleAdminApi(req, res)) return;
-handler(req, res, { public: PUBLIC_DIR });
-});
-server.listen(PORT, () => console.log("Serving on port " + PORT));
+  layoutPublicDir();
+  copyVendorFiles();
+  const server = http.createServer((req, res) => {
+    try {
+      // serve-handler returns a promise; catch its rejections too.
+      const maybePromise = routeRequest(req, res);
+      if (maybePromise && typeof maybePromise.catch === "function") maybePromise.catch((e) => failRequest(res, e));
+    } catch (e) {
+      failRequest(res, e);
+    }
+  });
+  server.on("clientError", (err, socket) => {
+    if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+  });
+  server.on("error", (err) => {
+    if (err && err.code === "EADDRINUSE") console.error("Port " + PORT + " is already in use. Set a different PORT or stop the other process.");
+    else console.error("Server error:", err);
+    process.exit(1);
+  });
+  server.listen(PORT, () => console.log("Serving on port " + PORT));
+
+  // Finish in-flight requests on a deploy restart instead of cutting them off.
+  const shutdown = (signal) => {
+    console.log(signal + " received, shutting down.");
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 10000).unref();
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
-main();
+// A bug in one request must not take the whole wallet site down.
+process.on("unhandledRejection", (reason) => console.error("Unhandled promise rejection:", reason));
+process.on("uncaughtException", (err) => console.error("Uncaught exception:", err && err.stack ? err.stack : err));
+
+try {
+  main();
+} catch (e) {
+  console.error("Startup failed:", e && e.message ? e.message : e);
+  process.exit(1);
+}
