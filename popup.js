@@ -735,6 +735,57 @@ async function switchNetworkFromPicker(n, side) {
   }
 }
 
+// Top-by-market-cap tokens on this network (25) when the search box is empty,
+// or a name / symbol / contract-address search when something is typed --
+// including tokens the person doesn't hold yet. Buy ("To") side only. Rows
+// are appended after the held assets once CoinGecko answers (lib/token-catalog.js).
+let pickerCatalogGen = 0;
+async function appendCatalogRows(side, query, list, items, sugg) {
+  const gen = ++pickerCatalogGen;
+  if (side !== "to" || pickerShowFavs || typeof TM_CATALOG === "undefined" || !currentNetwork || !TM_CATALOG.supports(currentNetwork.key)) return;
+  if (query && query.length < 2) return;
+  const status = document.createElement("p");
+  status.className = "hint";
+  status.textContent = TM_I18N.t("swap.pickerLoadingTokens");
+  list.appendChild(status);
+  let rows = [];
+  try {
+    if (query) await new Promise((r) => setTimeout(r, 350)); // wait for typing to pause
+    if (gen !== pickerCatalogGen) return;
+    rows = query ? await TM_CATALOG.search(currentNetwork.key, query, 15) : await TM_CATALOG.top(currentNetwork.key, 25);
+  } catch (e) { rows = []; }
+  if (gen !== pickerCatalogGen) return;
+  status.remove();
+  const skip = new Set(
+    items.map((a) => String(a.address || "").toLowerCase())
+      .concat(sugg.map((t) => t.address.toLowerCase()), [String($("swap-from-select").value === "custom" ? $("swap-from-custom").value.trim() : $("swap-from-select").value).toLowerCase()])
+  );
+  rows = rows.filter((t) => !skip.has(t.address.toLowerCase()));
+  if (!rows.length) return;
+  const nomatch = list.querySelector(".picker-nomatch");
+  if (nomatch) nomatch.remove();
+  const h = document.createElement("p");
+  h.className = "hint";
+  h.textContent = TM_I18N.t(query ? "swap.pickerSearchResults" : "swap.pickerTopTokens");
+  list.appendChild(h);
+  rows.forEach((t) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "asset-picker-row";
+    row.innerHTML = tokenIconHtml(t.symbol) +
+      `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(t.symbol)}</span>` +
+      `<span class="asset-picker-row-sub">${escapeHtml(t.name)}${t.rank ? ` · #${escapeHtml(String(t.rank))}` : ""}</span></span>`;
+    row.addEventListener("click", () => {
+      $("swap-to-select").value = "custom";
+      syncSwapAsset("to");
+      $("swap-to-custom").value = t.address;
+      renderSwapPill("to");
+      closeAssetPicker();
+    });
+    list.appendChild(row);
+  });
+}
+
 function renderAssetPicker(side) {
   renderPickerChips(side);
   const list = $("swap-picker-list");
@@ -753,7 +804,7 @@ function renderAssetPicker(side) {
   let items = swapHeldAssets.filter((a) => a.key !== otherKey);
   if (side === "from") items = items.filter((a) => Number(a.balance) > 0);
   if (pickerShowFavs) items = items.filter((a) => pickerFavs.has(pickerFavId(a)));
-  if (q) items = items.filter((a) => String(a.symbol || "").toLowerCase().includes(q) || String(a.address || "").toLowerCase().includes(q));
+  if (q) items = items.filter((a) => String(a.symbol || "").toLowerCase().includes(q) || String(a.name || "").toLowerCase().includes(q) || String(a.address || "").toLowerCase().includes(q));
 
   const pick = (a) => {
     const selEl = $(`swap-${side}-select`);
@@ -785,7 +836,7 @@ function renderAssetPicker(side) {
     : [];
   if (!items.length && !sugg.length && !list.children.length) {
     const p = document.createElement("p");
-    p.className = "hint";
+    p.className = "hint picker-nomatch";
     p.textContent = TM_I18N.t(q ? "swap.pickerNoMatch" : (pickerShowFavs ? "swap.pickerNoFavs" : "swap.noAssetsHint"));
     list.appendChild(p);
   }
@@ -843,6 +894,7 @@ function renderAssetPicker(side) {
       list.appendChild(row);
     });
   }
+  appendCatalogRows(side, query, list, items, sugg);
   fillPickerPrices(items, list);
 }
 
@@ -1136,30 +1188,26 @@ async function refreshMainPricesCard() {
 }
 
 // ---------------------------------------------------------------- PREDICTIONS
-// Read-only display of trending Polymarket markets (see lib/polymarket.js).
-// This wallet never places a bet or holds a position -- it only shows the
-// public odds, the same way MetaMask's Portfolio surfaces them.
-function formatMarketVolume(v) {
-  if (!v) return null;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
-  return `$${Math.round(v)}`;
-}
-
-function renderMarketRow(m) {
+// Read-only display of coins trending on CoinGecko (see lib/token-catalog.js).
+// Informational only -- tapping a row opens that coin's CoinGecko page.
+function renderTrendingRow(c) {
   const row = document.createElement("div");
-  row.className = "market-row";
-  let metaHtml = "";
-  if (m.leadPct != null && m.leadName) {
-    const cls = m.leadPct >= 50 ? "up" : "down";
-    metaHtml += `<span class="market-pct ${cls}">${escapeHtml(m.leadName)} ${escapeHtml(m.leadPct)}%</span>`;
+  row.className = "price-row";
+  const priceText =
+    c.price == null
+      ? TM_I18N.t("prices.naText")
+      : TM_PRICES.formatMoney(c.price, currentCurrency, { price: true });
+  let changeHtml = "";
+  if (typeof c.change24h === "number") {
+    const cls = c.change24h >= 0 ? "up" : "down";
+    const sign = c.change24h >= 0 ? "+" : "";
+    changeHtml = `<span class="price-change ${cls}">${sign}${c.change24h.toFixed(2)}%</span>`;
   }
-  const volText = formatMarketVolume(m.volume24hr);
-  if (volText) metaHtml += `<span class="market-volume">${escapeHtml(volText)} ${TM_I18N.t("predictions.volSuffix")}</span>`;
-  row.innerHTML = `
-    <span class="market-question">${escapeHtml(m.question)}</span>
-    <span class="market-meta">${metaHtml}</span>
-  `;
+  const linkLabel = escapeHtml(TM_I18N.t("prices.viewCoin", { name: c.name }));
+  row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${escapeHtml(c.symbol)}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>`;
+  row.querySelector(".price-link").addEventListener("click", () => {
+    window.open(c.url, "_blank", "noopener,noreferrer");
+  });
   return row;
 }
 
@@ -1168,7 +1216,7 @@ async function refreshPredictions() {
   $("predictions-status").innerHTML = coinSpinnerHtml(TM_I18N.t("predictions.loading"));
   $("predictions-status").classList.remove("hidden");
   try {
-    const markets = await TM_POLYMARKET.getTrendingMarkets(12);
+    const markets = await TM_CATALOG.getTrendingCoins(12, currentCurrency);
     const list = $("predictions-list");
     list.innerHTML = "";
     if (!markets.length) {
@@ -1177,7 +1225,7 @@ async function refreshPredictions() {
       p.textContent = TM_I18N.t("predictions.empty");
       list.appendChild(p);
     } else {
-      markets.forEach((m) => list.appendChild(renderMarketRow(m)));
+      markets.forEach((m) => list.appendChild(renderTrendingRow(m)));
     }
     $("predictions-status").classList.add("hidden");
   } catch (e) {
@@ -1190,17 +1238,17 @@ const MAIN_PREDICTIONS_CARD_COUNT = 3;
 async function refreshMainPredictionsCard() {
   const list = $("predictions-card-list");
   if (!list) return;
-  list.innerHTML = `<div class="market-row skeleton">${coinSpinnerHtml(TM_I18N.t("predictions.loading"))}</div>`;
+  list.innerHTML = `<div class="price-row skeleton">${coinSpinnerHtml(TM_I18N.t("predictions.loading"))}</div>`;
   try {
-    const markets = await TM_POLYMARKET.getTrendingMarkets(MAIN_PREDICTIONS_CARD_COUNT);
+    const markets = await TM_CATALOG.getTrendingCoins(MAIN_PREDICTIONS_CARD_COUNT, currentCurrency);
     list.innerHTML = "";
     if (!markets.length) {
-      list.innerHTML = `<div class="market-row skeleton">${TM_I18N.t("predictions.empty")}</div>`;
+      list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("predictions.empty")}</div>`;
     } else {
-      markets.forEach((m) => list.appendChild(renderMarketRow(m)));
+      markets.forEach((m) => list.appendChild(renderTrendingRow(m)));
     }
   } catch (e) {
-    list.innerHTML = `<div class="market-row skeleton">${TM_I18N.t("predictions.cardUnavailable")}</div>`;
+    list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("predictions.cardUnavailable")}</div>`;
   }
 }
 
@@ -1418,7 +1466,6 @@ $("btn-swap-quote").addEventListener("click", async () => {
     $("swap-quote-display").dataset.tokenOut = tokenOut;
     $("swap-quote-display").dataset.totalAmountInWei = totalAmountInWei.toString();
     $("swap-quote-display").dataset.netAmountInWei = quote.netAmountInWei;
-    $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei;
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
@@ -1498,7 +1545,7 @@ $("btn-swap-execute").addEventListener("click", async () => {
 
     $("swap-status").textContent = TM_I18N.t("swap.sendingStatus");
     $("swap-status").classList.remove("hidden");
-    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps, quotedAmountOutWei: ds.amountOutWei });
+    const res = await sendMsg("TM_SWAP_EXECUTE", { tokenIn, tokenOut, amountInWei: totalAmountInWei, slippageBps });
     $("swap-status").textContent = TM_I18N.t("swap.swappedStatus", { feeTx: res.feeTxHash || TM_I18N.t("swap.feeTxNa"), tx: res.txHash });
     await refreshBalance();
   } catch (e) {
@@ -1582,15 +1629,6 @@ async function renderApproval(requestId, pending) {
     showScreen("screen-approve-sign");
     $("btn-approve-sign-accept").onclick = () => respondApproval(requestId, true, true);
     $("btn-approve-sign-reject").onclick = () => respondApproval(requestId, false, null, "User rejected signature.");
-  } else if (type === "switchNetwork") {
-    $("approve-switchnet-text").textContent = TM_I18N.t("approve.switchNetText", {
-      origin: payload.origin,
-      from: payload.fromName,
-      to: payload.toName,
-    });
-    showScreen("screen-approve-switchnetwork");
-    $("btn-approve-switchnet-accept").onclick = () => respondApproval(requestId, true, true);
-    $("btn-approve-switchnet-reject").onclick = () => respondApproval(requestId, false, null, "User rejected switching network.");
   } else if (type === "addNetwork") {
     $("approve-addnet-origin").textContent = payload.origin;
     $("approve-addnet-details").innerHTML = `

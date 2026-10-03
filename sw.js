@@ -39,6 +39,7 @@ const PRECACHE_URLS = [
   "/lib/identicon.js",
   "/lib/prices.js",
   "/lib/polymarket.js",
+  "/lib/token-catalog.js",
   "/lib/transak-config.js",
   "/lib/i18n.js",
   "/lib/support-config.js",
