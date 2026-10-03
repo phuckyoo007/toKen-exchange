@@ -1,6 +1,11 @@
 # Changelog
 ## Unreleased
 
+- **Security:** sites can no longer switch the wallet's network silently. The extension
+  opens an approval window ("X wants to switch from A to B"); rejecting returns EIP-1193
+  error 4001, and switching to the chain you are already on does not prompt. Strings added
+  in all nine languages; new `tests/switch-network.test.js`.
+
 - **Fee:** `computeFee` / `feePercentLabel` now honor `{ viaAggregator }`. Swaps routed
   through 0x are charged 0.65% (our 0.5% + 0x's ~0.15%); router swaps stay at 0.5%.
   Three new tests. (`wallet-engine.js` already passed the option; `fee-config.js`
@@ -73,8 +78,7 @@ meant for, but the content script never checked the tag, so connecting to site A
 sent your address to every open page. Pages now only receive events addressed
 to their own origin. `host_permissions` deliberately left as is: the background
 worker fetches custom RPCs, NFT metadata and APIs that rely on it to skip CORS.
-Noticed, not changed: `wallet_switchEthereumChain` switches the active network
-for any site without a confirmation prompt (MetaMask asks first).
+Fixed since: `wallet_switchEthereumChain` now asks first (see Unreleased).
 
 **6. `playwright` removed** (`package.json`, `package-lock.json`)
 Listed as a production dependency but used nowhere; it only slowed installs.
