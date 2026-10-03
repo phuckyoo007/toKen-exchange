@@ -2500,7 +2500,7 @@ function populateSendDelaySelect() {
 // wallet" button does. 5 minutes by default (matching MetaMask's own
 // out-of-the-box auto-lock timer), fully configurable in Settings.
 const TM_AUTO_LOCK_KEY = "tm_auto_lock_minutes";
-let currentAutoLockMinutes = 5;
+let currentAutoLockMinutes = 21; // default for anyone who has not picked a value
 let autoLockTimerId = null;
 let autoLockArmed = false; // only true once a real wallet session is unlocked
 let autoLockLastReset = 0;
@@ -2509,7 +2509,7 @@ function loadAutoLockMinutes() {
   return new Promise((resolve) => {
     chrome.storage.local.get([TM_AUTO_LOCK_KEY], (res) => {
       const stored = res[TM_AUTO_LOCK_KEY];
-      currentAutoLockMinutes = typeof stored === "number" ? stored : 5;
+      currentAutoLockMinutes = typeof stored === "number" ? stored : 21;
       resolve();
     });
   });

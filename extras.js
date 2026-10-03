@@ -237,7 +237,7 @@
     try { live = await TM_PRICES.getNativePriceForNetwork(net.key, cur); } catch (e) { /* offline */ }
     if (live == null) { toast(tr("settings.alertNoFeed", "No price feed is available for this network right now.")); return; }
     const list = loadAlerts();
-    list.push({ id: crypto.randomUUID(), net: net.key, sym: net.nativeCurrency.symbol, cur, dir: $id("alert-dir").value === "below" ? "below" : "above", price });
+    list.push({ id: Date.now() + Math.random().toString(36).slice(2, 6), net: net.key, sym: net.nativeCurrency.symbol, cur, dir: $id("alert-dir").value === "below" ? "below" : "above", price });
     saveAlerts(list);
     $id("alert-price").value = "";
     renderAlerts();

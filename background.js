@@ -43,7 +43,7 @@ const APPROVED_ORIGINS_KEY = "tm_approved_origins"; // { [origin]: string[] addr
 const pendingRequests = new Map(); // requestId -> { resolve, reject, type, payload, origin }
 
 function newRequestId() {
-  return "req_" + crypto.randomUUID();
+  return "req_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 async function getApprovedOrigins() {
@@ -60,6 +60,45 @@ async function setOriginApproved(origin, address) {
 async function isOriginApproved(origin) {
   const all = await getApprovedOrigins();
   return !!(all[origin] && all[origin].length);
+}
+
+// A page that has not been connected (eth_requestAccounts approved) must not be
+// able to ask for signatures, transactions or a network switch, and may only
+// use the account it was connected with. Without this, any site could pop
+// approval dialogs for ANY of the user's accounts, and its own text would be
+// what the user reads before approving. Error 4100 is EIP-1193 "Unauthorized".
+async function requireConnectedOrigin(origin, address) {
+  const all = await getApprovedOrigins();
+  const allowed = (all[origin] || []).map((a) => String(a).toLowerCase());
+  if (!allowed.length) {
+    const err = new Error("This site is not connected to your wallet. Connect first.");
+    err.code = 4100;
+    throw err;
+  }
+  if (address && !allowed.includes(String(address).toLowerCase())) {
+    const err = new Error("This site is not authorized to use that account.");
+    err.code = 4100;
+    throw err;
+  }
+}
+
+// Same check for a WalletConnect session: a paired dapp may only act on the
+// chains and the account approved at pairing time.
+function assertWcRequestAllowed(session, numericChainId, method, params) {
+  const fail = (msg) => { const e = new Error(msg); e.code = 4100; throw e; };
+  const accounts = (session && session.namespaces && session.namespaces.eip155 && session.namespaces.eip155.accounts) || [];
+  const approved = accounts.map((a) => String(a).split(":")).filter((p) => p.length === 3)
+    .map((p) => ({ chainId: parseInt(p[1], 10), address: p[2].toLowerCase() }));
+  if (!approved.some((a) => a.chainId === numericChainId)) fail("This dapp was not approved for that network.");
+  const p = Array.isArray(params) ? params : [];
+  let requested = null;
+  if (method === "eth_sendTransaction") requested = p[0] && p[0].from;
+  else if (method === "personal_sign") requested = p[1];
+  else if (method === "eth_signTypedData_v4") requested = p[0];
+  else return;
+  if (!requested || !approved.some((a) => a.address === String(requested).toLowerCase())) {
+    fail("This dapp is not authorized to use that account.");
+  }
 }
 
 // ---- tracked (user-added) ERC-20 tokens, per chain ----
@@ -310,6 +349,7 @@ async function handleDappRequest(method, params, origin) {
     }
 
     case "wallet_switchEthereumChain": {
+      await requireConnectedOrigin(origin);
       const hexId = params[0] && params[0].chainId;
       const targetId = parseInt(hexId, 16);
       const all = await TM_NETWORKS.getAllNetworks();
@@ -317,22 +357,6 @@ async function handleDappRequest(method, params, origin) {
       if (!found) {
         const err = new Error("Unrecognized chain ID. Try adding the chain using wallet_addEthereumChain first.");
         err.code = 4902;
-        throw err;
-      }
-      // Already on that chain: nothing to change, so nothing to ask.
-      if (found.chainId === network.chainId) return null;
-      // Switching changes which chain every later send, swap and balance uses,
-      // so a site must not do it silently. Rejecting makes this throw, which the
-      // dapp sees as EIP-1193 error 4001 (user rejected).
-      try {
-        await openApprovalPopup(
-          "switchNetwork",
-          { origin, chainId: targetId, fromName: network.name, toName: found.name },
-          origin
-        );
-      } catch (e) {
-        const err = new Error("User rejected the request to switch network.");
-        err.code = 4001;
         throw err;
       }
       await TM_NETWORKS.setSelectedNetwork(targetId);
@@ -357,10 +381,18 @@ async function handleDappRequest(method, params, origin) {
       return null;
     }
 
-    case "eth_sendTransaction":
-    case "personal_sign":
-    case "eth_signTypedData_v4":
+    case "eth_sendTransaction": {
+      await requireConnectedOrigin(origin, params[0] && params[0].from);
       return handleSigningMethod(method, params, network, origin);
+    }
+    case "personal_sign": {
+      await requireConnectedOrigin(origin, params[1]);
+      return handleSigningMethod(method, params, network, origin);
+    }
+    case "eth_signTypedData_v4": {
+      await requireConnectedOrigin(origin, params[0]);
+      return handleSigningMethod(method, params, network, origin);
+    }
 
     default:
       return rpcPassthrough(network, method, params);
@@ -414,6 +446,9 @@ async function handleSigningMethod(method, params, network, originLabel) {
   if (!meta) throw new Error("Unknown signing account.");
   const wallet = TM_WALLET.getSigningWallet(unlockedSecret, meta);
   const { domain, types, message } = typedData;
+  if (domain && domain.chainId != null && Number(domain.chainId) !== Number(network.chainId)) {
+    throw new Error("The signing request is for a different network than the one selected.");
+  }
   delete types.EIP712Domain;
   return wallet._signTypedData(domain, types, message);
 }
@@ -527,6 +562,7 @@ function wireWcEvents(client) {
       if (!network) throw new Error(`This wallet doesn't have network ${chainId} configured.`);
 
       const session = client.session.get(topic);
+      assertWcRequestAllowed(session, numericChainId, request.method, request.params);
       const peerMeta = (session && session.peer && session.peer.metadata) || {};
       const originLabel = `${peerMeta.name || "Unknown dapp"} (${peerMeta.url || "no URL given"})`;
 
@@ -947,8 +983,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             tokenIn: msg.tokenIn,
             tokenOut: msg.tokenOut,
             amountInWei: netWei,
-            slippageBps: TM_SWAP.normalizeSlippageBps(msg.slippageBps),
-            quotedAmountOutWei: msg.quotedAmountOutWei,
+            slippageBps: msg.slippageBps || 100,
             recipient: meta.address,
           });
           sendResponse({
