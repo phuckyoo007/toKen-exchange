@@ -154,7 +154,17 @@ function mountCubeNav() {
   if (!stageRoot) return;
   const faces = CUBE_FACE_ORDER.map((id) => ({ id, el: $(id) }));
   if (faces.some((f) => !f.el)) return;
-  cubeNav = window.CubeNav.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
+  // Nav style: "cube" (default) or "globe". Open the site with ?nav=globe or
+  // ?nav=cube to switch (remembered); the extension popup uses whatever was
+  // last saved, or set localStorage navStyle in the popup's dev tools.
+  let style = "cube";
+  try {
+    const q = new URLSearchParams(location.search).get("nav");
+    if (q === "globe" || q === "cube") localStorage.setItem("navStyle", q);
+    style = localStorage.getItem("navStyle") || "cube";
+  } catch (_) {}
+  const Impl = style === "globe" && window.GlobeNav ? window.GlobeNav : window.CubeNav;
+  cubeNav = Impl.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
   // The cube keeps every face permanently in the DOM (just rotated out of
   // view) so the 3D transform has something to show on every side -- so
   // these three stop being ".hidden"-toggled like a normal screen the
