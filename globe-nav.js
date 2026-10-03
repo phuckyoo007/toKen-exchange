@@ -21,7 +21,7 @@
     '.gn-globe{position:absolute;inset:0;transform-style:preserve-3d;transition:transform var(--cn-dur,700ms) cubic-bezier(.2,.8,.2,1)}',
     '.gn-globe.gn-live{transition:none}',
     '.gn-ring{position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;border:1px solid color-mix(in srgb,var(--gold-bright,#f5c542) 32%,transparent);box-shadow:0 0 10px color-mix(in srgb,var(--gold-bright,#f5c542) 14%,transparent)}',
-    '.gn-face{position:absolute;overflow:auto;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:18px;transition:filter var(--cn-dur,700ms)}',
+    '.gn-face{position:absolute;left:50%;top:50%;overflow:auto;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:18px;transition:filter var(--cn-dur,700ms)}',
     '.gn-face[data-active="false"]{filter:brightness(.5)}',
     '@media (prefers-reduced-motion:reduce){.gn-globe,.gn-face{transition:none}}'
   ].join('\n');
@@ -162,9 +162,9 @@
       if (!dragging) return;
       dragging = false;
       var moveFaces = (base - angle) / step;      // + = toward next page
-      var target = Math.round(moveFaces + (-vx * 120) / stage.clientWidth * 1.0);
-      if (target === 0 && Math.abs(vx) > 0.5) target = vx < 0 ? 1 : -1;
-      target = Math.max(-1, Math.min(1, target)); // never skip more than one page
+      var target = 0;
+      if (Math.abs(vx) > 0.3 && Math.abs(moveFaces) > 0.02) target = vx < 0 ? 1 : -1; // flick
+      else if (Math.abs(moveFaces) > 0.18) target = moveFaces > 0 ? 1 : -1;            // dragged far enough
       angle = base;                                // go() works from the settled angle
       var from = index;
       // reset visual angle to where finger left it, then animate to target
