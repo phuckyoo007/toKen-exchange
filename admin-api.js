@@ -21,6 +21,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { clientIp } = require("./client-ip");
 const { _test } = require("./auth-api");
 const db = _test.db;
 const persist = _test.persist;
@@ -199,7 +200,11 @@ function handleAdminApi(req, res) {
     return true;
   }
 
-  const ip = req.socket.remoteAddress || "unknown";
+  // clientIp() lives in ./client-ip.js (proxy-aware; ignores forged X-Forwarded-For) --
+  // same helper every other API in this directory uses, so the admin brute-force
+  // throttle keys on the real caller instead of Railway's proxy address (which
+  // would otherwise be shared by every request and throttle everyone together).
+  const ip = clientIp(req);
   if (tooManyFailures(ip)) {
     sendJson(res, 429, { error: "Too many failed admin attempts from this network. Try again later." });
     return true;

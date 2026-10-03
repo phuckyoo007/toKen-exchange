@@ -2,6 +2,25 @@
 
 ## 2026-09-28 — second-pass audit
 
+- **Admin console wired in:** `admin-api.js` and `admin.html` existed but
+  `server.js` never loaded them. Now `/admin.html` and `/admin.js` are served
+  and `/api/admin/*` is routed through `handleAdminApi`. `admin.html`'s
+  previously-inline `<script>` moved to `admin.js` -- the site's CSP
+  (`script-src 'self'`, no inline scripts) would otherwise have silently
+  broken the page. The brute-force throttle on bad tokens now keys on
+  `clientIp()` (same helper every other endpoint uses) instead of the raw
+  socket address, which behind Railway's proxy would have put every caller
+  in one shared bucket. Requires `ADMIN_TOKEN` (documented in README); without
+  it every admin route still answers 503, as before. 8 new tests
+  (`tests/admin-api.test.js`): auth required, wrong token refused, correct
+  token returns metadata only (no vault/bundle data), throttle behavior and
+  its IP-spoofing resistance, and that no inline script remains. Also
+  verified over real HTTP (a temporary local server): 401 unauthenticated,
+  200 with the right token, and the page loads under the live CSP header
+  with `admin.js` as an external file. `accounts-api.js` (a separate,
+  lower-stakes, optional website-accounts feature) is unrelated and still
+  not wired in; see README.
+
 - **Security (extension):** any website could request transactions, message
   signatures or `eth_signTypedData_v4`, for any account in the wallet, without
   ever being connected; `wallet_switchEthereumChain` changed the active network
