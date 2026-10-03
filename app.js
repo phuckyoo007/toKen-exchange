@@ -1330,6 +1330,7 @@ async function populateSwapSelects(pre) {
   if (!fromItems.length) fromItems = held.filter((a) => a.key === "native" && a.key !== toKey);
   swapState.fromKey = fromItems[0] ? fromItems[0].key : null;
   if (toKey && held.some((a) => a.key === toKey)) swapState.toKey = toKey;
+  else if (toKey && /^0x[0-9a-fA-F]{40}$/.test(toKey)) swapState.toKey = toKey; // a coin not held yet, picked by address
   else swapState.toKey = (held.find((a) => a.key !== swapState.fromKey) || held[0] || null)?.key || null;
   syncSwapAsset("from");
   syncSwapAsset("to");
@@ -1713,7 +1714,7 @@ async function openCoinDetail(c, fromScreen) {
 async function loadCoinInfo(gen) {
   const c = coinDetail.coin;
   try {
-    const d = await TM_PRICES.getCoinDetail(c.symbol, currentCurrency);
+    const d = await TM_PRICES.getCoinDetail(c.symbol, currentCurrency, c.cgId);
     if (gen !== coinDetail.gen) return;
     if (d.price != null) renderCoinPrice(d.price, d.change24h != null ? d.change24h : c.change24h);
     if (d.rank != null) {
@@ -1748,7 +1749,7 @@ async function loadCoinChart(gen) {
   box.innerHTML = `<div class="coin-chart-msg">${escapeHtml(TM_I18N.t("prices.loading"))}</div>`;
   $("coin-chart-readout").textContent = "";
   try {
-    const pts = await TM_PRICES.getCoinChart(c.symbol, currentCurrency, coinDetail.days);
+    const pts = await TM_PRICES.getCoinChart(c.symbol, currentCurrency, coinDetail.days, c.cgId);
     if (gen !== coinDetail.gen || token !== coinDetail.chartGen) return;
     drawCoinChart(pts);
   } catch (e) {
@@ -1848,6 +1849,23 @@ async function loadCoinSwapState(gen) {
   if (!currentNetwork.swapRouter) {
     $("btn-coin-switch-network").classList.add("hidden");
     showNote(TM_I18N.t("coin.swapNoRouter"));
+    return;
+  }
+  // Trending coins that aren't on the fixed price list: match by CONTRACT
+  // ADDRESS on this network (from CoinGecko's platform data), never by
+  // symbol -- a same-symbol look-alike must not stand in for the real coin.
+  if (c.cgId && TM_PRICES.COINGECKO_IDS[c.symbol] !== c.cgId) {
+    $("btn-coin-switch-network").classList.add("hidden");
+    let addr = null;
+    try { addr = await TM_CATALOG.addressFor(currentNetwork.key, c.cgId); } catch (e) { /* treated as unavailable */ }
+    if (gen !== coinDetail.gen) return;
+    if (!addr) {
+      showNote(TM_I18N.t("coin.swapUnavailableNetwork", { symbol: c.symbol, network: currentNetwork.name }));
+      return;
+    }
+    coinDetail.swapTarget = { key: addr, symbol: c.symbol, address: addr };
+    btn.disabled = false;
+    showNote(TM_I18N.t("coin.swapHint"));
     return;
   }
   const held = await getHeldAssets();
@@ -1970,7 +1988,7 @@ async function refreshMainPricesCard() {
 
 // ---------------------------------------------------------------- PREDICTIONS
 // Read-only display of coins trending on CoinGecko (see lib/token-catalog.js).
-// Informational only -- tapping a row opens that coin's CoinGecko page.
+// Tapping a row opens the in-app coin screen (chart, stats, Swap).
 function renderTrendingRow(c) {
   const row = document.createElement("div");
   row.className = "price-row";
@@ -1987,7 +2005,7 @@ function renderTrendingRow(c) {
   const linkLabel = escapeHtml(TM_I18N.t("prices.viewCoin", { name: c.name }));
   row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${escapeHtml(c.symbol)}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>`;
   row.querySelector(".price-link").addEventListener("click", () => {
-    window.open(c.url, "_blank", "noopener,noreferrer");
+    openCoinDetail(c, $("screen-predictions").classList.contains("hidden") ? "screen-main" : "screen-predictions");
   });
   return row;
 }

@@ -165,6 +165,14 @@ function mountCubeNav() {
   } catch (_) {}
   const Impl = style === "globe" && window.GlobeNav ? window.GlobeNav : window.CubeNav;
   cubeNav = Impl.mount(stageRoot, { faces, start: 0, duration: 650, bar: false });
+  const navSel = document.getElementById("nav-style-select");
+  if (navSel) {
+    navSel.value = style === "globe" && window.GlobeNav ? "globe" : "cube";
+    navSel.addEventListener("change", () => {
+      try { localStorage.setItem("navStyle", navSel.value); } catch (_) {}
+      location.reload(); // simplest way to remount the navigation cleanly
+    });
+  }
   // The cube keeps every face permanently in the DOM (just rotated out of
   // view) so the 3D transform has something to show on every side -- so
   // these three stop being ".hidden"-toggled like a normal screen the

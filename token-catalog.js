@@ -110,6 +110,16 @@
     return out;
   }
 
+  // Contract address of a CoinGecko coin id on this network (checksummed), or null.
+  async function addressFor(networkKey, coinId) {
+    const platform = platformFor(networkKey);
+    if (!platform || !coinId) return null;
+    const list = await loadList();
+    const slice = list.byPlatform[platform];
+    const e = slice && slice.byId.get(coinId);
+    return e ? e.address : null;
+  }
+
   async function search(networkKey, query, limit) {
     const platform = platformFor(networkKey);
     const q = String(query || "").trim().toLowerCase();
@@ -178,6 +188,7 @@
       const m = byId[i.id] || {};
       return {
         id: i.id,
+        cgId: i.id,
         name: String(i.name || m.name || ""),
         symbol: String(i.symbol || m.symbol || "").toUpperCase(),
         image: m.image || i.small || i.thumb || null,
@@ -190,5 +201,5 @@
     return data;
   }
 
-  self.TM_CATALOG = { getTrendingCoins, top, search, supports };
+  self.TM_CATALOG = { getTrendingCoins, top, search, addressFor, supports };
 })();

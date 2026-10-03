@@ -413,8 +413,8 @@ function shortDescription(text, maxLen) {
   return (lastStop > maxLen * 0.5 ? cut.slice(0, lastStop + 1) : cut.replace(/\s+\S*$/, "") + "...").trim();
 }
 
-async function getCoinDetail(symbol, currency) {
-  const id = COINGECKO_IDS[symbol];
+async function getCoinDetail(symbol, currency, idOverride) {
+  const id = idOverride || COINGECKO_IDS[symbol];
   if (!id) throw new Error("Unknown coin.");
   const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
   const key = id + "|" + vs;
@@ -459,8 +459,8 @@ async function getCoinDetail(symbol, currency) {
 
 // days: 1 (24H), 7, 30, or 365. Returns [[timestampMs, price], ...] thinned
 // to at most ~120 points, plenty for a phone-width line chart.
-async function getCoinChart(symbol, currency, days) {
-  const id = COINGECKO_IDS[symbol];
+async function getCoinChart(symbol, currency, days, idOverride) {
+  const id = idOverride || COINGECKO_IDS[symbol];
   if (!id) throw new Error("Unknown coin.");
   const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
   const key = id + "|" + vs + "|" + days;
@@ -592,6 +592,15 @@ const NETWORK_COINGECKO_PLATFORM = {
   arbitrum: "arbitrum-one",
   optimism: "optimistic-ethereum",
   avalanche: "avalanche",
+  // Added 2026-10-03 from memory of CoinGecko's asset-platform ids -- NOT yet
+  // checked against https://www.coingecko.com/en/chains/<id> like the ones
+  // above. A wrong id fails soft (no suggestions / no prices on that chain).
+  linea: "linea",
+  scroll: "scroll",
+  zksync: "zksync",
+  mantle: "mantle",
+  gnosis: "xdai",
+  celo: "celo",
   // Custom networks intentionally unmapped -- see NETWORK_NATIVE_COINGECKO_ID above.
 };
 
