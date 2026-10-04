@@ -696,7 +696,10 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 }
 .intro-details summary::-webkit-details-marker { display: none; }
 .intro-details summary::before {
-  content: "▸ "; display: inline-block; transition: transform 0.15s;
+  /* margin, not a trailing space in content -- a space at the edge of an
+     inline-block box gets collapsed away, which was landing the triangle
+     flush against the text with no visible gap. */
+  content: "▸"; display: inline-block; margin-right: 5px; transition: transform 0.15s;
 }
 .intro-details[open] summary::before { transform: rotate(90deg); }
 .intro-details p { margin: 8px 0 0; font-weight: normal; }
@@ -1907,6 +1910,43 @@ html[data-theme="light"] #network-badge {
 html[dir="rtl"] .top-back-btn { left: auto; right: calc(50% - 165px); padding: 5px 5px 5px 20px; flex-direction: row-reverse; }
 html[dir="rtl"] .top-back-btn-coin { transform: scaleX(-1); }
 @media (max-width: 460px) { html[dir="rtl"] .top-back-btn { left: auto; right: 22px; } }
+
+/* #network-badge (in the persistent #app-header, shared by every screen)
+   is otherwise centered in the card -- fine on its own, but every
+   standalone screen (Swap, Buy, Sell, Settings and its sub-screens,
+   Support, the coin-detail/prices screen, etc. -- anything that isn't one
+   of the three cube faces, see .cn-face below) pins a Back/Cancel button
+   (.top-back-btn, position:fixed) over the left side of that same row,
+   and a long network name (e.g. "Ethereum Mainnet", "Sepolia (testnet)")
+   centers wide enough to run under it. Rather than list every such
+   screen by id (new ones would silently inherit the bug), key off the
+   structural difference that already separates them from the cube faces:
+   those three get reparented into .cn-face wrappers at runtime, so a
+   still-direct child of #app with a back button is exactly the "standalone
+   screen showing" case. Right-align the badge there so it grows away
+   from Back instead of into it; mirrored for RTL, where Back sits on the
+   right. */
+#app:has(> .screen:not(.hidden) .top-back-btn) #app-header {
+  align-items: flex-end;
+}
+html[dir="rtl"] #app:has(> .screen:not(.hidden) .top-back-btn) #app-header {
+  align-items: flex-start;
+}
+/* Right-aligning (above) is enough room at every normal width, but below
+   ~340px there isn't space left over for both the Back pill and a long
+   name even pushed to the far edge -- clip the badge instead of letting
+   it creep back under Back. Rare width in practice (pre-SE2 iPhones), so
+   a truncated name here is the acceptable tradeoff over an overlap. */
+@media (max-width: 340px) {
+  #app:has(> .screen:not(.hidden) .top-back-btn) #network-badge {
+    max-width: calc(100% - 117px);
+  }
+  /* #network-badge is itself flex (dot + name, see app.js); clip the name
+     span specifically so the dot never gets squeezed out. */
+  #app:has(> .screen:not(.hidden) .top-back-btn) #network-badge span:not(.network-dot) {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+}
 
 /* Inside a rotating cube face (Activity / Send) a fixed element would be
    positioned against the 3D-transformed face, not the screen. The face is
