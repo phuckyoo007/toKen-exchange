@@ -2915,6 +2915,8 @@ async function runSwapAutoQuote() {
     ds.amountOutWei = quote.amountOutWei.toString();
     ds.decimalsOut = String(decimalsOut);
     ds.symbolOut = symbolOut;
+    ds.priceImpactBps = quote.priceImpactBps == null ? "" : String(quote.priceImpactBps);
+    renderPriceImpact(quote.priceImpactBps);
     renderSwapMinReceived();
 
     // Router allowance only ever needs to cover the NET amount -- the fee
@@ -2955,6 +2957,24 @@ async function runSwapAutoQuote() {
 // cost in network fees, and warns when the account can't pay it -- that
 // shortfall is exactly what used to surface as a confusing "couldn't get a
 // response from the network" on Approve. Best-effort: never blocks the swap.
+// Price impact (basis points -> text) and the advisory banner. Advisory only: the
+// number can be missing (aggregator route, dust amounts), in which case nothing shows.
+function formatImpactPercent(bps) {
+  return (bps / 100).toLocaleString(undefined, { maximumFractionDigits: bps < 100 ? 2 : 1 }) + "%";
+}
+function renderPriceImpact(bps) {
+  const row = $("swap-impact-row"), line = $("swap-impact-line"), warn = $("swap-impact-warning");
+  if (row) row.classList.add("hidden");
+  warn.classList.add("hidden");
+  if (bps == null) return;
+  const pct = formatImpactPercent(bps);
+  if (row && line) { line.textContent = "≈ " + pct; row.classList.remove("hidden"); }
+  if (bps >= 300) {
+    warn.textContent = TM_I18N.t(bps >= 1000 ? "swap.priceImpactHigh" : "swap.priceImpactWarn", { percent: pct });
+    warn.classList.remove("hidden");
+  }
+}
+
 async function renderSwapGasEstimate(gen, tokenIn, needsApprove) {
   const lineEl = $("swap-gas-line"), breakdownEl = $("swap-gas-breakdown"), warnEl = $("swap-gas-warning");
   if (!lineEl) return;
@@ -3009,6 +3029,9 @@ async function renderSwapGasEstimate(gen, tokenIn, needsApprove) {
 $("btn-swap-execute").addEventListener("click", async () => {
   hideError("swap-error");
   const ds = $("swap-quote-display").dataset;
+  // A very thin pool can eat most of the amount: ask before going ahead (10%+).
+  const impactBps = ds.priceImpactBps === undefined || ds.priceImpactBps === "" ? null : Number(ds.priceImpactBps);
+  if (impactBps != null && impactBps >= 1000 && !window.confirm(TM_I18N.t("swap.priceImpactConfirm", { percent: formatImpactPercent(impactBps) }))) return;
   $("btn-swap-execute").disabled = true;
   try {
     const tokenIn = ds.tokenIn;
