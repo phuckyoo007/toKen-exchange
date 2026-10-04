@@ -69,6 +69,31 @@ function applyI18n(root) {
   scope.querySelectorAll("[data-i18n-title]").forEach((el) => {
     el.title = t(el.getAttribute("data-i18n-title"));
   });
+  scope.querySelectorAll("[data-i18n-alt]").forEach((el) => {
+    el.setAttribute("alt", t(el.getAttribute("data-i18n-alt")));
+  });
+  scope.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
+  });
+  // Brand wordmarks are shown in capitals; uppercase using the language's own rules
+  // (no-op for Chinese/Japanese/Arabic/Hindi).
+  scope.querySelectorAll("[data-i18n-upper]").forEach((el) => {
+    el.textContent = t(el.getAttribute("data-i18n-upper")).toLocaleUpperCase(tmI18nCurrentLang);
+    // A long translated name must still fit the fixed-width SVG logo.
+    if (el.namespaceURI === "http://www.w3.org/2000/svg" && el.getComputedTextLength) {
+      try {
+        el.removeAttribute("textLength");
+        if (el.getComputedTextLength() > 290) {
+          el.setAttribute("textLength", "290");
+          el.setAttribute("lengthAdjust", "spacingAndGlyphs");
+        }
+      } catch (e) { /* not rendered yet: leave as is */ }
+    }
+  });
+  // The app's own name, in the chosen language, for the tab title and home-screen name.
+  document.title = t("app.name");
+  const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if (appleTitle) appleTitle.setAttribute("content", t("app.name"));
   const dir = tmI18nCurrentLang === "ar" ? "rtl" : "ltr";
   document.documentElement.setAttribute("lang", tmI18nCurrentLang);
   document.documentElement.setAttribute("dir", dir);

@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "Troca de Tokens"
+  },
+  "appShortName": {
+    "message": "Troca de Tokens"
+  },
+  "appDescription": {
+    "message": "Carteira Ethereum e Base de autocustódia com troca de tokens integrada. Suas chaves nunca saem do seu dispositivo."
+  }
+}

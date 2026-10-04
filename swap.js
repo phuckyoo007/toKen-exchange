@@ -53,6 +53,27 @@ async function getQuote({ network, provider, tokenIn, tokenOut, amountInWei }) {
   return { amountOutWei: amounts[amounts.length - 1], path };
 }
 
+// Price impact of a trade against a V2-style pool, in basis points (100 = 1%).
+// Compares the quoted price for this trade with the quoted price for a tiny
+// (1/1000-size) reference trade, which sees almost the un-moved pool price. A big
+// number means a thin pool: you'd get far less than the going rate. Returns null
+// when it can't be worked out -- it never throws, it's an advisory number only.
+async function getPriceImpactBps({ network, provider, tokenIn, tokenOut, amountInWei, amountOutWei }) {
+  try {
+    const inBn = ethers.BigNumber.from(amountInWei);
+    const outBn = ethers.BigNumber.from(amountOutWei);
+    const refIn = inBn.div(1000);
+    if (inBn.lte(0) || outBn.lte(0) || refIn.lt(1000)) return null;
+    const ref = await getQuote({ network, provider, tokenIn, tokenOut, amountInWei: refIn });
+    if (ref.amountOutWei.lte(0)) return null;
+    const ratioBps = outBn.mul(refIn).mul(10000).div(inBn.mul(ref.amountOutWei)); // 10000 = no impact
+    if (ratioBps.gt(20000)) return null; // nonsense from rounding on dust -- don't show
+    return Math.max(0, Math.min(10000, 10000 - ratioBps.toNumber()));
+  } catch (e) {
+    return null;
+  }
+}
+
 async function getErc20Info(provider, tokenAddress) {
   const c = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
   const [decimals, symbol] = await Promise.all([c.decimals(), c.symbol().catch(() => "TOKEN")]);
@@ -230,6 +251,7 @@ if (typeof self !== "undefined") {
     NATIVE_PSEUDO_ADDRESS,
     isNative,
     getQuote,
+    getPriceImpactBps,
     getErc20Info,
     getAllowance,
     sendApprove,

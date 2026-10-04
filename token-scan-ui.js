@@ -6,7 +6,9 @@
 // The wording is plain English for now -- it is kept in one object (S) so it can be
 // moved into the language files later without touching the logic.
 (function () {
-  const S = {
+  // Wording lives in the language files (keys scan.*). The English fallback below only
+  // applies if the i18n script is not loaded.
+  const S_EN = {
     scanning: "Scanning this account for tokens\u2026",
     unsupported: "Scanning isn't available on this network yet. Use \"+ Add token\" and paste a contract address instead.",
     noAccount: "No account is selected.",
@@ -17,6 +19,7 @@
     added: "Added \u2713",
     addAll: "Add all",
   };
+  const S = new Proxy({}, { get: (_, k) => (typeof TM_I18N !== "undefined" && TM_I18N.t ? TM_I18N.t("scan." + String(k)) : S_EN[k]) });
   const el = (id) => document.getElementById(id);
   const btn = el("btn-scan-tokens");
   if (!btn || !el("screen-scan-tokens")) return;

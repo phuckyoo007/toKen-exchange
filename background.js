@@ -896,6 +896,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             tokenOut: msg.tokenOut,
             amountInWei: netWei,
           });
+          const priceImpactBps = await TM_SWAP.getPriceImpactBps({ network, provider, tokenIn: msg.tokenIn, tokenOut: msg.tokenOut, amountInWei: netWei, amountOutWei });
           sendResponse({
             ok: true,
             amountOutWei: amountOutWei.toString(),
@@ -903,6 +904,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             feeWei: feeWei.toString(),
             netAmountInWei: netWei.toString(),
             feePercentLabel: TM_FEE.feePercentLabel(),
+            priceImpactBps,
           });
           break;
         }

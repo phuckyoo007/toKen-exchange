@@ -1495,6 +1495,8 @@ $("btn-swap-quote").addEventListener("click", async () => {
     // The output the user is being shown; sent back with the swap so the
     // minimum accepted amount is based on it (see TM_SWAP_EXECUTE).
     $("swap-quote-display").dataset.amountOutWei = quote.amountOutWei.toString();
+    $("swap-quote-display").dataset.priceImpactBps = quote.priceImpactBps == null ? "" : String(quote.priceImpactBps);
+    renderPriceImpact(quote.priceImpactBps);
 
     // Router allowance only ever needs to cover the NET amount -- the fee
     // portion moves as a separate plain transfer, never through the router.
@@ -1520,6 +1522,24 @@ $("btn-swap-quote").addEventListener("click", async () => {
 // Network fee row for the swap screen: approve (if needed) + app-fee transfer +
 // swap, priced at the chain's current fees, plus a warning when this account
 // doesn't hold enough of the native coin to pay it. Best-effort, never blocks.
+// Price impact (basis points -> text) and the advisory banner. Advisory only: the
+// number can be missing (aggregator route, dust amounts), in which case nothing shows.
+function formatImpactPercent(bps) {
+  return (bps / 100).toLocaleString(undefined, { maximumFractionDigits: bps < 100 ? 2 : 1 }) + "%";
+}
+function renderPriceImpact(bps) {
+  const row = null, line = null, warn = $("swap-impact-warning");
+  if (row) row.classList.add("hidden");
+  warn.classList.add("hidden");
+  if (bps == null) return;
+  const pct = formatImpactPercent(bps);
+  if (row && line) { line.textContent = "\u2248 " + pct; row.classList.remove("hidden"); }
+  if (bps >= 300) {
+    warn.textContent = TM_I18N.t(bps >= 1000 ? "swap.priceImpactHigh" : "swap.priceImpactWarn", { percent: pct });
+    warn.classList.remove("hidden");
+  }
+}
+
 async function renderSwapGasEstimate(tokenIn, needsApprove) {
   const lineEl = $("swap-gas-line"), breakdownEl = $("swap-gas-breakdown"), warnEl = $("swap-gas-warning");
   if (!lineEl) return;
@@ -1557,6 +1577,9 @@ async function renderSwapGasEstimate(tokenIn, needsApprove) {
 $("btn-swap-execute").addEventListener("click", async () => {
   hideError("swap-error");
   const ds = $("swap-quote-display").dataset;
+  // A very thin pool can eat most of the amount: ask before going ahead (10%+).
+  const impactBps = ds.priceImpactBps === undefined || ds.priceImpactBps === "" ? null : Number(ds.priceImpactBps);
+  if (impactBps != null && impactBps >= 1000 && !window.confirm(TM_I18N.t("swap.priceImpactConfirm", { percent: formatImpactPercent(impactBps) }))) return;
   $("btn-swap-execute").disabled = true;
   try {
     const tokenIn = ds.tokenIn;

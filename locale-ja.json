@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "トークン取引所"
+  },
+  "appShortName": {
+    "message": "トークン取引所"
+  },
+  "appDescription": {
+    "message": "トークンスワップ機能を内蔵した、自己管理型のEthereum・Baseウォレット。秘密鍵がデバイスの外に出ることはありません。"
+  }
+}

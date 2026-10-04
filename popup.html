@@ -9,8 +9,8 @@
 <body>
 <div id="bg-scene"></div>
 <div id="splash-screen">
-  <img src="img/splash.jpg" alt="Token Exchange" />
-  <div id="splash-brand">TOKEN EXCHANGE</div>
+  <img src="img/splash.jpg" alt="Token Exchange" data-i18n-alt="app.name" />
+  <div id="splash-brand" data-i18n-upper="app.name">TOKEN EXCHANGE</div>
   <div id="splash-spinner"><img src="img/spinner-coin.png" alt="" /></div>
   <div id="splash-tabbar">
     <button id="splash-tab-home" class="splash-tab" data-i18n-title="home.tabHome" title="Home">
@@ -42,7 +42,7 @@
 <div id="app">
 
   <header id="app-header">
-    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange">
+    <svg id="brand-logo" viewBox="0 0 320 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Token Exchange" data-i18n-aria="app.name">
       <defs>
         <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#fff3c4"/>
@@ -100,8 +100,8 @@
       </g>
 
       <!-- marquee title -->
-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
-      <text x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
+      <text data-i18n-upper="app.name" x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#5c4208" letter-spacing="2">TOKEN EXCHANGE</text>
+      <text data-i18n-upper="app.name" x="160" y="24" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="17" font-weight="700" fill="#fff6d6" letter-spacing="2" transform="translate(0,-1)" opacity="0.85">TOKEN EXCHANGE</text>
 
       <!-- glass display housing -->
       <rect x="64" y="40" width="192" height="52" rx="6" fill="#0c0f16" stroke="#3a2c05" stroke-width="2"/>
@@ -283,7 +283,7 @@
       <div class="tokens-header">
         <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
         <span class="tokens-header-actions">
-          <button id="btn-scan-tokens" class="link" type="button">🔍 Scan wallet</button>
+          <button id="btn-scan-tokens" class="link" type="button" data-i18n="scan.button">🔍 Scan wallet</button>
           <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
         </span>
       </div>
@@ -344,12 +344,12 @@
   <!-- ADD TOKEN -->
   <!-- SCAN WALLET FOR TOKENS (see token-scan.js / token-scan-ui.js) -->
   <section id="screen-scan-tokens" class="screen hidden">
-    <h2>Scan wallet</h2>
-    <p class="muted">Checks this account on the current network for popular, market-listed tokens and lists the ones it holds. Only public balances are read -- nothing is added until you tap Add, and tokens outside that list (including airdropped look-alikes) are never shown.</p>
+    <h2 data-i18n="scan.title">Scan wallet</h2>
+    <p class="muted" data-i18n="scan.intro">Checks this account on the current network for popular, market-listed tokens and lists the ones it holds. Only public balances are read -- nothing is added until you tap Add, and tokens outside that list (including airdropped look-alikes) are never shown.</p>
     <p id="scan-tokens-status" class="muted small"></p>
     <div id="scan-tokens-list" class="tokens-list"></div>
-    <button type="button" id="btn-scan-add-all" class="secondary hidden">Add all</button>
-    <button type="button" id="btn-scan-again" class="secondary">Scan again</button>
+    <button type="button" id="btn-scan-add-all" class="secondary hidden" data-i18n="scan.addAll">Add all</button>
+    <button type="button" id="btn-scan-again" class="secondary" data-i18n="scan.again">Scan again</button>
     <button class="link back-btn" data-back="screen-main" data-i18n="common.back">Back</button>
     <p id="scan-tokens-error" class="error hidden"></p>
   </section>
@@ -498,6 +498,7 @@
       <div id="swap-quote-display" class="hidden">
         <p id="swap-fee-line" class="muted"></p>
         <p id="swap-net-line" class="muted"></p>
+        <p id="swap-impact-warning" class="warn hidden"></p>
         <p id="swap-quote-line"></p>
         <p id="swap-gas-line" class="muted"></p>
         <p id="swap-gas-breakdown" class="muted small hidden"></p>

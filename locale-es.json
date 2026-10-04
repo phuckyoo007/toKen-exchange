@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "Intercambio de Tokens"
+  },
+  "appShortName": {
+    "message": "Intercambio de Tokens"
+  },
+  "appDescription": {
+    "message": "Billetera Ethereum y Base de autocustodia con intercambio de tokens integrado. Tus claves nunca salen de tu dispositivo."
+  }
+}

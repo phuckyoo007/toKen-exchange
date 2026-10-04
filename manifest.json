@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Token Exchange",
-  "short_name": "Token Exchange",
+  "default_locale": "en",
+  "name": "__MSG_appName__",
+  "short_name": "__MSG_appShortName__",
   "version": "1.11.4",
-  "description": "Self-custody Ethereum & Base wallet with a built-in token swap. Your keys never leave your device.",
+  "description": "__MSG_appDescription__",
   "minimum_chrome_version": "111",
   "icons": {
     "16": "icons/icon16.png",
@@ -13,7 +14,7 @@
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Token Exchange",
+    "default_title": "__MSG_appName__",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

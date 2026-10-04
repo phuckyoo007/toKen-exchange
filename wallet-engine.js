@@ -1264,6 +1264,7 @@ async function handleMessage(msg) {
               tokenOut: msg.tokenOut,
               amountInWei: netWei,
             });
+            const priceImpactBps = await TM_SWAP.getPriceImpactBps({ network, provider, tokenIn: msg.tokenIn, tokenOut: msg.tokenOut, amountInWei: netWei, amountOutWei });
             sendResponse({
               ok: true,
               amountOutWei: amountOutWei.toString(),
@@ -1272,6 +1273,7 @@ async function handleMessage(msg) {
               netAmountInWei: netWei.toString(),
               feePercentLabel: TM_FEE.feePercentLabel({ viaAggregator: false }),
               route: "router",
+              priceImpactBps,
             });
             break;
           }

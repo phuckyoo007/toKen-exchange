@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "代币交易所"
+  },
+  "appShortName": {
+    "message": "代币交易所"
+  },
+  "appDescription": {
+    "message": "自托管的以太坊和 Base 钱包，内置代币兑换。你的密钥绝不会离开你的设备。"
+  }
+}

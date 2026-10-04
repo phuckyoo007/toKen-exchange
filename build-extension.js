@@ -36,6 +36,19 @@ function build(outDir) {
   for (const s of [16, 32, 48, 128]) add(`icons/icon${s}.png`, `icon${s}.png`);
   for (const f of VENDOR) add("vendor/" + f, f);
   for (const f of I18N) add("lib/i18n/" + f, f);
+  // Translated extension name/description (Chrome shows these in the browser's language).
+  const LOCALES = {
+    "_locales/en/messages.json": "locale-en.json",
+    "_locales/es/messages.json": "locale-es.json",
+    "_locales/fr/messages.json": "locale-fr.json",
+    "_locales/pt_BR/messages.json": "locale-pt.json",
+    "_locales/ru/messages.json": "locale-ru.json",
+    "_locales/zh_CN/messages.json": "locale-zh.json",
+    "_locales/ja/messages.json": "locale-ja.json",
+    "_locales/ar/messages.json": "locale-ar.json",
+    "_locales/hi/messages.json": "locale-hi.json",
+  };
+  for (const [dest, src] of Object.entries(LOCALES)) add(dest, src);
 
   // Shared scripts: everything the popup page and the background worker pull from ../lib/.
   const libRefs = new Set();

@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "Échange de Tokens"
+  },
+  "appShortName": {
+    "message": "Échange de Tokens"
+  },
+  "appDescription": {
+    "message": "Portefeuille Ethereum et Base en autogarde avec échange de tokens intégré. Vos clés ne quittent jamais votre appareil."
+  }
+}
