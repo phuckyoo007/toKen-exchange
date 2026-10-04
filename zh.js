@@ -101,10 +101,10 @@
     "swap.customAddressOption": "其他代币（粘贴地址）...",
 
     "buy.title": "购买加密货币",
-    "buy.description1": "购买功能由独立的第三方服务 MoonPay 提供支持——Token Exchange 不会接触您的支付信息。",
-    "buy.noThirdPartyCallout": "已经持有一些加密货币了?完全跳过 MoonPay——直接在链上兑换成您需要的资产,无需第三方,无需注册。",
+    "buy.description1": "购买功能由独立的第三方服务 Transak 提供支持——Token Exchange 不会接触您的支付信息。",
+    "buy.noThirdPartyCallout": "已经持有一些加密货币了?完全跳过 Transak——直接在链上兑换成您需要的资产,无需第三方,无需注册。",
     "buy.noThirdPartySwapBtn": "改为兑换",
-    "buy.continueBtn": "前往 MoonPay",
+    "buy.continueBtn": "前往 Transak",
 
     "support.title": "帮助与支持",
     "support.description": "在下方提问，或点击一个主题。此功能完全在您的设备本地运行——您在此输入的内容不会被发送到任何地方。",
@@ -555,9 +555,9 @@
     },
     {
       id: "buy-not-working",
-      chip: "购买功能无法使用",
-      keywords: ["购买按钮", "购买不能用", "购买没反应", "moonpay", "无法购买", "买不了"],
-      answer: "「购买」按钮会在新标签页中打开第三方法币入金服务 MoonPay。如果提示「购买功能尚未配置」，说明本钱包的开发者尚未添加 MoonPay API 密钥——这不是您在钱包内部可以解决的问题。配置完成后，您需要自行将收款地址粘贴到 MoonPay 页面中；Token Exchange 不会代您发送该地址。",
+      chip: "购买或出售功能无法使用",
+      keywords: ["购买按钮", "出售按钮", "购买不能用", "出售不能用", "购买没反应", "出售没反应", "transak", "无法购买", "无法出售"],
+      answer: "「购买」和「出售」都会在新标签页中打开第三方法币入金/出金服务 Transak。如果提示该服务「尚未配置」，说明本钱包的开发者尚未添加 Transak 的凭证——这不是您在钱包内部可以解决的问题。配置完成后，购买时您的收款地址会自动填入并锁定；Token Exchange 不会代您发送该地址。",
     },
     {
       id: "reset-wallet",

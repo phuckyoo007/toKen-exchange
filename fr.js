@@ -101,10 +101,10 @@
     "swap.customAddressOption": "Autre jeton (coller l'adresse)...",
 
     "buy.title": "Acheter des cryptos",
-    "buy.description1": "L'achat est propulsé par MoonPay, un service tiers indépendant -- Token Exchange n'a jamais accès à vos informations de paiement.",
-    "buy.noThirdPartyCallout": "Vous avez déjà des cryptos ? Passez complètement MoonPay : échangez-les directement on-chain contre ce dont vous avez besoin, sans tiers ni inscription.",
+    "buy.description1": "L'achat est propulsé par Transak, un service tiers indépendant -- Token Exchange n'a jamais accès à vos informations de paiement.",
+    "buy.noThirdPartyCallout": "Vous avez déjà des cryptos ? Passez complètement Transak : échangez-les directement on-chain contre ce dont vous avez besoin, sans tiers ni inscription.",
     "buy.noThirdPartySwapBtn": "Échanger à la place",
-    "buy.continueBtn": "Continuer vers MoonPay",
+    "buy.continueBtn": "Continuer vers Transak",
 
     "support.title": "Aide et assistance",
     "support.description": "Posez une question ou appuyez sur un sujet ci-dessous. Cela fonctionne entièrement sur votre appareil -- rien de ce que vous saisissez ici n'est envoyé où que ce soit.",
@@ -555,9 +555,9 @@
     },
     {
       id: "buy-not-working",
-      chip: "Acheter ne fonctionne pas",
-      keywords: ["bouton acheter", "acheter ne fonctionne pas", "achat non configuré", "moonpay", "impossible d'acheter", "je ne peux pas acheter"],
-      answer: "Le bouton Acheter ouvre MoonPay, un service d'achat tiers indépendant, dans un nouvel onglet. S'il indique « L'achat n'est pas encore configuré », cela signifie que le développeur de ce portefeuille n'a pas encore ajouté de clé API MoonPay -- ce n'est pas quelque chose que vous pouvez corriger depuis le portefeuille lui-même. Une fois configuré, vous collerez vous-même votre adresse de réception sur la page de MoonPay ; Token Exchange ne l'envoie jamais à votre place.",
+      chip: "Achat ou vente ne fonctionne pas",
+      keywords: ["bouton acheter", "bouton vendre", "acheter ne fonctionne pas", "vendre ne fonctionne pas", "achat non configuré", "vente non configurée", "transak", "impossible d'acheter", "impossible de vendre"],
+      answer: "Acheter et Vendre ouvrent tous deux Transak, un service tiers indépendant d'achat/vente, dans un nouvel onglet. S'il indique que le service « n'est pas encore configuré », cela signifie que le développeur de ce portefeuille n'a pas encore ajouté les identifiants Transak -- ce n'est pas quelque chose que vous pouvez corriger depuis le portefeuille lui-même. Une fois configuré, votre adresse de réception est renseignée et verrouillée automatiquement pour l'achat ; Token Exchange ne l'envoie jamais à votre place.",
     },
     {
       id: "reset-wallet",

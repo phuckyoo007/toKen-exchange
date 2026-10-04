@@ -100,10 +100,10 @@
     "swap.customAddressOption": "Otro token (pega la dirección)...",
 
     "buy.title": "Comprar criptomonedas",
-    "buy.description1": "La función Comprar funciona con MoonPay, un servicio de terceros independiente -- Token Exchange nunca tiene acceso a tus datos de pago.",
-    "buy.noThirdPartyCallout": "¿Ya tienes algo de cripto? Sáltate MoonPay por completo: intercámbialo directamente en la cadena por lo que necesites, sin terceros ni registro.",
+    "buy.description1": "La función Comprar funciona con Transak, un servicio de terceros independiente -- Token Exchange nunca tiene acceso a tus datos de pago.",
+    "buy.noThirdPartyCallout": "¿Ya tienes algo de cripto? Sáltate Transak por completo: intercámbialo directamente en la cadena por lo que necesites, sin terceros ni registro.",
     "buy.noThirdPartySwapBtn": "Intercambiar en su lugar",
-    "buy.continueBtn": "Continuar a MoonPay",
+    "buy.continueBtn": "Continuar a Transak",
 
     "support.title": "Ayuda y soporte",
     "support.description": "Haz una pregunta o toca un tema abajo. Esto funciona por completo en tu dispositivo -- nada de lo que escribas aquí se envía a ningún lugar.",
@@ -554,9 +554,9 @@
     },
     {
       id: "buy-not-working",
-      chip: "La función Comprar no funciona",
-      keywords: ["botón comprar", "comprar no funciona", "comprar no configurado", "moonpay", "no puedo comprar"],
-      answer: "El botón Comprar abre MoonPay, un servicio externo de rampa de entrada independiente, en una pestaña nueva. Si dice “Buy isn't configured yet,” significa que el desarrollador de esta billetera aún no ha agregado una clave de API de MoonPay -- no es algo que puedas solucionar desde la billetera misma. Una vez configurado, tú mismo pegarás tu dirección de recepción en la página de MoonPay; Token Exchange nunca la envía en tu nombre.",
+      chip: "Comprar o vender no funciona",
+      keywords: ["botón comprar", "botón vender", "comprar no funciona", "vender no funciona", "comprar no configurado", "vender no configurado", "transak", "no puedo comprar", "no puedo vender"],
+      answer: "Comprar y Vender abren Transak, un servicio externo independiente de compra/venta, en una pestaña nueva. Si indica que el servicio «aún no está configurado», significa que el desarrollador de esta billetera todavía no ha agregado las credenciales de Transak -- no es algo que puedas solucionar desde la billetera misma. Una vez configurado, tu dirección de recepción se completa y bloquea automáticamente para Comprar; Token Exchange nunca la envía en tu nombre.",
     },
     {
       id: "reset-wallet",

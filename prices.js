@@ -46,6 +46,16 @@ const COINGECKO_IDS = {
   SHIB: "shiba-inu",
   TON: "the-open-network", // NOT "toncoin" -- CoinGecko's own quirk, verified on their coin page
 
+  // Native gas tokens for networks this wallet supports that aren't already
+  // covered above. Each id is CoinGecko's own `native_coin_id` for that
+  // chain's asset-platform entry (GET /api/v3/asset_platforms), not guessed
+  // from the display symbol, and confirmed live against /simple/price on
+  // 2026-10-04.
+  MNT: "mantle", // Mantle's native gas token
+  XDAI: "xdai", // Gnosis Chain's native gas token (a USD-pegged bridge token, not Dai itself)
+  CELO: "celo", // Celo's native gas token
+  MON: "monad", // Monad's native gas token
+
   // ---- Extra coins (added later; see EXTRA_PRICE_BOARD below) ----
   // These follow CoinGecko's usual id conventions but were NOT each checked
   // against a live coin page the way the 18 above were, so they are flagged
@@ -118,8 +128,10 @@ const NETWORK_NATIVE_COINGECKO_ID = {
   linea: COINGECKO_IDS.ETH,
   scroll: COINGECKO_IDS.ETH,
   zksync: COINGECKO_IDS.ETH,
-  // mantle / gnosis / celo: unmapped until their CoinGecko ids are verified.
-  // monad: intentionally unmapped until its CoinGecko id is verified (price shows as unavailable).
+  mantle: COINGECKO_IDS.MNT,
+  gnosis: COINGECKO_IDS.XDAI,
+  celo: COINGECKO_IDS.CELO,
+  monad: COINGECKO_IDS.MON,
   // Custom networks (key starts with "custom-") intentionally have no entry
   // here -- we don't know what their native coin actually is, so
   // getNativePriceForNetwork() below returns null for them rather than
@@ -592,15 +604,23 @@ const NETWORK_COINGECKO_PLATFORM = {
   arbitrum: "arbitrum-one",
   optimism: "optimistic-ethereum",
   avalanche: "avalanche",
-  // Added 2026-10-03 from memory of CoinGecko's asset-platform ids -- NOT yet
-  // checked against https://www.coingecko.com/en/chains/<id> like the ones
-  // above. A wrong id fails soft (no suggestions / no prices on that chain).
+  // linea/scroll/zksync/mantle/gnosis/celo were added 2026-10-03 from memory
+  // of CoinGecko's asset-platform ids; robinhood/monad added 2026-10-04 --
+  // all eight since confirmed (2026-10-04) against the live
+  // GET /api/v3/asset_platforms response, matched by chain_identifier
+  // against each network's chainId in networks.js, not eyeballed from the
+  // chain pages like the ones above. A wrong id fails soft (no suggestions /
+  // no prices on that chain), which is how robinhood and monad were found
+  // missing here entirely -- their token picker and USD prices were always
+  // empty on those two networks.
   linea: "linea",
   scroll: "scroll",
   zksync: "zksync",
   mantle: "mantle",
   gnosis: "xdai",
   celo: "celo",
+  robinhood: "robinhood",
+  monad: "monad",
   // Custom networks intentionally unmapped -- see NETWORK_NATIVE_COINGECKO_ID above.
 };
 

@@ -99,10 +99,10 @@
     "swap.customAddressOption": "Outro token (cole o endereço)...",
 
     "buy.title": "Comprar cripto",
-    "buy.description1": "A compra é processada pela MoonPay, um serviço terceirizado independente -- a Token Exchange nunca tem acesso aos seus dados de pagamento.",
-    "buy.noThirdPartyCallout": "Já tem alguma cripto? Pule a MoonPay por completo: troque diretamente on-chain pelo que precisar, sem terceiros e sem cadastro.",
+    "buy.description1": "A compra é processada pela Transak, um serviço terceirizado independente -- a Token Exchange nunca tem acesso aos seus dados de pagamento.",
+    "buy.noThirdPartyCallout": "Já tem alguma cripto? Pule a Transak por completo: troque diretamente on-chain pelo que precisar, sem terceiros e sem cadastro.",
     "buy.noThirdPartySwapBtn": "Trocar em vez disso",
-    "buy.continueBtn": "Continuar para a MoonPay",
+    "buy.continueBtn": "Continuar para a Transak",
 
     "support.title": "Ajuda e suporte",
     "support.description": "Faça uma pergunta ou toque em um dos tópicos abaixo. Isso é processado inteiramente no seu dispositivo -- nada do que você digitar aqui é enviado a lugar nenhum.",
@@ -553,9 +553,9 @@
     },
     {
       id: "buy-not-working",
-      chip: "A compra não está funcionando",
-      keywords: ["botão de comprar", "botao de comprar", "compra não funciona", "compra nao funciona", "compra não configurada", "moonpay", "não consigo comprar", "nao consigo comprar"],
-      answer: "O botão Comprar abre a MoonPay, um serviço de on-ramp terceirizado, em uma nova aba. Se aparecer “Buy isn't configured yet”, isso significa que o desenvolvedor desta carteira ainda não adicionou uma chave de API da MoonPay -- não é algo que você possa corrigir de dentro da carteira. Depois de configurado, você mesmo colará seu próprio endereço de recebimento na página da MoonPay; a Token Exchange nunca o envia em seu nome.",
+      chip: "Compra ou venda não está funcionando",
+      keywords: ["botão de comprar", "botao de comprar", "botão de vender", "botao de vender", "compra não funciona", "compra nao funciona", "venda não funciona", "venda nao funciona", "compra não configurada", "venda não configurada", "transak", "não consigo comprar", "nao consigo comprar", "não consigo vender", "nao consigo vender"],
+      answer: "Comprar e Vender abrem a Transak, um serviço terceirizado independente de on-ramp/off-ramp, em uma nova aba. Se aparecer que o serviço “ainda não está configurado”, isso significa que o desenvolvedor desta carteira ainda não adicionou as credenciais da Transak -- não é algo que você possa corrigir de dentro da carteira. Depois de configurado, seu endereço de recebimento é preenchido e bloqueado automaticamente para a compra; a Token Exchange nunca o envia em seu nome.",
     },
     {
       id: "reset-wallet",
