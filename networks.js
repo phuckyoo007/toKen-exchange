@@ -12,6 +12,11 @@
 //   - Polygon: QuickSwap V2
 //   - Base: Uniswap V2 Router02 (Uniswap's own V2-compatible deployment on
 //     Base -- confirmed as a verified contract on BaseScan)
+//   - Avalanche: Uniswap V2 Router02 (Uniswap's v2 deployments page)
+//   - Linea, Gnosis: SushiSwap V2 Router (Sushi's cpAMM deployments page)
+// Still off, on purpose: Robinhood Chain, Monad, Scroll (conflicting sources
+// for its wrapped-ETH address), ZKsync Era, Mantle, Celo (Sushi's docs table
+// lists a Scroll factory address as the Celo router, so it can't be trusted).
 // For every other built-in chain, `swapRouter` is left null on purpose. The UI
 // (see popup) will refuse to run a swap on a chain with no verified router and
 // will instead prompt the user to supply + confirm one themselves (see
@@ -156,9 +161,11 @@ const BUILTIN_NETWORKS = [
     rpcUrls: ["https://api.avax.network/ext/bc/C/rpc", "https://avalanche-c-chain-rpc.publicnode.com", "https://rpc.ankr.com/avalanche"],
     blockExplorer: "https://snowtrace.io",
     wrappedNative: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", // WAVAX
-    swapRouter: null,
-    swapFactory: null,
-    swapLabel: null,
+    // Verified 2026-10-03 against Uniswap's own v2 deployments page
+    // (docs.uniswap.org/contracts/v2/reference/smart-contracts/v2-deployments).
+    swapRouter: "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24", // Uniswap V2 Router02 (Avalanche)
+    swapFactory: "0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C", // Uniswap V2 Factory (Avalanche)
+    swapLabel: "Uniswap V2",
     builtin: true,
   },
   {
@@ -190,10 +197,12 @@ const BUILTIN_NETWORKS = [
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
     rpcUrls: ["https://rpc.linea.build", "https://linea.gateway.tenderly.co"],
     blockExplorer: "https://lineascan.build",
-    wrappedNative: null,
-    swapRouter: null,
-    swapFactory: null,
-    swapLabel: null,
+    wrappedNative: "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f", // WETH
+    // Verified 2026-10-03: router + factory from Sushi's own docs
+    // (docs.sushi.com/contracts/cpamm); wrapped token from two independent lists.
+    swapRouter: "0x2abf469074dc0b54d793850807e6eb5faf2625b1", // SushiSwap V2 Router
+    swapFactory: "0xfbc12984689e5f15626bad03ad60160fe98b303c", // SushiSwap V2 Factory
+    swapLabel: "SushiSwap V2",
     builtin: true,
   },
   {
@@ -242,10 +251,12 @@ const BUILTIN_NETWORKS = [
     nativeCurrency: { name: "xDAI", symbol: "XDAI", decimals: 18 },
     rpcUrls: ["https://rpc.gnosischain.com", "https://gnosis-chain.gateway.tenderly.co"],
     blockExplorer: "https://gnosisscan.io",
-    wrappedNative: null,
-    swapRouter: null,
-    swapFactory: null,
-    swapLabel: null,
+    wrappedNative: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d", // WXDAI
+    // Verified 2026-10-03: router + factory from Sushi's own docs
+    // (docs.sushi.com/contracts/cpamm); wrapped token from two independent lists.
+    swapRouter: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506", // SushiSwap V2 Router
+    swapFactory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", // SushiSwap V2 Factory
+    swapLabel: "SushiSwap V2",
     builtin: true,
   },
   {

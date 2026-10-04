@@ -1135,3 +1135,44 @@ button.price-link { background: none; border: 0; padding: 0; font: inherit; text
 }
 .scan-add-btn:disabled { opacity: 0.65; cursor: default; }
 #btn-scan-add-all, #btn-scan-again { margin-top: 8px; }
+
+/* ---------------- big pinned Back button (.top-back-btn) ----------------
+   Large gold pill pinned to the popup's top-left so it stays reachable
+   while a long list scrolls. Glow pulse is off under "reduce motion". */
+.top-back-btn {
+  position: fixed; z-index: 40; top: 22px; left: 26px;
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 44px; padding: 5px 18px 5px 5px;
+  border: 1.5px solid #8a6a10; border-radius: 999px;
+  background: linear-gradient(180deg, #fff6df 0%, var(--gold-bright) 32%, var(--gold) 68%, var(--gold-deep) 100%);
+  color: var(--gold-ink);
+  font: inherit; font-weight: 700; font-size: 15px; line-height: 1;
+  cursor: pointer; text-decoration: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.45), 0 0 14px rgba(243,212,136,0.45);
+  animation: topBackGlow 2.8s ease-in-out infinite;
+}
+.top-back-btn:hover { filter: brightness(1.07); }
+.top-back-btn:active { transform: scale(0.97); }
+.top-back-btn:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 3px; }
+.top-back-btn-coin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #14100a; color: var(--gold-bright);
+  font-size: 21px; font-weight: 700; line-height: 1;
+  box-shadow: inset 0 0 0 1.5px var(--gold-deep);
+}
+@keyframes topBackGlow {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.45), 0 0 8px rgba(243,212,136,0.25); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.45), 0 0 20px rgba(243,212,136,0.7); }
+}
+@media (prefers-reduced-motion: reduce) { .top-back-btn { animation: none; } }
+.screen:has(.top-back-btn) { padding-top: 76px; }
+html[dir="rtl"] .top-back-btn { left: auto; right: 26px; padding: 5px 5px 5px 18px; flex-direction: row-reverse; }
+html[dir="rtl"] .top-back-btn-coin { transform: scaleX(-1); }
+
+/* Inside a rotating cube face (Activity / Send) a fixed element would be
+   positioned against the 3D-transformed face, not the screen. The face is
+   its own scroller, so the pill sticks to the top of the face instead. */
+.cn-face .top-back-btn { position: sticky; top: 8px; left: auto; right: auto; align-self: flex-start; margin-bottom: 4px; }
+.cn-face .screen:has(.top-back-btn) { padding-top: 12px; }
+html[dir="rtl"] .cn-face .top-back-btn { align-self: flex-end; right: auto; left: auto; }

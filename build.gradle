@@ -1,0 +1,46 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.tokenexchange.wallet"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.tokenexchange.wallet"
+        minSdk 24
+        targetSdk 36
+        // Play rejects a versionCode it has already seen: 3 (2.0), and 4, 10, 11
+        // were used or tried for earlier 2.1 builds. Always go up, never reuse.
+        versionCode 12
+        versionName "2.1"
+    }
+
+    // Signing comes from environment variables so the keystore and its
+    // passwords never live in the repo. In GitHub Actions they are repository
+    // secrets (see .github/workflows/android.yml). Without them the release
+    // build is produced unsigned.
+    signingConfigs {
+        release {
+            def ks = System.getenv("KEYSTORE_PATH")
+            if (ks != null && !ks.isEmpty()) {
+                storeFile file(ks)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("KEYSTORE_PATH")) { signingConfig signingConfigs.release }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
