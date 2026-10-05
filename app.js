@@ -1466,13 +1466,21 @@ async function appendCatalogRows(side, query, list, items, sugg) {
   status.textContent = TM_I18N.t("swap.pickerLoadingTokens");
   list.appendChild(status);
   let rows = [];
+  let failed = false;
   try {
     if (query) await new Promise((r) => setTimeout(r, 350)); // wait for typing to pause
     if (gen !== pickerCatalogGen) return;
     rows = query ? await TM_CATALOG.search(currentNetwork.key, query, 15) : await TM_CATALOG.top(currentNetwork.key, 25);
-  } catch (e) { rows = []; }
+  } catch (e) { rows = []; failed = true; }
   if (gen !== pickerCatalogGen) return;
   status.remove();
+  if (failed) {
+    const f = document.createElement("p");
+    f.className = "hint";
+    f.textContent = TM_I18N.t("swap.pickerLoadFailed");
+    list.appendChild(f);
+    return;
+  }
   const skip = new Set(
     items.map((a) => String(a.address || "").toLowerCase())
       .concat(sugg.map((t) => t.address.toLowerCase()), [String(swapState.fromKey || "").toLowerCase()])
@@ -1522,7 +1530,18 @@ function renderAssetPicker(side) {
   // balance. Either side excludes whatever the OTHER side currently holds.
   const otherKey = side === "from" ? swapState.toKey : swapState.fromKey;
   let items = swapState.held.filter((a) => a.key !== otherKey);
-  if (side === "from") items = items.filter((a) => Number(a.balance) > 0);
+  let nothingFunded = false;
+  if (side === "from") {
+    const funded = items.filter((a) => Number(a.balance) > 0);
+    if (funded.length) items = funded;
+    else nothingFunded = true; // keep the (zero-balance) assets visible instead of an empty list
+  }
+  if (nothingFunded && !pickerShowFavs) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t("swap.pickerNothingHeld");
+    list.appendChild(p);
+  }
   if (pickerShowFavs) items = items.filter((a) => pickerFavs.has(pickerFavId(a)));
   if (q) items = items.filter((a) => String(a.symbol || "").toLowerCase().includes(q) || String(a.name || "").toLowerCase().includes(q) || String(a.address || "").toLowerCase().includes(q));
 
@@ -1652,6 +1671,9 @@ function openAssetPicker(side) {
 }
 
 $("swap-picker-search").addEventListener("input", () => {
+  // Searching should search everything -- never leave the star (favorites only)
+  // filter silently on top of a search, which just looks like an empty list.
+  if (pickerShowFavs && $("swap-picker-search").value.trim()) pickerShowFavs = false;
   if (swapState.pickerSide) renderAssetPicker(swapState.pickerSide);
 });
 
@@ -2099,6 +2121,9 @@ async function refreshMainPredictionsCard() {
 // Null for the plain "Buy crypto" entry point (Settings / main), where
 // Transak's own picker starts from its usual default.
 let buyPresetSymbol = null;
+// Set when a fiat currency row (USD / EUR) is picked: Transak opens with that
+// currency as its default and the matching dollar/euro coin as the crypto.
+let buyPresetFiat = null;
 
 function resetBuyWidget() {
   $("buy-iframe").src = "about:blank";
@@ -2106,10 +2131,9 @@ function resetBuyWidget() {
   $("buy-intro").classList.remove("hidden");
 }
 
-function setupBuyScreen(presetSymbol) {
-  hideError("buy-error");
-  buyPresetSymbol = presetSymbol || null;
+function updateBuyPresetNote() {
   const note = $("buy-preset-note");
+  const change = $("btn-buy-change-coin");
   if (note) {
     if (buyPresetSymbol) {
       note.textContent = TM_I18N.t("buy.presetNote", { symbol: buyPresetSymbol });
@@ -2118,20 +2142,33 @@ function setupBuyScreen(presetSymbol) {
       note.classList.add("hidden");
     }
   }
+  if (change) change.classList.toggle("hidden", !buyPresetSymbol);
+}
+
+// Opening Buy with no coin chosen (Home / Settings) goes straight to the coin
+// picker below; opening it from a coin's own detail screen already knows the
+// coin, so it skips the picker and shows the intro with a "Change coin" link.
+function setupBuyScreen(presetSymbol) {
+  hideError("buy-error");
+  closeBuyPicker();
+  buyPresetSymbol = presetSymbol || null;
+  buyPresetFiat = null;
+  updateBuyPresetNote();
   resetBuyWidget();
   const btn = $("btn-buy-open");
   if (btn) { btn.disabled = false; btn.classList.remove("hidden"); }
+  if (!buyPresetSymbol) openBuyPicker();
 }
 
-$("btn-buy-goto-swap").addEventListener("click", () => { setupSwapScreen(); showScreen("screen-swap"); });
+$("btn-buy-goto-swap").addEventListener("click", () => { closeBuyPicker(); setupSwapScreen(); showScreen("screen-swap"); });
 
-$("btn-buy-open").addEventListener("click", async () => {
+async function startBuyWidget() {
   hideError("buy-error");
   const btn = $("btn-buy-open");
   btn.disabled = true;
   try {
     const address = (currentStatus && currentStatus.selectedAddress) || "";
-    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, currentCurrency, buyPresetSymbol);
+    const url = await TM_TRANSAK_CONFIG.buildTransakUrl("BUY", currentNetwork.key, address, buyPresetFiat || currentCurrency, buyPresetSymbol);
     $("buy-iframe").src = url;
     $("buy-intro").classList.add("hidden");
     $("buy-widget").classList.remove("hidden");
@@ -2140,9 +2177,202 @@ $("btn-buy-open").addEventListener("click", async () => {
   } finally {
     btn.disabled = false;
   }
-});
+}
+$("btn-buy-open").addEventListener("click", startBuyWidget);
 $("btn-buy-close-widget").addEventListener("click", resetBuyWidget);
 $("btn-buy-back").addEventListener("click", resetBuyWidget);
+$("btn-buy-change-coin").addEventListener("click", () => openBuyPicker());
+
+// ---- Buy coin picker -----------------------------------------------------
+// Network chips along the top, a search box, then the coins people actually
+// buy: the network's own coin, issuer-verified stablecoins, and the top coins
+// by market cap on that network (same CoinGecko-backed lists the Swap picker
+// uses). Tapping a coin sets it as Transak's default and opens Transak right
+// away. The chips switch the wallet's active network, like Swap's picker.
+let buyPickerGen = 0;
+let buyPickerOpen = false;
+
+function closeBuyPicker() {
+  const el = $("buy-asset-picker");
+  if (el) el.classList.add("hidden");
+  buyPickerOpen = false;
+  buyPickerGen++;
+}
+
+function openBuyPicker() {
+  $("buy-picker-search").value = "";
+  $("buy-picker-chips").dataset.scrolled = "";
+  buyPickerOpen = true;
+  renderBuyPicker();
+  $("buy-asset-picker").classList.remove("hidden");
+}
+
+function renderBuyPickerChips() {
+  const chips = $("buy-picker-chips");
+  chips.innerHTML = "";
+  currentNetworks.forEach((n) => {
+    const active = currentNetwork && n.chainId === currentNetwork.chainId;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "asset-picker-chip" + (active ? " active" : "");
+    b.innerHTML = networkDotHtml(n.key) + `<span>${escapeHtml(n.name)}</span>`;
+    b.addEventListener("click", () => switchNetworkFromBuyPicker(n));
+    chips.appendChild(b);
+    if (active && !chips.dataset.scrolled) { chips.dataset.scrolled = "1"; setTimeout(() => b.scrollIntoView({ inline: "center", block: "nearest" }), 0); }
+  });
+}
+
+async function switchNetworkFromBuyPicker(n) {
+  if (currentNetwork && n.chainId === currentNetwork.chainId) return;
+  const chips = $("buy-picker-chips");
+  chips.classList.add("busy");
+  try {
+    await sendMsg("TM_SELECT_NETWORK", { chainId: n.chainId });
+    await refreshMain();
+  } catch (e) {
+    showError("buy-error", e.message);
+  } finally {
+    chips.classList.remove("busy");
+    if (buyPickerOpen) renderBuyPicker();
+  }
+}
+
+function pickBuyCoin(symbol, fiat) {
+  closeBuyPicker();
+  buyPresetSymbol = String(symbol || "").toUpperCase() || null;
+  buyPresetFiat = fiat ? String(fiat).toLowerCase() : null;
+  updateBuyPresetNote();
+  startBuyWidget();
+}
+
+function buyPickerRow(symbol, name, imageUrl, sub, coin, fiat) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "asset-picker-row";
+  row.dataset.symbol = String(symbol).toUpperCase();
+  row.innerHTML =
+    `<span class="token-icon-wrap">${tokenIconHtml(symbol, imageUrl)}<span class="token-net-badge" style="background:${networkDotColor(currentNetwork.key)}"></span></span>` +
+    `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(symbol)}</span>` +
+    `<span class="asset-picker-row-sub">${escapeHtml(sub || name || "")}</span></span>`;
+  row.addEventListener("click", () => pickBuyCoin(coin || symbol, fiat));
+  return row;
+}
+
+function renderBuyPicker() {
+  renderBuyPickerChips();
+  const list = $("buy-picker-list");
+  list.innerHTML = "";
+  if (!currentNetwork) return;
+  const query = $("buy-picker-search").value.trim();
+  const q = query.toLowerCase();
+  const matches = (sym, name) => !q || String(sym).toLowerCase().includes(q) || String(name || "").toLowerCase().includes(q);
+  const seen = new Set();
+
+  // Currencies first: US dollar / euro (fiat) and the matching dollar/euro coins.
+  // A fiat row buys its coin with that currency as Transak's default.
+  const knownBySymbol = {};
+  (typeof TM_KNOWN_TOKENS !== "undefined" ? TM_KNOWN_TOKENS.forChain(currentNetwork.chainId) : []).forEach((t) => { knownBySymbol[String(t.symbol).toUpperCase()] = t; });
+  const currencyName = (code) => {
+    try { return new Intl.DisplayNames([TM_I18N.getLanguage ? TM_I18N.getLanguage() : undefined].filter(Boolean), { type: "currency" }).of(code) || code; }
+    catch (e) { return code; }
+  };
+  const currencies = [
+    { symbol: "EUR", name: currencyName("EUR"), coin: "EURC", fiat: "eur", fiatRow: true },
+    { symbol: "EURC", name: (knownBySymbol.EURC || {}).name || "Euro Coin", coin: "EURC", image: knownBySymbol.EURC ? trustWalletLogoUrl(currentNetwork.key, knownBySymbol.EURC.address) : null },
+    { symbol: "USD", name: currencyName("USD"), coin: "USDC", fiat: "usd", fiatRow: true },
+    { symbol: "USDC", name: (knownBySymbol.USDC || {}).name || "USD Coin", coin: "USDC", image: knownBySymbol.USDC ? trustWalletLogoUrl(currentNetwork.key, knownBySymbol.USDC.address) : null },
+  ].filter((c) => matches(c.symbol, c.name) || matches(c.coin, ""));
+  if (currencies.length) {
+    const h = document.createElement("p");
+    h.className = "hint";
+    h.textContent = TM_I18N.t("buy.pickerCurrencies");
+    list.appendChild(h);
+    currencies.forEach((c) => {
+      seen.add(String(c.symbol).toUpperCase());
+      list.appendChild(buyPickerRow(c.symbol, c.name, c.image || null, c.fiatRow ? `${c.name} \u2192 ${c.coin}` : c.name, c.coin, c.fiat));
+    });
+  }
+
+  // Crypto: the network's own coin and USDT (issuer-verified). Other coins are
+  // found by typing in the search box -- no long "top coins" list by default.
+  const crypto = [];
+  const nc = currentNetwork.nativeCurrency || {};
+  if (nc.symbol && matches(nc.symbol, nc.name)) crypto.push({ symbol: nc.symbol, name: nc.name || nc.symbol, image: null, sub: currentNetwork.name });
+  if (knownBySymbol.USDT && matches("USDT", knownBySymbol.USDT.name)) crypto.push({ symbol: "USDT", name: knownBySymbol.USDT.name, image: trustWalletLogoUrl(currentNetwork.key, knownBySymbol.USDT.address), sub: knownBySymbol.USDT.name });
+  const cryptoRows = crypto.filter((c) => !seen.has(String(c.symbol).toUpperCase()));
+  if (cryptoRows.length) {
+    const h = document.createElement("p");
+    h.className = "hint";
+    h.textContent = TM_I18N.t("buy.pickerCrypto");
+    list.appendChild(h);
+    cryptoRows.forEach((c) => {
+      seen.add(String(c.symbol).toUpperCase());
+      list.appendChild(buyPickerRow(c.symbol, c.name, c.image, c.sub));
+    });
+  }
+  if (!q) return; // nothing typed: just Currencies + Crypto
+  appendBuyCatalogRows(query, list, seen);
+}
+
+async function appendBuyCatalogRows(query, list, seen) {
+  const gen = ++buyPickerGen;
+  if (typeof TM_CATALOG === "undefined" || !currentNetwork || !TM_CATALOG.supports(currentNetwork.key)) {
+    if (!list.children.length) {
+      const p = document.createElement("p");
+      p.className = "hint picker-nomatch";
+      p.textContent = TM_I18N.t("swap.pickerNoMatch");
+      list.appendChild(p);
+    }
+    return;
+  }
+  if (query && query.length < 2) return;
+  const status = document.createElement("p");
+  status.className = "hint";
+  status.textContent = TM_I18N.t("swap.pickerLoadingTokens");
+  list.appendChild(status);
+  let rows = [];
+  let failed = false;
+  try {
+    if (query) await new Promise((r) => setTimeout(r, 350)); // wait for typing to pause
+    if (gen !== buyPickerGen) return;
+    rows = query ? await TM_CATALOG.search(currentNetwork.key, query, 20) : await TM_CATALOG.top(currentNetwork.key, 40);
+  } catch (e) { rows = []; failed = true; }
+  if (gen !== buyPickerGen) return;
+  status.remove();
+  if (failed) {
+    const f = document.createElement("p");
+    f.className = "hint";
+    f.textContent = TM_I18N.t("swap.pickerLoadFailed");
+    list.appendChild(f);
+  }
+  rows = rows.filter((t) => t.symbol && !seen.has(String(t.symbol).toUpperCase()));
+  if (rows.length) {
+    const h = document.createElement("p");
+    h.className = "hint";
+    h.textContent = TM_I18N.t(query ? "swap.pickerSearchResults" : "swap.pickerTopTokens");
+    list.appendChild(h);
+    rows.forEach((t) => {
+      const key = String(t.symbol).toUpperCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      list.appendChild(buyPickerRow(t.symbol, t.name, t.image || trustWalletLogoUrl(currentNetwork.key, t.address), t.name + (t.rank ? ` · #${t.rank}` : "")));
+    });
+  }
+  if (!list.querySelector(".asset-picker-row") && !failed) {
+    const p = document.createElement("p");
+    p.className = "hint picker-nomatch";
+    p.textContent = TM_I18N.t("swap.pickerNoMatch");
+    list.appendChild(p);
+  }
+}
+
+$("buy-picker-search").addEventListener("input", () => { if (buyPickerOpen) renderBuyPicker(); });
+$("buy-picker-close").addEventListener("click", () => {
+  closeBuyPicker();
+  // Nothing chosen: leave Buy rather than strand the person on the intro.
+  showScreen("screen-main");
+  refreshMain();
+});
 
 // ---------------------------------------------------------------- SELL
 // Same in-app iframe pattern as Buy above.

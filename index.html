@@ -463,6 +463,7 @@
       </div>
       <p class="muted" data-i18n="buy.description2">Transak's buy flow opens right here in the app, with your receiving address already filled in and locked -- nothing to paste, and purchased crypto can only go to your own wallet.</p>
       <p id="buy-preset-note" class="hint hidden"></p>
+      <button type="button" class="link hidden" id="btn-buy-change-coin" data-i18n="buy.changeCoinBtn">Change coin</button>
       <button id="btn-buy-open" class="primary" data-i18n="buy.continueBtn">Continue to Transak</button>
       <button id="btn-buy-back" class="back-btn top-back-btn" type="button" data-back="screen-main"><span class="top-back-btn-coin" aria-hidden="true">&#8592;</span><span class="top-back-btn-label" data-i18n="common.back">Back</span></button>
       <p id="buy-error" class="error hidden"></p>
@@ -470,6 +471,23 @@
     <div id="buy-widget" class="transak-widget hidden">
       <button type="button" class="link" id="btn-buy-close-widget" data-i18n="buy.closeWidgetBtn">← Close</button>
       <iframe id="buy-iframe" class="transak-iframe" src="about:blank" allow="camera;microphone;payment"></iframe>
+    </div>
+
+    <!-- Coin picker shown first when Buy opens: network chips + search + coin list -->
+    <div id="buy-asset-picker" class="asset-picker hidden">
+      <div class="asset-picker-panel asset-picker-panel-tall">
+        <div class="asset-picker-head asset-picker-head-page">
+          <button type="button" class="asset-picker-close asset-picker-back" id="buy-picker-close" aria-label="Back">&#8249;</button>
+          <span data-i18n="buy.pickerTitle">Choose what to buy</span>
+          <span class="asset-picker-head-spacer" aria-hidden="true"></span>
+        </div>
+        <div class="asset-picker-searchwrap">
+          <span class="asset-picker-searchicon" aria-hidden="true">&#9906;</span>
+          <input type="text" id="buy-picker-search" class="asset-picker-search" autocomplete="off" spellcheck="false" data-i18n-placeholder="buy.pickerSearchPlaceholder" placeholder="Search coins by name or symbol" />
+        </div>
+        <div class="asset-picker-chips" id="buy-picker-chips"></div>
+        <div class="asset-picker-list" id="buy-picker-list"></div>
+      </div>
     </div>
   </section>
 

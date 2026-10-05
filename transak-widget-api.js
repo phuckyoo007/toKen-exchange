@@ -267,6 +267,7 @@ function handleTransakApi(req, res) {
         const widgetUrl = await createWidgetUrl(widgetParams);
         sendJson(res, 200, { configured: true, url: widgetUrl, networkLocked: !!transakNetwork });
       } catch (e) {
+        console.error("[transak-session] " + product + " failed: " + ((e && e.message) || e));
         sendJson(res, 502, { error: (e && e.message) || "Could not reach Transak." });
       }
     })

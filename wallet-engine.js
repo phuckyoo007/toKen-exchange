@@ -1020,6 +1020,17 @@ async function handleMessage(msg) {
             break;
           }
 
+          // "Find NFTs": lists what an address holds on the active network via this
+          // project's own /api/nft-list proxy (lib/nft.js). Read-only; every failure
+          // mode comes back as configured/supported/ok flags, never a thrown error.
+          case "TM_GET_NFTS_FOR_OWNER": {
+            if (!ethers.utils.isAddress(msg.owner)) throw new Error("That doesn't look like a valid address.");
+            const network = await getActiveNetwork();
+            const result = await TM_NFT.fetchNftsForOwner({ networkKey: network.key, owner: msg.owner, pageKey: msg.pageKey || null });
+            sendResponse({ ok: true, ...result });
+            break;
+          }
+
           // Read-only preview of an NFT before it's added -- mirrors
           // TM_LOOKUP_TOKEN's "look up, show a preview, then confirm" flow.
           case "TM_LOOKUP_NFT": {

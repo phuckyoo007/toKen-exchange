@@ -1074,7 +1074,7 @@ button:focus-visible, .link:focus-visible, a:focus-visible {
 .asset-picker-row-symbol { font-weight: 600; font-size: 13px; }
 .asset-picker-row-balance { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .asset-picker-custom-btn { margin-top: 6px; font-size: 12.5px; }
-#swap-asset-picker { align-items: stretch; background: var(--bg); backdrop-filter: none; }
+#swap-asset-picker, #buy-asset-picker { align-items: stretch; background: var(--bg); backdrop-filter: none; }
 .asset-picker-panel-tall {
   max-height: none; height: 100%; border: none; border-radius: 0;
   background: var(--bg); padding: 14px 14px 12px;
