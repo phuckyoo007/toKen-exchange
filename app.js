@@ -1821,6 +1821,9 @@ async function loadCoinInfo(gen) {
     const fm = (n) => TM_PRICES.formatMoney(n, currentCurrency, { price: true });
     if (d.marketCap != null) stats.appendChild(coinStat(TM_I18N.t("coin.marketCap"), TM_PRICES.formatMoneyCompact(d.marketCap, currentCurrency)));
     if (d.volume != null) stats.appendChild(coinStat(TM_I18N.t("coin.volume24h"), TM_PRICES.formatMoneyCompact(d.volume, currentCurrency)));
+    const fmPct = (n) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+    if (d.change7d != null) stats.appendChild(coinStat("7D", fmPct(d.change7d)));
+    if (d.change30d != null) stats.appendChild(coinStat("30D", fmPct(d.change30d)));
     if (d.high24h != null) stats.appendChild(coinStat(TM_I18N.t("coin.high24h"), fm(d.high24h)));
     if (d.low24h != null) stats.appendChild(coinStat(TM_I18N.t("coin.low24h"), fm(d.low24h)));
     if (d.circulatingSupply != null) stats.appendChild(coinStat(TM_I18N.t("coin.supply"), d.circulatingSupply.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 })));
@@ -2082,9 +2085,10 @@ async function refreshMainPricesCard() {
 }
 
 // ---------------------------------------------------------------- PREDICTIONS
-// Read-only display of coins trending on CoinGecko (see lib/token-catalog.js).
-// Tapping a row opens the in-app coin screen (chart, stats, Swap).
-function renderTrendingRow(c) {
+// Read-only display of national currencies with the stablecoins pegged to them (see lib/prices.js,
+// getCurrencyStablecoins). Each row shows the stablecoin's live price and how far it is from its peg
+// (green while within 0.5%, red beyond that). Tapping a row opens the in-app coin screen (chart, stats, Swap).
+function renderStablecoinRow(c) {
   const row = document.createElement("div");
   row.className = "price-row";
   const priceText =
@@ -2092,13 +2096,13 @@ function renderTrendingRow(c) {
       ? TM_I18N.t("prices.naText")
       : TM_PRICES.formatMoney(c.price, currentCurrency, { price: true });
   let changeHtml = "";
-  if (typeof c.change24h === "number") {
-    const cls = c.change24h >= 0 ? "up" : "down";
-    const sign = c.change24h >= 0 ? "+" : "";
-    changeHtml = `<span class="price-change ${cls}">${sign}${c.change24h.toFixed(2)}%</span>`;
+  if (typeof c.peg === "number" && isFinite(c.peg)) {
+    const cls = Math.abs(c.peg) <= 0.5 ? "up" : "down";
+    const sign = c.peg >= 0 ? "+" : "";
+    changeHtml = `<span class="price-change ${cls}">${sign}${c.peg.toFixed(2)}%</span>`;
   }
   const linkLabel = escapeHtml(TM_I18N.t("prices.viewCoin", { name: c.name }));
-  row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${escapeHtml(c.symbol)}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>`;
+  row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${escapeHtml(c.symbol)} &middot; ${escapeHtml(c.fiat)}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>`;
   row.querySelector(".price-link").addEventListener("click", () => {
     openCoinDetail(c, $("screen-predictions").classList.contains("hidden") ? "screen-main" : "screen-predictions");
   });
@@ -2110,7 +2114,7 @@ async function refreshPredictions() {
   $("predictions-status").innerHTML = coinSpinnerHtml(TM_I18N.t("predictions.loading"));
   $("predictions-status").classList.remove("hidden");
   try {
-    const markets = await TM_CATALOG.getTrendingCoins(12, currentCurrency);
+    const markets = await TM_PRICES.getCurrencyStablecoins(currentCurrency);
     const list = $("predictions-list");
     list.innerHTML = "";
     if (!markets.length) {
@@ -2119,7 +2123,7 @@ async function refreshPredictions() {
       p.textContent = TM_I18N.t("predictions.empty");
       list.appendChild(p);
     } else {
-      markets.forEach((m) => list.appendChild(renderTrendingRow(m)));
+      markets.forEach((m) => list.appendChild(renderStablecoinRow(m)));
     }
     $("predictions-status").classList.add("hidden");
   } catch (e) {
@@ -2134,12 +2138,15 @@ async function refreshMainPredictionsCard() {
   if (!list) return;
   list.innerHTML = `<div class="price-row skeleton">${coinSpinnerHtml(TM_I18N.t("predictions.loading"))}</div>`;
   try {
-    const markets = await TM_CATALOG.getTrendingCoins(MAIN_PREDICTIONS_CARD_COUNT, currentCurrency);
+    const all = await TM_PRICES.getCurrencyStablecoins(currentCurrency);
+    // One stablecoin per currency on the small card; the full screen lists them all.
+    const seen = new Set();
+    const markets = all.filter((m) => (seen.has(m.fiat) ? false : seen.add(m.fiat))).slice(0, MAIN_PREDICTIONS_CARD_COUNT);
     list.innerHTML = "";
     if (!markets.length) {
       list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("predictions.empty")}</div>`;
     } else {
-      markets.forEach((m) => list.appendChild(renderTrendingRow(m)));
+      markets.forEach((m) => list.appendChild(renderStablecoinRow(m)));
     }
   } catch (e) {
     list.innerHTML = `<div class="price-row skeleton">${TM_I18N.t("predictions.cardUnavailable")}</div>`;

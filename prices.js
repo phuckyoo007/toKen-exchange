@@ -428,6 +428,101 @@ async function usdToDisplayRate(vsCurrency) {
   return null;
 }
 
+// ---- DefiLlama history + % change (coin pages) -----------------------------------------
+// The coin page's chart and its 24h / 7d / 30d changes are asked of DefiLlama FIRST; CoinGecko
+// is the backup (and still supplies market cap, volume, supply, rank and the description, which
+// DefiLlama doesn't have). DefiLlama quotes US dollars, so prices are converted with
+// usdToDisplayRate() like the other DefiLlama lookups.
+const LLAMA_DIRECT_ROOT = "https://coins.llama.fi";
+const LLAMA_PROXY_ROOT = MARKET_PROXY_BASE + "/llama";
+// days -> how many points to ask for and how far apart (span x period covers the whole range).
+const LLAMA_CHART_SHAPES = {
+  1: { span: 48, period: "30m" },
+  7: { span: 84, period: "2h" },
+  30: { span: 120, period: "6h" },
+  365: { span: 122, period: "3d" },
+};
+
+// GET <root><path> as JSON, our server's cached relay first and DefiLlama directly second.
+// Returns null (never throws) if neither answers.
+async function llamaJson(path) {
+  for (const root of [LLAMA_PROXY_ROOT, LLAMA_DIRECT_ROOT]) {
+    try {
+      const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = ctrl ? setTimeout(() => ctrl.abort(), MARKET_PROXY_TIMEOUT_MS) : null;
+      let res;
+      try { res = await fetch(root + path, ctrl ? { signal: ctrl.signal } : undefined); } finally { if (timer) clearTimeout(timer); }
+      if (res && res.ok) return await res.json();
+    } catch (e) { /* try the next route */ }
+  }
+  return null;
+}
+
+const CG_ID_SAFE = /^[A-Za-z0-9._-]{1,100}$/;
+
+// [[timestampMs, price in display currency], ...] from DefiLlama, or null if it has no usable history.
+async function llamaCoinChart(id, days, vs) {
+  const shape = LLAMA_CHART_SHAPES[days];
+  if (!shape || !CG_ID_SAFE.test(id)) return null;
+  const rate = await usdToDisplayRate(vs);
+  if (rate == null) return null;
+  const coin = "coingecko:" + id;
+  const start = Math.floor(Date.now() / 1000) - days * 86400;
+  const json = await llamaJson(`/chart/${coin}?start=${start}&span=${shape.span}&period=${shape.period}`);
+  const row = json && json.coins && json.coins[coin];
+  const prices = row && Array.isArray(row.prices) ? row.prices : [];
+  const pts = prices
+    .filter((p) => p && isFinite(p.timestamp) && typeof p.price === "number" && isFinite(p.price) && p.price > 0)
+    .map((p) => [p.timestamp * 1000, p.price * rate]);
+  return pts.length >= 8 ? pts : null;
+}
+
+// { change24h, change7d, change30d } in percent (any of them null if DefiLlama doesn't know).
+async function llamaPercentChanges(id) {
+  const out = { change24h: null, change7d: null, change30d: null };
+  if (!CG_ID_SAFE.test(id)) return out;
+  const coin = "coingecko:" + id;
+  await Promise.all([["change24h", "1d"], ["change7d", "7d"], ["change30d", "30d"]].map(async ([key, period]) => {
+    const json = await llamaJson(`/percentage/${coin}?period=${period}`);
+    const v = json && json.coins ? json.coins[coin] : null;
+    if (typeof v === "number" && isFinite(v)) out[key] = v;
+  }));
+  return out;
+}
+
+// Value of the issuer-verified stablecoins (USDC / USDT = 1 US dollar, EURC = 1 euro) in the
+// display currency, for balances whose price no service returned -- so they still show a dollar
+// value instead of a blank. Matched by CONTRACT ADDRESS against TM_KNOWN_TOKENS (the issuers' own
+// published lists), never by symbol, so a look-alike token never gets a value. Returns
+// { [lower-case address]: { price } } for just the ones it can value. Never throws.
+async function stablecoinFallbackPrices(chainId, addresses, currency) {
+  const out = {};
+  try {
+    if (typeof TM_KNOWN_TOKENS === "undefined" || !addresses || !addresses.length) return out;
+    const known = TM_KNOWN_TOKENS.forChain(chainId) || [];
+    const want = new Map(); // lower-case address -> currency it is pegged to
+    addresses.forEach((a) => {
+      const k = known.find((t) => t.address.toLowerCase() === String(a || "").toLowerCase());
+      if (k && (k.symbol === "USDC" || k.symbol === "USDT" || k.symbol === "EURC")) want.set(k.address.toLowerCase(), k.symbol === "EURC" ? "EUR" : "USD");
+    });
+    if (!want.size) return out;
+    const display = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+    let rates = null;
+    const rateFor = async (code) => {
+      if (code.toLowerCase() === String(display).toLowerCase()) return 1;
+      if (!rates) rates = await getFiatRates(display);
+      const r = rates.find((x) => String(x.code).toUpperCase() === code);
+      return r ? r.rate : null;
+    };
+    for (const [addr, code] of want) {
+      let p = null;
+      try { p = await rateFor(code); } catch (e) { p = null; }
+      if (typeof p === "number" && p > 0) out[addr] = { price: p };
+    }
+  } catch (e) { /* best-effort */ }
+  return out;
+}
+
 // Separate small in-memory cache for the price BOARD specifically (kept
 // apart from fetchPrices()'s cache above, and calling a different
 // endpoint) -- CoinGecko's /coins/markets returns price, 24h change, AND
@@ -527,38 +622,73 @@ async function getCoinDetail(symbol, currency, idOverride) {
   const hit = coinDetailCache.get(key);
   if (hit && now - hit.fetchedAt < CACHE_TTL_MS) return hit.data;
 
-  let res;
+  // DefiLlama's price changes are asked in parallel with CoinGecko's market data.
+  const changesP = llamaPercentChanges(id);
+  let json = null;
+  let failure = null;
   try {
-    res = await cgFetch(`/coins/${encodeURIComponent(id)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`);
+    const res = await cgFetch(`/coins/${encodeURIComponent(id)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`);
+    if (res.ok) json = await res.json();
+    else failure = new Error(`CoinGecko request failed (HTTP ${res.status}).`);
   } catch (e) {
-    throw new Error("Couldn't reach CoinGecko. Check your internet connection.");
+    failure = new Error("Couldn't reach CoinGecko. Check your internet connection.");
   }
-  if (!res.ok) throw new Error(`CoinGecko request failed (HTTP ${res.status}).`);
-  const json = await res.json();
-  const md = json.market_data || {};
-  const pick = (o) => (o && typeof o[vs] === "number" ? o[vs] : null);
-  const change = md.price_change_percentage_24h_in_currency && typeof md.price_change_percentage_24h_in_currency[vs] === "number"
-    ? md.price_change_percentage_24h_in_currency[vs]
-    : (typeof md.price_change_percentage_24h === "number" ? md.price_change_percentage_24h : null);
-  const homepage = json.links && Array.isArray(json.links.homepage)
-    ? json.links.homepage.find((u) => typeof u === "string" && /^https:\/\//i.test(u)) || null
-    : null;
-  const data = {
-    id,
-    rank: typeof json.market_cap_rank === "number" ? json.market_cap_rank : null,
-    price: pick(md.current_price),
-    change24h: change,
-    marketCap: pick(md.market_cap),
-    volume: pick(md.total_volume),
-    high24h: pick(md.high_24h),
-    low24h: pick(md.low_24h),
-    ath: pick(md.ath),
-    athChange: pick(md.ath_change_percentage),
-    circulatingSupply: typeof md.circulating_supply === "number" ? md.circulating_supply : null,
-    description: shortDescription(plainTextFromHtml(json.description && json.description.en), 420),
-    homepage,
-  };
-  coinDetailCache.set(key, { fetchedAt: now, data });
+  const changes = await changesP;
+
+  let data;
+  if (json) {
+    const md = json.market_data || {};
+    const pick = (o) => (o && typeof o[vs] === "number" ? o[vs] : null);
+    const cgChange = md.price_change_percentage_24h_in_currency && typeof md.price_change_percentage_24h_in_currency[vs] === "number"
+      ? md.price_change_percentage_24h_in_currency[vs]
+      : (typeof md.price_change_percentage_24h === "number" ? md.price_change_percentage_24h : null);
+    const homepage = json.links && Array.isArray(json.links.homepage)
+      ? json.links.homepage.find((u) => typeof u === "string" && /^https:\/\//i.test(u)) || null
+      : null;
+    data = {
+      id,
+      rank: typeof json.market_cap_rank === "number" ? json.market_cap_rank : null,
+      price: pick(md.current_price),
+      change24h: cgChange != null ? cgChange : changes.change24h,
+      change7d: changes.change7d != null ? changes.change7d : (typeof md.price_change_percentage_7d === "number" ? md.price_change_percentage_7d : null),
+      change30d: changes.change30d != null ? changes.change30d : (typeof md.price_change_percentage_30d === "number" ? md.price_change_percentage_30d : null),
+      marketCap: pick(md.market_cap),
+      volume: pick(md.total_volume),
+      high24h: pick(md.high_24h),
+      low24h: pick(md.low_24h),
+      ath: pick(md.ath),
+      athChange: pick(md.ath_change_percentage),
+      circulatingSupply: typeof md.circulating_supply === "number" ? md.circulating_supply : null,
+      description: shortDescription(plainTextFromHtml(json.description && json.description.en), 420),
+      homepage,
+      source: "coingecko",
+    };
+    // CoinGecko answered but had no price: DefiLlama's fills the gap.
+    if (data.price == null) {
+      try {
+        const usd = (await llamaUsdPrices(["coingecko:" + id])).get(("coingecko:" + id).toLowerCase());
+        const rate = usd != null ? await usdToDisplayRate(vs) : null;
+        if (usd != null && rate != null) data.price = usd * rate;
+      } catch (e) { /* leave it null */ }
+    }
+  } else {
+    // CoinGecko is down or rate-limiting: show what DefiLlama knows (price + changes) rather than an error.
+    let price = null;
+    try {
+      const usd = (await llamaUsdPrices(["coingecko:" + id])).get(("coingecko:" + id).toLowerCase());
+      const rate = usd != null ? await usdToDisplayRate(vs) : null;
+      if (usd != null && rate != null) price = usd * rate;
+    } catch (e) { /* handled below */ }
+    if (price == null) throw failure || new Error("Couldn't load this coin right now.");
+    data = {
+      id, rank: null, price,
+      change24h: changes.change24h, change7d: changes.change7d, change30d: changes.change30d,
+      marketCap: null, volume: null, high24h: null, low24h: null, ath: null, athChange: null,
+      circulatingSupply: null, description: "", homepage: null, source: "defillama",
+    };
+  }
+  // Only a complete (CoinGecko) answer is cached for the full period; a DefiLlama-only one is retried sooner.
+  coinDetailCache.set(key, { fetchedAt: data.source === "coingecko" ? now : now - CACHE_TTL_MS + 15000, data });
   return data;
 }
 
@@ -573,17 +703,32 @@ async function getCoinChart(symbol, currency, days, idOverride) {
   const hit = coinChartCache.get(key);
   if (hit && now - hit.fetchedAt < CACHE_TTL_MS) return hit.data;
 
+  const thin = (raw) => {
+    const step = Math.max(1, Math.ceil(raw.length / 120));
+    return raw.filter((_, i) => i % step === 0 || i === raw.length - 1);
+  };
+
+  // 1) DefiLlama first.
+  try {
+    const pts = await llamaCoinChart(id, days, vs);
+    if (pts) {
+      const data = thin(pts);
+      coinChartCache.set(key, { fetchedAt: now, data });
+      return data;
+    }
+  } catch (e) { /* CoinGecko below */ }
+
+  // 2) CoinGecko if DefiLlama had nothing.
   let res;
   try {
     res = await cgFetch(`/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${vs}&days=${days}`);
   } catch (e) {
-    throw new Error("Couldn't reach CoinGecko. Check your internet connection.");
+    throw new Error("Couldn't load the chart. Check your internet connection.");
   }
-  if (!res.ok) throw new Error(`CoinGecko chart request failed (HTTP ${res.status}).`);
+  if (!res.ok) throw new Error(`Chart request failed (HTTP ${res.status}).`);
   const json = await res.json();
   const raw = Array.isArray(json.prices) ? json.prices.filter((p) => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1])) : [];
-  const step = Math.max(1, Math.ceil(raw.length / 120));
-  const data = raw.filter((_, i) => i % step === 0 || i === raw.length - 1);
+  const data = thin(raw);
   coinChartCache.set(key, { fetchedAt: now, data });
   return data;
 }
@@ -782,6 +927,88 @@ async function getTokenPricesByContract(networkKey, addresses, currency) {
   return result;
 }
 
+// ---- Currencies & their stablecoins (the main-screen card + its full screen) --------------
+// National currencies each paired with the well-known stablecoin(s) pegged to them. Every coin id
+// below was confirmed on 2026-10-05 against DefiLlama's live price API (it returned a price AND
+// the matching symbol), and each price was checked to be in line with that currency's market
+// rate. A currency with no confident, liquid, priced stablecoin is deliberately NOT listed (GBP,
+// MXN, CHF, CAD, AUD, TRY... -- their candidates either didn't resolve or weren't priced).
+const CURRENCY_STABLECOINS = [
+  { fiat: "usd", coins: [{ id: "usd-coin", symbol: "USDC", name: "USD Coin" }, { id: "tether", symbol: "USDT", name: "Tether" }] },
+  { fiat: "eur", coins: [{ id: "euro-coin", symbol: "EURC", name: "Euro Coin" }, { id: "stasis-eurs", symbol: "EURS", name: "STASIS EURS" }] },
+  { fiat: "jpy", coins: [{ id: "jpycoin", symbol: "JPYC", name: "JPY Coin" }, { id: "gyen", symbol: "GYEN", name: "GYEN" }] },
+  { fiat: "brl", coins: [{ id: "brz", symbol: "BRZ", name: "Brazilian Digital" }] },
+  { fiat: "sgd", coins: [{ id: "xsgd", symbol: "XSGD", name: "XSGD" }] },
+  { fiat: "zar", coins: [{ id: "zarp-stablecoin", symbol: "ZARP", name: "ZARP Stablecoin" }] },
+  { fiat: "idr", coins: [{ id: "idrx", symbol: "IDRX", name: "IDRX" }] },
+];
+
+// One flat list, grouped by currency in order, each stablecoin with its live price in the display
+// currency and how far it sits from its peg ("peg" in percent, null if we can't tell):
+// [{ id, cgId, symbol, name, fiat: "EUR", fiatName, price, peg, change24h: null, image: null, url }]
+// DefiLlama first, CoinGecko for any coin it doesn't price. Rows without a price are left out.
+const stablecoinListCache = { fetchedAt: 0, key: "", data: null };
+async function getCurrencyStablecoins(currency) {
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const now = Date.now();
+  if (stablecoinListCache.data && stablecoinListCache.key === vs && now - stablecoinListCache.fetchedAt < CACHE_TTL_MS) return stablecoinListCache.data;
+
+  const ids = [];
+  CURRENCY_STABLECOINS.forEach((g) => g.coins.forEach((c) => ids.push(c.id)));
+  const priceById = {}; // id -> price in the display currency
+
+  // 1) DefiLlama (US dollars, converted).
+  try {
+    const usd = await llamaUsdPrices(ids.map((id) => "coingecko:" + id));
+    if (usd.size) {
+      const rate = await usdToDisplayRate(vs);
+      if (rate != null) ids.forEach((id) => { const p = usd.get(("coingecko:" + id).toLowerCase()); if (p != null) priceById[id] = p * rate; });
+    }
+  } catch (e) { /* CoinGecko below */ }
+
+  // 2) CoinGecko for any it didn't have.
+  const missing = ids.filter((id) => priceById[id] == null);
+  if (missing.length) {
+    try {
+      const res = await cgFetch(`/simple/price?ids=${encodeURIComponent(missing.join(","))}&vs_currencies=${vs}`);
+      if (res.ok) {
+        const raw = await res.json();
+        missing.forEach((id) => { if (raw[id] && typeof raw[id][vs] === "number") priceById[id] = raw[id][vs]; });
+      }
+    } catch (e) { /* keep what we have */ }
+  }
+  if (!Object.keys(priceById).length) throw new Error("Couldn't load stablecoin prices. Check your internet connection.");
+
+  // What 1 unit of each pegged currency is worth in the display currency, to measure the peg.
+  let rateRows = [];
+  try { rateRows = await getFiatRates(vs); } catch (e) { rateRows = []; }
+  const fiatInDisplay = (code) => {
+    if (code.toLowerCase() === String(vs).toLowerCase()) return 1;
+    const r = rateRows.find((x) => String(x.code).toUpperCase() === code.toUpperCase());
+    return r ? r.rate : null;
+  };
+
+  const data = [];
+  CURRENCY_STABLECOINS.forEach((g) => {
+    const info = SUPPORTED_CURRENCIES[g.fiat] || { label: g.fiat.toUpperCase(), name: g.fiat.toUpperCase() };
+    const unit = fiatInDisplay(info.label);
+    g.coins.forEach((c) => {
+      const price = priceById[c.id];
+      if (price == null) return;
+      data.push({
+        id: c.id, cgId: c.id, symbol: c.symbol, name: c.name,
+        fiat: info.label, fiatName: info.name,
+        price,
+        peg: unit && unit > 0 ? (price / unit - 1) * 100 : null,
+        change24h: null, image: null,
+        url: `https://www.coingecko.com/en/coins/${encodeURIComponent(c.id)}`,
+      });
+    });
+  });
+  stablecoinListCache.fetchedAt = now; stablecoinListCache.key = vs; stablecoinListCache.data = data;
+  return data;
+}
+
 if (typeof self !== "undefined") {
   self.TM_PRICES = {
     getPriceBoard,
@@ -792,6 +1019,9 @@ if (typeof self !== "undefined") {
     formatMoneyCompact,
     getNativePriceForNetwork,
     getTokenPricesByContract,
+    stablecoinFallbackPrices,
+    getCurrencyStablecoins,
+    CURRENCY_STABLECOINS,
     getTopExchanges,
     COINGECKO_IDS,
     NETWORK_NATIVE_COINGECKO_ID,

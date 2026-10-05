@@ -14,6 +14,8 @@
 // ENDPOINT   GET /api/market/<coingecko path>?<query>
 //   e.g.     /api/market/coins/usd-coin?localization=false&market_data=true...
 //            /api/market/llama/prices/current/ethereum:0xA0b8...,coingecko:ethereum   (DefiLlama)
+//            /api/market/llama/chart/coingecko:ethereum?start=...&span=48&period=30m   (DefiLlama history)
+//            /api/market/llama/percentage/coingecko:ethereum?period=7d                  (DefiLlama % change)
 //            /api/market/coins/usd-coin/market_chart?vs_currency=usd&days=7
 //   Only the specific read-only CoinGecko paths below are relayed (an allow-list, not an
 //   open proxy), only known query parameters are passed on, and values are length/char
@@ -50,6 +52,10 @@ const ROUTES = [
   [new RegExp("^/simple/token_price/" + ID_RE + "$"), 60 * 1000],
   // DefiLlama current prices: /llama/prices/current/<chain:address-or-coingecko:id,...> (max 60 coins)
   [/^\/llama\/prices\/current\/[A-Za-z0-9._:-]{1,80}(,[A-Za-z0-9._:-]{1,80}){0,59}$/, 30 * 1000],
+  // DefiLlama price history for the coin-page chart: /llama/chart/<coin,...>?start=&span=&period= (max 5 coins)
+  [/^\/llama\/chart\/[A-Za-z0-9._:-]{1,80}(,[A-Za-z0-9._:-]{1,80}){0,4}$/, 5 * 60 * 1000],
+  // DefiLlama % price change over a period: /llama/percentage/<coin,...>?period=7d (max 20 coins)
+  [/^\/llama\/percentage\/[A-Za-z0-9._:-]{1,80}(,[A-Za-z0-9._:-]{1,80}){0,19}$/, 2 * 60 * 1000],
 ];
 // "coins/list" is deliberately NOT here: the big coin list is handled by token-list-api.js.
 
@@ -57,6 +63,8 @@ const ALLOWED_PARAMS = new Set([
   "vs_currency", "vs_currencies", "ids", "order", "per_page", "page", "price_change_percentage",
   "include_24hr_change", "contract_addresses", "days", "localization", "tickers", "market_data",
   "community_data", "developer_data", "sparkline",
+  // DefiLlama (chart / percentage):
+  "start", "end", "span", "period", "searchWidth", "timestamp", "lookForward",
 ]);
 const VALUE_RE = /^[A-Za-z0-9_.,%:-]{0,4000}$/;
 const STALE_MAX_MS = 24 * 60 * 60 * 1000;
@@ -82,6 +90,9 @@ function cleanQuery(search) {
     if (!ALLOWED_PARAMS.has(k) || !VALUE_RE.test(v)) return null;
     if (k === "per_page" && !(parseInt(v, 10) >= 1 && parseInt(v, 10) <= 250)) return null;
     if (k === "page" && !(parseInt(v, 10) >= 1 && parseInt(v, 10) <= 5)) return null;
+    if (k === "span" && !(parseInt(v, 10) >= 1 && parseInt(v, 10) <= 500)) return null;
+    if ((k === "start" || k === "end" || k === "timestamp") && !/^\d{1,12}$/.test(v)) return null;
+    if (k === "period" && !/^\d{1,4}[mhdwM]$/.test(v)) return null;
     kept.push([k, v]);
   }
   kept.sort((a, b) => (a[0] + "=" + a[1]).localeCompare(b[0] + "=" + b[1]));
@@ -95,7 +106,7 @@ async function fetchUpstream(pathname, query) {
   const ctrl = typeof AbortController === "function" ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS) : null;
   try {
-    const url = isLlama ? LLAMA_BASE + pathname.slice("/llama".length) : COINGECKO_BASE + pathname + (query ? "?" + query : "");
+    const url = (isLlama ? LLAMA_BASE + pathname.slice("/llama".length) : COINGECKO_BASE + pathname) + (query ? "?" + query : "");
     const res = await fetch(url, { headers, signal: ctrl ? ctrl.signal : undefined });
     const text = await res.text();
     return { status: res.status, body: text };

@@ -64,7 +64,7 @@
     "main.watchOnlySuffix": "(Watching)",
     "main.watchOnlyNotice": "You're viewing a watch-only address -- there's no private key for it in this wallet, so Send and Swap are turned off here.",
     "main.livePricesTitle": "Live Prices",
-    "main.predictionsTitle": "Trending Coins",
+    "main.predictionsTitle": "Currencies & Stablecoins",
     "main.currenciesCardTitle": "Currencies",
     "main.exchangesCardTitle": "Hottest Exchanges",
 
@@ -137,11 +137,11 @@
     "coin.chartUnavailable": "Chart unavailable right now.",
     "swap.customAddressOption": "Other token (paste address)...",
 
-    "predictions.title": "Trending Coins",
-    "predictions.description": "Coins trending on CoinGecko right now -- informational only. Nothing about your wallet is sent to look these up.",
+    "predictions.title": "Currencies & Stablecoins",
+    "predictions.description": "National currencies and the stablecoins pegged to them, with live prices -- informational only. Nothing about your wallet is sent to look these up.",
     "predictions.loading": "Loading...",
-    "predictions.empty": "No trending coins right now.",
-    "predictions.cardUnavailable": "Trending coins unavailable right now.",
+    "predictions.empty": "No stablecoin prices right now.",
+    "predictions.cardUnavailable": "Stablecoin prices unavailable right now.",
     "predictions.volSuffix": "24h vol",
 
     "exchanges.title": "Hottest Exchanges",
