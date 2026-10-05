@@ -9,6 +9,7 @@ const { handleCoinbaseOnrampApi } = require("./coinbase-onramp-api");
 const { handleTransakApi } = require("./transak-widget-api");
 const { handleNftApi } = require("./nft-api");
 const { handleTokenListApi, warm: warmTokenLists } = require("./token-list-api");
+const { handleMarketApi } = require("./market-api");
 const { handleAdminApi } = require("./admin-api");
 const { applySecurityHeaders } = require("./security-headers");
 
@@ -100,6 +101,7 @@ function routeRequest(req, res) {
   if (handleTransakApi(req, res)) return;
   if (handleNftApi(req, res)) return;
   if (handleTokenListApi(req, res)) return;
+  if (handleMarketApi(req, res)) return;
   if (handleAdminApi(req, res)) return;
   return handler(req, res, { public: PUBLIC_DIR });
 }

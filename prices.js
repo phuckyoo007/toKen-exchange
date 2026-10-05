@@ -12,6 +12,28 @@
 // display-only concern and don't need to survive the popup closing.
 
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
+// Our own server relays (and caches) these CoinGecko calls -- see market-api.js. CoinGecko
+// rate-limits by IP and phones on mobile data share IPs, so asking it directly often failed
+// and the coin pages came up empty. We ask our server first and fall back to CoinGecko
+// directly if our server can't be reached, so nothing gets worse.
+const MARKET_PROXY_BASE = "https://web-wallet-production.up.railway.app/api/market";
+const MARKET_PROXY_TIMEOUT_MS = 12000;
+
+// `path` is the CoinGecko path + query, e.g. "/coins/usd-coin/market_chart?vs_currency=usd&days=7".
+async function cgFetch(path) {
+  try {
+    const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), MARKET_PROXY_TIMEOUT_MS) : null;
+    let res;
+    try {
+      res = await fetch(MARKET_PROXY_BASE + path, ctrl ? { signal: ctrl.signal } : undefined);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (res && res.ok) return res;
+  } catch (e) { /* fall through to CoinGecko directly */ }
+  return fetch(COINGECKO_BASE + path);
+}
 
 // CoinGecko's own per-coin "id" strings. These are NOT the same as ticker
 // symbols and are easy to get subtly wrong (e.g. Polygon's native token
@@ -320,10 +342,10 @@ async function fetchPrices(ids, currency) {
   if (priceCache.data && priceCache.cacheKey === cacheKey && now - priceCache.fetchedAt < CACHE_TTL_MS) {
     return { data: priceCache.data, currency: vsCurrency };
   }
-  const url = `${COINGECKO_BASE}/simple/price?ids=${encodeURIComponent(idsKey)}&vs_currencies=${vsCurrency}&include_24hr_change=true`;
+  const url = `/simple/price?ids=${encodeURIComponent(idsKey)}&vs_currencies=${vsCurrency}&include_24hr_change=true`;
   let res;
   try {
-    res = await fetch(url);
+    res = await cgFetch(url);
   } catch (e) {
     throw new Error("Couldn't reach CoinGecko for live prices. Check your internet connection.");
   }
@@ -352,10 +374,10 @@ async function fetchPriceBoardMarkets(ids, currency) {
   if (priceBoardCache.data && priceBoardCache.cacheKey === cacheKey && now - priceBoardCache.fetchedAt < CACHE_TTL_MS) {
     return priceBoardCache.data;
   }
-  const url = `${COINGECKO_BASE}/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&per_page=250&price_change_percentage=24h`;
+  const url = `/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&per_page=250&price_change_percentage=24h`;
   let res;
   try {
-    res = await fetch(url);
+    res = await cgFetch(url);
   } catch (e) {
     throw new Error("Couldn't reach CoinGecko for live prices. Check your internet connection.");
   }
@@ -436,7 +458,7 @@ async function getCoinDetail(symbol, currency, idOverride) {
 
   let res;
   try {
-    res = await fetch(`${COINGECKO_BASE}/coins/${encodeURIComponent(id)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`);
+    res = await cgFetch(`/coins/${encodeURIComponent(id)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`);
   } catch (e) {
     throw new Error("Couldn't reach CoinGecko. Check your internet connection.");
   }
@@ -482,7 +504,7 @@ async function getCoinChart(symbol, currency, days, idOverride) {
 
   let res;
   try {
-    res = await fetch(`${COINGECKO_BASE}/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${vs}&days=${days}`);
+    res = await cgFetch(`/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${vs}&days=${days}`);
   } catch (e) {
     throw new Error("Couldn't reach CoinGecko. Check your internet connection.");
   }
@@ -507,7 +529,7 @@ async function fetchExchangeRates() {
   if (fiatRatesCache.data && now - fiatRatesCache.fetchedAt < CACHE_TTL_MS) return fiatRatesCache.data;
   let res;
   try {
-    res = await fetch(`${COINGECKO_BASE}/exchange_rates`);
+    res = await cgFetch(`/exchange_rates`);
   } catch (e) {
     throw new Error("Couldn't reach CoinGecko for currency rates. Check your internet connection.");
   }
@@ -550,7 +572,7 @@ async function getTopExchanges(count) {
   if (!topExchangesCache.data || now - topExchangesCache.fetchedAt >= CACHE_TTL_MS) {
     let res;
     try {
-      res = await fetch(`${COINGECKO_BASE}/exchanges?per_page=100&page=1`);
+      res = await cgFetch(`/exchanges?per_page=100&page=1`);
     } catch (e) {
       throw new Error("Couldn't reach CoinGecko for exchange rankings. Check your internet connection.");
     }
@@ -635,10 +657,10 @@ async function getTokenPricesByContract(networkKey, addresses, currency) {
   const platform = NETWORK_COINGECKO_PLATFORM[networkKey];
   if (!platform || !addresses || !addresses.length) return {};
   const vsCurrency = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
-  const url = `${COINGECKO_BASE}/simple/token_price/${platform}?contract_addresses=${encodeURIComponent(addresses.join(","))}&vs_currencies=${vsCurrency}`;
+  const url = `/simple/token_price/${platform}?contract_addresses=${encodeURIComponent(addresses.join(","))}&vs_currencies=${vsCurrency}`;
   let res;
   try {
-    res = await fetch(url);
+    res = await cgFetch(url);
   } catch (e) {
     throw new Error("Couldn't reach CoinGecko for token prices. Check your internet connection.");
   }

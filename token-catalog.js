@@ -30,8 +30,24 @@
   const TTL_MS = 6 * 60 * 60 * 1000;
   const TRENDING_TTL_MS = 60 * 1000;
 
+  // Market calls (trending, coin markets) go through our server's cached relay first
+  // (market-api.js); the big coin list is handled by token-list-api.js and goes direct.
+  const MARKET_PROXY_BASE = "https://web-wallet-production.up.railway.app/api/market";
   async function getJson(url) {
     let res;
+    const path = url.startsWith(BASE + "/") ? url.slice(BASE.length) : null;
+    if (path && !path.startsWith("/coins/list")) {
+      try {
+        const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+        try {
+          const r = await fetch(MARKET_PROXY_BASE + path, ctrl ? { signal: ctrl.signal } : undefined);
+          if (r && r.ok) return r.json();
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      } catch (e) { /* fall through to CoinGecko directly */ }
+    }
     try {
       res = await fetch(url);
     } catch (e) {
