@@ -100,13 +100,10 @@ body {
   z-index: 0;
   background:
     linear-gradient(to bottom,
-      rgba(4, 6, 12, 0.02) 0%,
-      rgba(4, 6, 12, 0.06) 18%,
-      rgba(5, 7, 13, 0.6) 33%,
-      rgba(6, 8, 14, 0.95) 41%,
-      rgba(6, 8, 14, 0.985) 50%,
-      rgba(6, 8, 14, 0.99) 100%),
-    url(img/bg-scene.jpg) center top / cover no-repeat;
+      rgba(4, 6, 12, 0.18) 0%,
+      rgba(5, 7, 13, 0.32) 50%,
+      rgba(6, 8, 14, 0.5) 100%),
+    url(img/bg-scene.jpg) center center / cover no-repeat;
 }
 
 #app {
