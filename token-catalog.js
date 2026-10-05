@@ -21,6 +21,12 @@
 // (TM_PRICES.NETWORK_COINGECKO_PLATFORM) are supported; others return [].
 (function () {
   const BASE = "https://api.coingecko.com/api/v3";
+  // Our own server keeps one cached copy of CoinGecko's list (token-list-api.js), so every
+  // device gets the same fast answer instead of each one downloading several MB from
+  // CoinGecko (which rate-limits by IP). If our server can't be reached we fall back to
+  // asking CoinGecko directly, exactly as before.
+  const SERVER_LIST_ENDPOINT = "https://web-wallet-production.up.railway.app/api/token-list";
+  const SERVER_TIMEOUT_MS = 10000;
   const TTL_MS = 6 * 60 * 60 * 1000;
   const TRENDING_TTL_MS = 60 * 1000;
 
@@ -43,6 +49,46 @@
 
   function checksum(addr) {
     try { return ethers.utils.getAddress(String(addr)); } catch (e) { return null; }
+  }
+
+
+  // Ask our server. Returns an array of {symbol,name,address,image,rank,id}, or null when the
+  // server couldn't answer (caller then falls back to CoinGecko directly).
+  const serverCache = new Map(); // url -> { at, rows }
+  const SERVER_CACHE_MS = 5 * 60 * 1000;
+  async function fromServer(networkKey, extraQuery) {
+    const url = `${SERVER_LIST_ENDPOINT}?network=${encodeURIComponent(networkKey)}&${extraQuery}`;
+    const hit = serverCache.get(url);
+    if (hit && Date.now() - hit.at < SERVER_CACHE_MS) return hit.rows;
+    let json;
+    const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), SERVER_TIMEOUT_MS) : null;
+    try {
+      const res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+      if (!res.ok) return null;
+      json = await res.json();
+    } catch (e) {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!json || json.ok !== true || !Array.isArray(json.tokens)) return null;
+    const rows = [];
+    json.tokens.forEach((t) => {
+      const address = t && checksum(t.address);
+      if (!address) return;
+      rows.push({
+        id: String(t.id || ""),
+        symbol: String(t.symbol || "").toUpperCase(),
+        name: String(t.name || ""),
+        address,
+        image: typeof t.image === "string" ? t.image : null,
+        rank: t.rank || null,
+      });
+    });
+    if (serverCache.size > 200) serverCache.clear();
+    serverCache.set(url, { at: Date.now(), rows });
+    return rows;
   }
 
   // ---- full coin list, sliced per platform (one big download, cached) -----
@@ -93,7 +139,7 @@
     return topCache;
   }
 
-  async function top(networkKey, n) {
+  async function topDirect(networkKey, n) {
     const platform = platformFor(networkKey);
     if (!platform) return [];
     const [list, topData] = await Promise.all([loadList(), loadTop()]);
@@ -111,7 +157,7 @@
   }
 
   // Contract address of a CoinGecko coin id on this network (checksummed), or null.
-  async function addressFor(networkKey, coinId) {
+  async function addressForDirect(networkKey, coinId) {
     const platform = platformFor(networkKey);
     if (!platform || !coinId) return null;
     const list = await loadList();
@@ -120,7 +166,7 @@
     return e ? e.address : null;
   }
 
-  async function search(networkKey, query, limit) {
+  async function searchDirect(networkKey, query, limit) {
     const platform = platformFor(networkKey);
     const q = String(query || "").trim().toLowerCase();
     if (!platform || q.length < 2) return [];
@@ -167,6 +213,31 @@
       .sort((a, b) => info.get(a.id).rank - info.get(b.id).rank)
       .slice(0, limit || 15)
       .map((e) => ({ symbol: e.symbol, name: e.name, address: e.address, image: info.get(e.id).image, rank: info.get(e.id).rank }));
+  }
+
+
+  // ---- public API: our server first, CoinGecko directly as the fallback -------
+  async function top(networkKey, n) {
+    if (!platformFor(networkKey)) return [];
+    const rows = await fromServer(networkKey, `limit=${encodeURIComponent(n || 25)}`);
+    if (rows) return rows.map(({ id, ...rest }) => rest);
+    return topDirect(networkKey, n);
+  }
+
+  async function search(networkKey, query, limit) {
+    const q = String(query || "").trim();
+    if (!platformFor(networkKey) || q.length < 2) return [];
+    const rows = await fromServer(networkKey, `q=${encodeURIComponent(q)}&limit=${encodeURIComponent(limit || 15)}`);
+    if (rows) return rows.map(({ id, ...rest }) => rest);
+    return searchDirect(networkKey, query, limit);
+  }
+
+  // Contract address of a CoinGecko coin id on this network (checksummed), or null.
+  async function addressFor(networkKey, coinId) {
+    if (!platformFor(networkKey) || !coinId) return null;
+    const rows = await fromServer(networkKey, `id=${encodeURIComponent(coinId)}`);
+    if (rows) return rows[0] ? rows[0].address : null;
+    return addressForDirect(networkKey, coinId);
   }
 
   // ---- trending coins ------------------------------------------------------

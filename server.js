@@ -8,6 +8,7 @@ const { handleAuthApi } = require("./auth-api");
 const { handleCoinbaseOnrampApi } = require("./coinbase-onramp-api");
 const { handleTransakApi } = require("./transak-widget-api");
 const { handleNftApi } = require("./nft-api");
+const { handleTokenListApi, warm: warmTokenLists } = require("./token-list-api");
 const { handleAdminApi } = require("./admin-api");
 const { applySecurityHeaders } = require("./security-headers");
 
@@ -98,6 +99,7 @@ function routeRequest(req, res) {
   if (handleCoinbaseOnrampApi(req, res)) return;
   if (handleTransakApi(req, res)) return;
   if (handleNftApi(req, res)) return;
+  if (handleTokenListApi(req, res)) return;
   if (handleAdminApi(req, res)) return;
   return handler(req, res, { public: PUBLIC_DIR });
 }
@@ -132,7 +134,11 @@ function main() {
     else console.error("Server error:", err);
     process.exit(1);
   });
-  server.listen(PORT, () => console.log("Serving on port " + PORT));
+  server.listen(PORT, () => {
+    console.log("Serving on port " + PORT);
+    // Load the cached token list (disk snapshot, then CoinGecko) before anyone asks for it.
+    try { warmTokenLists(); } catch (e) { console.error("[token-list] warm-up failed:", e && e.message ? e.message : e); }
+  });
 
   // Finish in-flight requests on a deploy restart instead of cutting them off.
   const shutdown = (signal) => {

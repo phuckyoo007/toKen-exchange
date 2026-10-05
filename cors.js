@@ -15,6 +15,9 @@ const DEFAULT_ALLOWED_ORIGINS = [
   // The website's own code still calls the Railway hostname directly, so the
   // site origin above needs it kept working; it's also a valid way to open the app.
   "https://web-wallet-production.up.railway.app",
+  // The Android app serves the wallet from a fixed port on the phone itself
+  // (LocalAssetServer, port 47831) and calls these endpoints by absolute URL.
+  "http://127.0.0.1:47831",
   // The published Chrome extension (Web Store item ID).
   "chrome-extension://adiihfpfinmhikjiopobbeigcfaoepko",
 ];
