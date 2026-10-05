@@ -2,41 +2,38 @@
 // One shared, cached token list for the whole app (Buy, Swap, the token scanner).
 //
 // WHY THIS EXISTS
-// lib/token-catalog.js used to download CoinGecko's full coin list (several MB)
-// plus the top-500 market list straight from every phone/browser. CoinGecko's
-// free tier rate-limits by IP, mobile networks and the Android WebView often
-// failed that download, and the pickers then showed an empty list. Now THIS
-// server downloads it once every few hours, keeps it in memory (and on disk,
-// so a restart or a CoinGecko outage doesn't empty it) and hands every client
-// a small, fast answer. The client still falls back to CoinGecko directly if
-// this endpoint is unreachable, so nothing gets worse.
+// The token pickers (Buy, Swap, the token scanner) need ONE reliable, consistent list of tokens per
+// network. This server builds it and every device reads the same small, fast answer.
+//
+// WHERE THE LIST COMES FROM
+//   1. MAIN SOURCE: the standard Uniswap-format token lists (https://tokens.uniswap.org by default).
+//      Curated, no API key, per-chain, with logos. The picker's tokens come from here.
+//   2. COINGECKO (kept, in a supporting role): market-cap ranking + logos for the tokens above,
+//      fills networks where the standard list is thin (e.g. Linea, Scroll, Monad), and lets a search
+//      find a ranked coin the standard list doesn't have. It is downloaded here once every few hours,
+//      never from each phone, and if CoinGecko is down the lists still work (and vice versa).
+//   Both are kept in memory and on disk, so a restart or an outage doesn't empty the pickers.
+//   The app itself still falls back to asking CoinGecko directly if this server can't be reached.
 //
 // ENDPOINT   GET /api/token-list?network=<key>&limit=<n>
 //            GET /api/token-list?network=<key>&q=<name|symbol|0xaddress>&limit=<n>
 //            GET /api/token-list?network=<key>&id=<coingecko id>        (its address on that network)
-//   -> { ok: true, network, stale, updatedAt, tokens: [{ id, symbol, name, address, image, rank }] }
+//   -> { ok: true, network, stale, updatedAt, sources: ["lists","coingecko"], tokens: [{ id, symbol, name, address, image, rank }] }
 //   -> { ok: true, supported: false, tokens: [] }   for networks CoinGecko has no platform id for
-//   -> 503 { ok: false, error } only when there is no list at all yet (first boot AND CoinGecko down)
+//   -> 503 { ok: false, error } only when there is no data from EITHER source yet
 //
-// SAFETY (same rules the client always applied)
-//   * Contract addresses come only from CoinGecko's own per-chain platform data.
-//   * A NAME search only returns tokens with a real market-cap rank, which hides
-//     the swarms of same-named fake tokens. A pasted contract address is matched
-//     exactly and is allowed without a rank.
+// SAFETY
+//   * Contract addresses come only from the curated lists or CoinGecko's own per-chain platform data.
+//   * Tokens from the standard lists are shown as-is (they are curated). A name search that falls
+//     through to CoinGecko only returns coins with a real market-cap rank, which hides fake look-alikes.
+//     A pasted contract address is matched exactly and is allowed without a rank.
 //   * Addresses are sent lower-case; the client checksums them (EIP-55) before use.
 //
 // OPTIONAL ENVIRONMENT VARIABLES (all optional)
+//   TOKEN_LIST_URLS     comma-separated standard token-list URLs. Default: https://tokens.uniswap.org
 //   COINGECKO_API_KEY   a free "Demo" key from coingecko.com/en/api -> higher rate limits
 //   COINGECKO_BASE      override the CoinGecko base URL (used by the tests)
-//   DATA_DIR            where the on-disk snapshot lives (same variable accounts use)
-//   TOKEN_LIST_URLS     comma-separated standard "token list" URLs (Uniswap token-lists format) used
-//                       as the BACKUP source when CoinGecko can't be reached and there is no saved
-//                       copy yet. Default: https://tokens.uniswap.org
-//
-// BACKUP SOURCE
-// If CoinGecko is down or rate-limiting this server on first boot (no snapshot on disk), the picker
-// would be empty. Instead we load the standard token lists above (curated, no API key, no market-cap
-// data -- list order is used as the ranking). The CoinGecko list always takes over as soon as it loads.
+//   DATA_DIR            where the on-disk snapshots live (same variable accounts use)
 
 const fs = require("fs");
 const path = require("path");
@@ -48,7 +45,8 @@ const { applyCors } = require("./cors");
 const COINGECKO_BASE = process.env.COINGECKO_BASE || "https://api.coingecko.com/api/v3";
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || "";
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
-const SNAPSHOT_PATH = path.join(DATA_DIR, "token-list-cache.json");
+const SNAPSHOT_PATH = path.join(DATA_DIR, "token-list-cache.json");        // CoinGecko copy
+const LISTS_SNAPSHOT_PATH = path.join(DATA_DIR, "token-lists-cache.json");  // standard-list copy
 
 const TTL_MS = 6 * 60 * 60 * 1000; // refresh every 6 hours
 const RETRY_AFTER_FAIL_MS = 5 * 60 * 1000; // after a failed refresh, wait 5 min
@@ -89,24 +87,25 @@ function loadPlatformByChainId() {
   return out;
 }
 const PLATFORM_BY_CHAIN_ID = loadPlatformByChainId();
-const FALLBACK_LIST_URLS = String(process.env.TOKEN_LIST_URLS || "https://tokens.uniswap.org")
+const LIST_URLS = String(process.env.TOKEN_LIST_URLS || "https://tokens.uniswap.org")
   .split(",").map((u) => u.trim()).filter(Boolean);
-const FALLBACK_TTL_MS = 60 * 60 * 1000;
+const THIN_LIST_MIN = Number.isInteger(+process.env.TOKEN_LIST_THIN_MIN) && process.env.TOKEN_LIST_THIN_MIN !== "" ? +process.env.TOKEN_LIST_THIN_MIN : 40; // a network whose standard list has fewer tokens than this is topped up from CoinGecko
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const NETWORK_RE = /^[a-z0-9-]{1,40}$/;
 
 // ---- in-memory state --------------------------------------------------------
-// state = { at, byPlatform: { [platform]: { entries: [{id,symbol,name,address}], byId: Map } },
-//           order: [id], info: Map id -> { rank, image } }
-let state = null;
-let refreshing = null;
-let lastFailAt = 0;
-let snapshotTried = false;
-let fallbackState = null; // built from standard token lists; only used while there is no CoinGecko list
-let fallbackPromise = null;
-let fallbackFailAt = 0;
-const extraInfo = new Map(); // id -> { at, rank, image } for coins outside the top 500
+// CoinGecko: { at, byPlatform: { [platform]: { entries, byId: Map, byAddress: Map } }, order: [id], info: Map id -> {rank,image} }
+let cg = null;
+let cgRefreshing = null;
+let cgLastFailAt = 0;
+// Standard lists: { at, byPlatform: { [platform]: { entries: [{id,symbol,name,address,image,idx}], byAddress: Map } } }
+let lists = null;
+let listsRefreshing = null;
+let listsLastFailAt = 0;
+let snapshotsTried = false;
+const extraInfo = new Map(); // coingecko id -> { at, rank, image } for coins outside the top 500
+const viewCache = new Map(); // platform -> { key, entries }
 
 async function getJson(url, plain) {
   const headers = { Accept: "application/json" };
@@ -115,16 +114,17 @@ async function getJson(url, plain) {
   const timer = ctrl ? setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS) : null;
   try {
     const res = await fetch(url, { headers, signal: ctrl ? ctrl.signal : undefined });
-    if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
+    if (!res.ok) throw new Error((plain ? "list" : "CoinGecko") + " HTTP " + res.status);
     return await res.json();
   } finally {
     if (timer) clearTimeout(timer);
   }
 }
 
-function buildState(rawList, marketRows, at) {
+// ---- CoinGecko state ----------------------------------------------------------
+function buildCgState(rawList, marketRows, at) {
   const byPlatform = {};
-  PLATFORMS.forEach((p) => { byPlatform[p] = { entries: [], byId: new Map() }; });
+  PLATFORMS.forEach((p) => { byPlatform[p] = { entries: [], byId: new Map(), byAddress: new Map() }; });
   (Array.isArray(rawList) ? rawList : []).forEach((c) => {
     const platforms = c && c.platforms;
     if (!platforms || !c.id) return;
@@ -139,6 +139,7 @@ function buildState(rawList, marketRows, at) {
       };
       byPlatform[p].entries.push(entry);
       byPlatform[p].byId.set(entry.id, entry);
+      if (!byPlatform[p].byAddress.has(entry.address)) byPlatform[p].byAddress.set(entry.address, entry);
     });
   });
   const order = [];
@@ -151,21 +152,9 @@ function buildState(rawList, marketRows, at) {
   return { at, byPlatform, order, info };
 }
 
-// ---- disk snapshot (best effort) ------------------------------------------
-function loadSnapshotOnce() {
-  if (snapshotTried) return;
-  snapshotTried = true;
-  try {
-    const snap = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, "utf8"));
-    if (!snap || !Array.isArray(snap.list) || !Array.isArray(snap.markets) || !snap.list.length) return;
-    // Old on purpose (at: 0 would mean "never"): it is served immediately and refreshed in the background.
-    state = buildState(snap.list, snap.markets, Number(snap.at) || 1);
-  } catch (e) { /* no snapshot yet -- normal on first boot */ }
-}
-function saveSnapshot(rawList, marketRows, at) {
+function saveCgSnapshot(rawList, marketRows, at) {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    // Store only what we use, so the file stays small.
     const list = (Array.isArray(rawList) ? rawList : [])
       .filter((c) => c && c.platforms && PLATFORMS.some((p) => c.platforms[p]))
       .map((c) => {
@@ -173,17 +162,14 @@ function saveSnapshot(rawList, marketRows, at) {
         PLATFORMS.forEach((p) => { if (c.platforms[p]) platforms[p] = c.platforms[p]; });
         return { id: c.id, symbol: c.symbol, name: c.name, platforms };
       });
-    const markets = (Array.isArray(marketRows) ? marketRows : []).map((r) => ({
-      id: r.id, market_cap_rank: r.market_cap_rank, image: r.image,
-    }));
+    const markets = (Array.isArray(marketRows) ? marketRows : []).map((r) => ({ id: r.id, market_cap_rank: r.market_cap_rank, image: r.image }));
     const tmp = SNAPSHOT_PATH + ".tmp";
     fs.writeFileSync(tmp, JSON.stringify({ at, list, markets }));
     fs.renameSync(tmp, SNAPSHOT_PATH);
   } catch (e) { /* a read-only disk just means no snapshot */ }
 }
 
-// ---- refresh ------------------------------------------------------------------
-async function refresh() {
+async function refreshCg() {
   const rawList = await getJson(`${COINGECKO_BASE}/coins/list?include_platform=true`);
   const marketRows = [];
   for (const page of [1, 2]) {
@@ -192,119 +178,204 @@ async function refresh() {
   }
   if (!Array.isArray(rawList) || !rawList.length || !marketRows.length) throw new Error("CoinGecko returned an empty list");
   const at = Date.now();
-  state = buildState(rawList, marketRows, at);
-  saveSnapshot(rawList, marketRows, at);
-  lastFailAt = 0;
+  cg = buildCgState(rawList, marketRows, at);
+  saveCgSnapshot(rawList, marketRows, at);
+  cgLastFailAt = 0;
 }
 
-function startRefresh() {
-  if (refreshing) return refreshing;
-  if (lastFailAt && Date.now() - lastFailAt < RETRY_AFTER_FAIL_MS) return Promise.resolve();
-  refreshing = refresh()
+function startCgRefresh() {
+  if (cgRefreshing) return cgRefreshing;
+  if (cgLastFailAt && Date.now() - cgLastFailAt < RETRY_AFTER_FAIL_MS) return Promise.resolve();
+  cgRefreshing = refreshCg()
     .catch((e) => {
-      lastFailAt = Date.now();
-      console.error("[token-list] refresh failed (serving the previous list if there is one):", e && e.message ? e.message : e);
+      cgLastFailAt = Date.now();
+      console.error("[token-list] CoinGecko refresh failed (using the previous copy if there is one):", e && e.message ? e.message : e);
     })
-    .finally(() => { refreshing = null; });
-  return refreshing;
+    .finally(() => { cgRefreshing = null; });
+  return cgRefreshing;
 }
 
+// ---- standard token lists (the main source) ------------------------------------
+const rawListsByUrl = new Map(); // url -> { tokens: [{chainId,address,symbol,name,logoURI}] } (trimmed to chains we use)
 
-// ---- backup source: standard token lists -------------------------------------
-function buildFallbackState(lists, at) {
-  const byPlatform = {};
-  PLATFORMS.forEach((p) => { byPlatform[p] = { entries: [], byId: new Map() }; });
-  const order = [];
-  const info = new Map();
-  lists.forEach((list) => {
-    (Array.isArray(list && list.tokens) ? list.tokens : []).forEach((t) => {
-      const platform = t && PLATFORM_BY_CHAIN_ID[t.chainId];
-      if (!platform || !ADDRESS_RE.test(String(t.address || ""))) return;
-      const address = String(t.address).toLowerCase();
-      const id = platform + ":" + address;
-      if (byPlatform[platform].byId.has(id)) return;
-      const entry = {
-        id,
-        symbol: String(t.symbol || "").toUpperCase().slice(0, 40),
-        name: String(t.name || "").slice(0, 120),
-        address,
-      };
-      if (!entry.symbol) return;
-      byPlatform[platform].entries.push(entry);
-      byPlatform[platform].byId.set(id, entry);
-      order.push(id);
-      const logo = typeof t.logoURI === "string" && /^https:\/\//i.test(t.logoURI) ? t.logoURI.slice(0, 500) : null;
-      info.set(id, { rank: order.length, image: logo });
+function trimList(json) {
+  const out = [];
+  (Array.isArray(json && json.tokens) ? json.tokens : []).forEach((t) => {
+    if (!t || !PLATFORM_BY_CHAIN_ID[t.chainId] || !ADDRESS_RE.test(String(t.address || ""))) return;
+    out.push({
+      chainId: t.chainId,
+      address: String(t.address),
+      symbol: String(t.symbol || ""),
+      name: String(t.name || ""),
+      logoURI: typeof t.logoURI === "string" ? t.logoURI : null,
     });
   });
-  return { at, byPlatform, order, info, fallback: true };
+  return { tokens: out };
 }
 
-async function loadFallback() {
-  if (fallbackState && Date.now() - fallbackState.at < FALLBACK_TTL_MS) return fallbackState;
-  if (fallbackFailAt && Date.now() - fallbackFailAt < RETRY_AFTER_FAIL_MS) return fallbackState;
-  if (!fallbackPromise) {
-    fallbackPromise = (async () => {
-      const lists = [];
-      for (const url of FALLBACK_LIST_URLS) {
-        try { lists.push(await getJson(url, true)); } catch (e) {
-          console.error("[token-list] backup list failed (" + url + "):", e && e.message ? e.message : e);
-        }
-      }
-      const st = buildFallbackState(lists, Date.now());
-      if (st.order.length) { fallbackState = st; fallbackFailAt = 0; } else { fallbackFailAt = Date.now(); }
-      return fallbackState;
-    })().finally(() => { fallbackPromise = null; });
+function buildListsState(at) {
+  const byPlatform = {};
+  PLATFORMS.forEach((p) => { byPlatform[p] = { entries: [], byAddress: new Map() }; });
+  let idx = 0;
+  LIST_URLS.forEach((url) => {
+    const raw = rawListsByUrl.get(url);
+    if (!raw) return;
+    raw.tokens.forEach((t) => {
+      const platform = PLATFORM_BY_CHAIN_ID[t.chainId];
+      const address = t.address.toLowerCase();
+      const slice = byPlatform[platform];
+      const symbol = t.symbol.toUpperCase().slice(0, 40);
+      if (!slice || !symbol || slice.byAddress.has(address)) return;
+      const entry = {
+        id: platform + ":" + address,
+        symbol,
+        name: t.name.slice(0, 120),
+        address,
+        image: t.logoURI && /^https:\/\//i.test(t.logoURI) ? t.logoURI.slice(0, 500) : null,
+        idx: idx++,
+      };
+      slice.entries.push(entry);
+      slice.byAddress.set(address, entry);
+    });
+  });
+  return { at, byPlatform };
+}
+
+function loadSnapshotsOnce() {
+  if (snapshotsTried) return;
+  snapshotsTried = true;
+  // CoinGecko copy. Served immediately and refreshed in the background.
+  try {
+    const snap = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, "utf8"));
+    if (snap && Array.isArray(snap.list) && Array.isArray(snap.markets) && snap.list.length) {
+      cg = buildCgState(snap.list, snap.markets, Number(snap.at) || 1);
+    }
+  } catch (e) { /* none yet -- normal on first boot */ }
+  try {
+    const snap = JSON.parse(fs.readFileSync(LISTS_SNAPSHOT_PATH, "utf8"));
+    if (snap && snap.byUrl && typeof snap.byUrl === "object") {
+      Object.keys(snap.byUrl).forEach((u) => { if (LIST_URLS.includes(u)) rawListsByUrl.set(u, trimList(snap.byUrl[u])); });
+      if (rawListsByUrl.size) lists = buildListsState(Number(snap.at) || 1);
+    }
+  } catch (e) { /* none yet */ }
+}
+
+function saveListsSnapshot(at) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const byUrl = {};
+    rawListsByUrl.forEach((v, k) => { byUrl[k] = v; });
+    const tmp = LISTS_SNAPSHOT_PATH + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify({ at, byUrl }));
+    fs.renameSync(tmp, LISTS_SNAPSHOT_PATH);
+  } catch (e) { /* ignore */ }
+}
+
+async function refreshLists() {
+  let got = 0;
+  for (const url of LIST_URLS) {
+    try {
+      const trimmed = trimList(await getJson(url, true));
+      if (!trimmed.tokens.length) throw new Error("no tokens for our networks");
+      rawListsByUrl.set(url, trimmed);
+      got++;
+    } catch (e) {
+      console.error("[token-list] standard list failed (" + url + "):", e && e.message ? e.message : e);
+    }
   }
-  return fallbackPromise;
+  if (!got) throw new Error("no standard list could be loaded");
+  const at = Date.now();
+  lists = buildListsState(at);
+  saveListsSnapshot(at);
+  listsLastFailAt = 0;
 }
 
-// Resolves with a usable state, or null if there is none at all. A stale list is
-// returned straight away while a refresh runs in the background.
-async function getState() {
-  loadSnapshotOnce();
-  const fresh = state && Date.now() - state.at < TTL_MS;
-  if (fresh) return state;
-  if (state) { startRefresh(); return state; }
-  await startRefresh();
-  if (state) return state;
-  return loadFallback(); // CoinGecko unreachable and nothing saved: use the backup lists
+function startListsRefresh() {
+  if (listsRefreshing) return listsRefreshing;
+  if (listsLastFailAt && Date.now() - listsLastFailAt < RETRY_AFTER_FAIL_MS) return Promise.resolve();
+  listsRefreshing = refreshLists()
+    .catch((e) => { listsLastFailAt = Date.now(); console.error("[token-list] standard-list refresh failed:", e && e.message ? e.message : e); })
+    .finally(() => { listsRefreshing = null; });
+  return listsRefreshing;
 }
 
-function warm() { loadSnapshotOnce(); if (!state || Date.now() - state.at >= TTL_MS) startRefresh(); }
+// Both sources are refreshed independently. A stale copy is served straight away while a
+// refresh runs in the background; we only wait when we have nothing at all.
+async function getSources() {
+  loadSnapshotsOnce();
+  const now = Date.now();
+  const waits = [];
+  if (!lists) waits.push(startListsRefresh()); else if (now - lists.at >= TTL_MS) startListsRefresh();
+  if (!cg) waits.push(startCgRefresh()); else if (now - cg.at >= TTL_MS) startCgRefresh();
+  if (waits.length) await Promise.all(waits);
+  return { lists, cg };
+}
 
-// ---- queries --------------------------------------------------------------------
+function warm() {
+  loadSnapshotsOnce();
+  if (!lists || Date.now() - lists.at >= TTL_MS) startListsRefresh();
+  if (!cg || Date.now() - cg.at >= TTL_MS) startCgRefresh();
+}
+
+// ---- merged view of one network ---------------------------------------------------
 function platformFor(networkKey) { return PLATFORM_BY_NETWORK[networkKey] || null; }
+const UNRANKED = 1e9;
 
-function shape(e, i) {
-  return { id: e.id, symbol: e.symbol, name: e.name, address: e.address, image: (i && i.image) || null, rank: (i && i.rank) || null };
+function shape(e) {
+  return { id: e.id, symbol: e.symbol, name: e.name, address: e.address, image: e.image || null, rank: e.rank || null };
 }
 
-function topTokens(st, platform, limit) {
-  const slice = st.byPlatform[platform];
-  const out = [];
-  if (!slice) return out;
-  for (const id of st.order) {
-    const e = slice.byId.get(id);
-    if (!e) continue;
-    out.push(shape(e, st.info.get(id)));
-    if (out.length >= limit) break;
+// All tokens for a network, best first: ranked coins by market cap, then the rest in list order.
+// Standard-list tokens are the base; CoinGecko adds rank + logos, and tops up thin networks.
+function viewFor(src, platform) {
+  const key = (src.lists ? src.lists.at : 0) + "|" + (src.cg ? src.cg.at : 0);
+  const hit = viewCache.get(platform);
+  if (hit && hit.key === key) return hit.entries;
+
+  const listSlice = src.lists && src.lists.byPlatform[platform];
+  const cgSlice = src.cg && src.cg.byPlatform[platform];
+  const entries = [];
+  const seen = new Set();
+  if (listSlice) {
+    listSlice.entries.forEach((e) => {
+      const c = cgSlice && cgSlice.byAddress.get(e.address);
+      const ci = c && src.cg.info.get(c.id);
+      entries.push({
+        id: c ? c.id : e.id, symbol: e.symbol, name: e.name, address: e.address,
+        image: e.image || (ci && ci.image) || null,
+        rank: (ci && ci.rank) || null,
+        idx: e.idx,
+      });
+      seen.add(e.address);
+    });
   }
-  return out;
+  const thin = !listSlice || listSlice.entries.length < THIN_LIST_MIN;
+  if (thin && cgSlice) {
+    src.cg.order.forEach((id) => {
+      const e = cgSlice.byId.get(id);
+      if (!e || seen.has(e.address)) return;
+      const i = src.cg.info.get(id) || {};
+      entries.push({ id: e.id, symbol: e.symbol, name: e.name, address: e.address, image: i.image || null, rank: i.rank || null, idx: UNRANKED });
+      seen.add(e.address);
+    });
+  }
+  entries.sort((a, b) => (a.rank || UNRANKED) - (b.rank || UNRANKED) || a.idx - b.idx);
+  viewCache.set(platform, { key, entries });
+  return entries;
 }
 
-async function rankInfoFor(st, ids) {
+async function rankInfoFor(src, ids) {
   const info = new Map();
   const missing = [];
   const now = Date.now();
   ids.forEach((id) => {
-    const i = st.info.get(id);
+    const i = src.cg && src.cg.info.get(id);
     if (i) { info.set(id, i); return; }
     const x = extraInfo.get(id);
     if (x && now - x.at < EXTRA_INFO_TTL_MS) { if (x.rank) info.set(id, x); return; }
     missing.push(id);
   });
-  if (missing.length && !st.fallback) {
+  if (missing.length && src.cg) {
     try {
       const rows = await getJson(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(missing.join(","))}&per_page=250`);
       const seen = new Set();
@@ -316,22 +387,30 @@ async function rankInfoFor(st, ids) {
         if (v.rank) info.set(r.id, v);
       });
       missing.forEach((id) => { if (!seen.has(id)) extraInfo.set(id, { at: now, rank: null, image: null }); });
-    } catch (e) { /* unranked candidates are dropped below */ }
+    } catch (e) { /* unranked candidates are dropped by the caller */ }
     if (extraInfo.size > 5000) extraInfo.clear();
   }
   return info;
 }
 
-async function searchTokens(st, platform, query, limit) {
-  const q = String(query || "").trim().toLowerCase();
-  const slice = st.byPlatform[platform];
-  if (!slice || q.length < 2) return [];
+function topTokens(src, platform, limit) {
+  return viewFor(src, platform).slice(0, limit).map(shape);
+}
 
+async function searchTokens(src, platform, query, limit) {
+  const q = String(query || "").trim().toLowerCase();
+  if (q.length < 2) return [];
+  const view = viewFor(src, platform);
+  const cgSlice = src.cg && src.cg.byPlatform[platform];
+
+  // Pasted contract address: exact match, allowed without a rank.
   if (/^0x[0-9a-f]{40}$/.test(q)) {
-    const e = slice.entries.find((x) => x.address === q);
-    if (!e) return [];
-    const i = st.info.get(e.id) || (extraInfo.get(e.id) || null);
-    return [shape(e, i)];
+    const e = view.find((x) => x.address === q);
+    if (e) return [shape(e)];
+    const c = cgSlice && cgSlice.byAddress.get(q);
+    if (!c) return [];
+    const i = (src.cg.info.get(c.id)) || extraInfo.get(c.id) || {};
+    return [shape({ ...c, image: i.image || null, rank: i.rank || null })];
   }
 
   const score = (e) => {
@@ -340,17 +419,28 @@ async function searchTokens(st, platform, query, limit) {
     if (s.startsWith(q) || n.startsWith(q)) return 1;
     return 2;
   };
-  const cands = slice.entries
+  const out = view
     .filter((e) => e.symbol.toLowerCase().includes(q) || e.name.toLowerCase().includes(q))
+    .sort((a, b) => score(a) - score(b) || (a.rank || UNRANKED) - (b.rank || UNRANKED) || a.idx - b.idx)
+    .slice(0, limit)
+    .map(shape);
+  if (out.length >= limit || !cgSlice) return out;
+
+  // Not enough from the curated lists: add ranked CoinGecko coins we don't already show.
+  const have = new Set(out.map((e) => e.address));
+  const viewAddrs = new Set(view.map((e) => e.address));
+  const cands = cgSlice.entries
+    .filter((e) => !have.has(e.address) && !viewAddrs.has(e.address) && (e.symbol.toLowerCase().includes(q) || e.name.toLowerCase().includes(q)))
     .sort((a, b) => score(a) - score(b))
     .slice(0, 60);
-  if (!cands.length) return [];
-  const info = await rankInfoFor(st, cands.map((e) => e.id));
-  return cands
+  if (!cands.length) return out;
+  const info = await rankInfoFor(src, cands.map((e) => e.id));
+  cands
     .filter((e) => info.get(e.id) && info.get(e.id).rank)
     .sort((a, b) => info.get(a.id).rank - info.get(b.id).rank)
-    .slice(0, limit)
-    .map((e) => shape(e, info.get(e.id)));
+    .slice(0, limit - out.length)
+    .forEach((e) => out.push(shape({ ...e, image: info.get(e.id).image, rank: info.get(e.id).rank })));
+  return out;
 }
 
 // ---- HTTP -------------------------------------------------------------------------
@@ -405,24 +495,28 @@ function handleTokenListApi(req, res) {
   const platform = platformFor(network);
   if (!platform) { sendJson(res, 200, { ok: true, supported: false, network, tokens: [] }, 300); return true; }
 
-  getState()
-    .then(async (st) => {
-      if (!st) { sendJson(res, 503, { ok: false, error: "The token list isn't available right now. Try again in a minute." }); return; }
+  getSources()
+    .then(async (src) => {
+      if (!src.lists && !src.cg) { sendJson(res, 503, { ok: false, error: "The token list isn't available right now. Try again in a minute." }); return; }
       let tokens;
       if (id) {
-        const e = st.byPlatform[platform] && st.byPlatform[platform].byId.get(id);
-        tokens = e ? [shape(e, st.info.get(id))] : [];
+        // A CoinGecko coin id (from the trending list) -> its address on this network.
+        const e = src.cg && src.cg.byPlatform[platform] && src.cg.byPlatform[platform].byId.get(id);
+        const i = e && src.cg.info.get(id);
+        tokens = e ? [shape({ ...e, image: (i && i.image) || null, rank: (i && i.rank) || null })] : [];
       } else if (q) {
-        tokens = await searchTokens(st, platform, q, clampInt(params.get("limit"), 15, 1, 50));
+        tokens = await searchTokens(src, platform, q, clampInt(params.get("limit"), 15, 1, 50));
       } else {
-        tokens = topTokens(st, platform, clampInt(params.get("limit"), 40, 1, 500));
+        tokens = topTokens(src, platform, clampInt(params.get("limit"), 40, 1, 500));
       }
+      const times = [src.lists && src.lists.at, src.cg && src.cg.at].filter(Boolean);
       sendJson(res, 200, {
         ok: true,
         supported: true,
         network,
-        stale: Date.now() - st.at >= TTL_MS,
-        updatedAt: st.at,
+        stale: times.every((t) => Date.now() - t >= TTL_MS),
+        updatedAt: Math.max.apply(null, times),
+        sources: [src.lists ? "lists" : null, src.cg ? "coingecko" : null].filter(Boolean),
         tokens,
       }, q ? 60 : 300);
     })
@@ -433,4 +527,4 @@ function handleTokenListApi(req, res) {
   return true;
 }
 
-module.exports = { handleTokenListApi, warm, PLATFORM_BY_NETWORK, _test: { buildState, searchTokens, topTokens } };
+module.exports = { handleTokenListApi, warm, PLATFORM_BY_NETWORK };
