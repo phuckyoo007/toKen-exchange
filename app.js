@@ -664,6 +664,13 @@ async function refreshTokens() {
   } catch (e) {
     prices = {};
   }
+  // Verified stablecoins with no returned price still get a value (see stablecoinFallbackPrices).
+  try {
+    const unpriced = res.tokens
+      .map((t) => t.address)
+      .filter((a) => !prices[a.toLowerCase()] || typeof prices[a.toLowerCase()].price !== "number");
+    if (unpriced.length) prices = Object.assign({}, prices, await stablecoinFallbackPrices(unpriced));
+  } catch (e) { /* best-effort */ }
 
   let tokensUsdTotal = 0;
   res.tokens.forEach((t) => {
@@ -1634,6 +1641,38 @@ function renderAssetPicker(side) {
   fillPickerPrices(items, list);
 }
 
+// Value of the issuer-verified stablecoins (USDC / USDT = 1 US dollar, EURC = 1 euro) in the
+// display currency. Used ONLY when the price service has no price for one of them (rate-limited
+// or unreachable), so a balance of USDC or EURC still shows its worth in dollars and cents
+// instead of a blank. Matched by contract address against TM_KNOWN_TOKENS (copied from the
+// issuers' own published lists), never by symbol, so a look-alike token never gets a value.
+async function stablecoinFallbackPrices(addresses) {
+  const out = {};
+  try {
+    if (!currentNetwork || typeof TM_KNOWN_TOKENS === "undefined" || !addresses || !addresses.length) return out;
+    const known = TM_KNOWN_TOKENS.forChain(currentNetwork.chainId);
+    const want = new Map(); // lower-case address -> currency it is pegged to
+    addresses.forEach((a) => {
+      const k = known.find((t) => t.address.toLowerCase() === String(a || "").toLowerCase());
+      if (k) want.set(k.address.toLowerCase(), k.symbol === "EURC" ? "EUR" : "USD");
+    });
+    if (!want.size) return out;
+    let rates = null;
+    const rateFor = async (code) => {
+      if (code.toLowerCase() === String(currentCurrency).toLowerCase()) return 1;
+      if (!rates) rates = await TM_PRICES.getFiatRates(currentCurrency);
+      const r = rates.find((x) => String(x.code).toUpperCase() === code);
+      return r ? r.rate : null;
+    };
+    for (const [addr, code] of want) {
+      let p = null;
+      try { p = await rateFor(code); } catch (e) { p = null; }
+      if (typeof p === "number" && p > 0) out[addr] = { price: p };
+    }
+  } catch (e) { /* best-effort */ }
+  return out;
+}
+
 // Best-effort USD value per row; a rate-limited or unreachable price API just
 // leaves the value blank rather than breaking the list.
 async function fillPickerPrices(items, list) {
@@ -1644,10 +1683,15 @@ async function fillPickerPrices(items, list) {
     const held = items.filter((a) => Number(a.balance) > 0);
     if (!held.length) return;
     const addrs = held.filter((a) => a.address).map((a) => a.address);
-    const [nativePrice, byAddr] = await Promise.all([
+    const [nativePrice, byAddrRaw] = await Promise.all([
       TM_PRICES.getNativePriceForNetwork(key, currentCurrency).catch(() => null),
       addrs.length ? TM_PRICES.getTokenPricesByContract(key, addrs, currentCurrency).catch(() => ({})) : Promise.resolve({}),
     ]);
+    if (gen !== pickerPriceGen) return;
+    // Stablecoins the price service didn't return a price for still get a value (see above).
+    const byAddr = Object.assign({}, byAddrRaw || {});
+    const unpriced = addrs.filter((a) => !byAddr[a.toLowerCase()] || typeof byAddr[a.toLowerCase()].price !== "number");
+    if (unpriced.length) Object.assign(byAddr, await stablecoinFallbackPrices(unpriced));
     if (gen !== pickerPriceGen) return;
     held.forEach((a) => {
       const price = a.address ? ((byAddr || {})[a.address.toLowerCase()] || {}).price : nativePrice;
