@@ -357,6 +357,77 @@ async function fetchPrices(ids, currency) {
   return { data, currency: vsCurrency };
 }
 
+
+// ---- DefiLlama prices (free, no key) ---------------------------------------------------
+// Token and native-coin prices are asked of DefiLlama FIRST (https://coins.llama.fi, through
+// our server's cached relay, then directly), and only the ones it doesn't know go on to
+// CoinGecko. DefiLlama quotes US dollars, so non-USD display currencies are converted with
+// the exchange-rate table already used for the Currencies screen; if that isn't available
+// we simply skip DefiLlama and use CoinGecko as before. Chain prefixes below were checked
+// against the live API on 2026-10-05; a network that isn't listed (e.g. robinhood) just
+// goes straight to CoinGecko.
+const LLAMA_CHAIN = {
+  ethereum: "ethereum", base: "base", polygon: "polygon", bsc: "bsc", arbitrum: "arbitrum",
+  optimism: "optimism", avalanche: "avax", linea: "linea", scroll: "scroll", zksync: "era",
+  mantle: "mantle", gnosis: "xdai", celo: "celo", monad: "monad",
+};
+const LLAMA_DIRECT_BASE = "https://coins.llama.fi/prices/current/";
+const LLAMA_PROXY_BASE = MARKET_PROXY_BASE + "/llama/prices/current/";
+const LLAMA_BATCH = 40;
+let llamaCache = new Map(); // coin id -> { at, price }
+
+// coinIds: ["ethereum:0x...", "coingecko:ethereum"]. Returns Map coinId(lower-case) -> USD price.
+// Never throws: any failure just returns what it has (maybe nothing).
+async function llamaUsdPrices(coinIds) {
+  const out = new Map();
+  const now = Date.now();
+  const want = [];
+  [...new Set(coinIds)].forEach((id) => {
+    const hit = llamaCache.get(id.toLowerCase());
+    if (hit && now - hit.at < CACHE_TTL_MS) { if (hit.price != null) out.set(id.toLowerCase(), hit.price); }
+    else want.push(id);
+  });
+  for (let i = 0; i < want.length; i += LLAMA_BATCH) {
+    const batch = want.slice(i, i + LLAMA_BATCH).filter((id) => /^[A-Za-z0-9._:-]{1,80}$/.test(id));
+    if (!batch.length) continue;
+    const list = batch.join(",");
+    let json = null;
+    for (const base of [LLAMA_PROXY_BASE, LLAMA_DIRECT_BASE]) {
+      try {
+        const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), MARKET_PROXY_TIMEOUT_MS) : null;
+        let res;
+        try { res = await fetch(base + list, ctrl ? { signal: ctrl.signal } : undefined); } finally { if (timer) clearTimeout(timer); }
+        if (res && res.ok) { json = await res.json(); break; }
+      } catch (e) { /* try the next route */ }
+    }
+    if (!json || !json.coins) continue;
+    const seen = new Set();
+    Object.keys(json.coins).forEach((k) => {
+      const price = json.coins[k] && json.coins[k].price;
+      if (typeof price === "number" && isFinite(price) && price > 0) {
+        out.set(k.toLowerCase(), price);
+        llamaCache.set(k.toLowerCase(), { at: now, price });
+        seen.add(k.toLowerCase());
+      }
+    });
+    batch.forEach((id) => { if (!seen.has(id.toLowerCase())) llamaCache.set(id.toLowerCase(), { at: now, price: null }); });
+  }
+  if (llamaCache.size > 3000) llamaCache = new Map();
+  return out;
+}
+
+// 1 US dollar in the display currency, or null if we can't tell.
+async function usdToDisplayRate(vsCurrency) {
+  if (vsCurrency === "usd") return 1;
+  try {
+    const rates = await fetchExchangeRates();
+    const target = rates[vsCurrency], usd = rates.usd;
+    if (target && usd && target.value && usd.value) return target.value / usd.value;
+  } catch (e) { /* fall through */ }
+  return null;
+}
+
 // Separate small in-memory cache for the price BOARD specifically (kept
 // apart from fetchPrices()'s cache above, and calling a different
 // endpoint) -- CoinGecko's /coins/markets returns price, 24h change, AND
@@ -604,6 +675,15 @@ async function getTopExchanges(count) {
 async function getNativePriceForNetwork(networkKey, currency) {
   const id = NETWORK_NATIVE_COINGECKO_ID[networkKey];
   if (!id) return null;
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  // DefiLlama first (see above); CoinGecko if it has no answer.
+  try {
+    const usd = (await llamaUsdPrices(["coingecko:" + id])).get(("coingecko:" + id).toLowerCase());
+    if (usd != null) {
+      const rate = await usdToDisplayRate(vs);
+      if (rate != null) return usd * rate;
+    }
+  } catch (e) { /* use CoinGecko */ }
   const { data, currency: vsCurrency } = await fetchPrices([id], currency);
   return data[id] ? data[id][vsCurrency] : null;
 }
@@ -657,22 +737,48 @@ async function getTokenPricesByContract(networkKey, addresses, currency) {
   const platform = NETWORK_COINGECKO_PLATFORM[networkKey];
   if (!platform || !addresses || !addresses.length) return {};
   const vsCurrency = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
-  const url = `/simple/token_price/${platform}?contract_addresses=${encodeURIComponent(addresses.join(","))}&vs_currencies=${vsCurrency}`;
-  let res;
-  try {
-    res = await cgFetch(url);
-  } catch (e) {
-    throw new Error("Couldn't reach CoinGecko for token prices. Check your internet connection.");
-  }
-  if (!res.ok) {
-    throw new Error(`CoinGecko token price request failed (HTTP ${res.status}).`);
-  }
-  const raw = await res.json();
   const result = {};
-  Object.keys(raw).forEach((addr) => {
-    const entry = raw[addr];
-    result[addr] = { price: entry ? entry[vsCurrency] : null };
-  });
+
+  // 1) DefiLlama first (free, no key; batched, and not rate-limited the way CoinGecko is on phones).
+  const chain = LLAMA_CHAIN[networkKey];
+  if (chain) {
+    try {
+      const ids = addresses.map((a) => chain + ":" + a);
+      const usd = await llamaUsdPrices(ids);
+      if (usd.size) {
+        const rate = await usdToDisplayRate(vsCurrency);
+        if (rate != null) {
+          addresses.forEach((a) => {
+            const p = usd.get((chain + ":" + a).toLowerCase());
+            if (p != null) result[a.toLowerCase()] = { price: p * rate };
+          });
+        }
+      }
+    } catch (e) { /* CoinGecko below covers anything missing */ }
+  }
+
+  // 2) CoinGecko for whatever DefiLlama didn't have. If this fails we keep what we already got.
+  const missing = addresses.filter((a) => !result[a.toLowerCase()]);
+  if (!missing.length) return result;
+  const url = `/simple/token_price/${platform}?contract_addresses=${encodeURIComponent(missing.join(","))}&vs_currencies=${vsCurrency}`;
+  try {
+    let res;
+    try {
+      res = await cgFetch(url);
+    } catch (e) {
+      throw new Error("Couldn't reach CoinGecko for token prices. Check your internet connection.");
+    }
+    if (!res.ok) {
+      throw new Error(`CoinGecko token price request failed (HTTP ${res.status}).`);
+    }
+    const raw = await res.json();
+    Object.keys(raw).forEach((addr) => {
+      const entry = raw[addr];
+      result[addr] = { price: entry ? entry[vsCurrency] : null };
+    });
+  } catch (e) {
+    if (!Object.keys(result).length) throw e;
+  }
   return result;
 }
 

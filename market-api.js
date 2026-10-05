@@ -13,6 +13,7 @@
 //
 // ENDPOINT   GET /api/market/<coingecko path>?<query>
 //   e.g.     /api/market/coins/usd-coin?localization=false&market_data=true...
+//            /api/market/llama/prices/current/ethereum:0xA0b8...,coingecko:ethereum   (DefiLlama)
 //            /api/market/coins/usd-coin/market_chart?vs_currency=usd&days=7
 //   Only the specific read-only CoinGecko paths below are relayed (an allow-list, not an
 //   open proxy), only known query parameters are passed on, and values are length/char
@@ -25,12 +26,15 @@
 // OPTIONAL ENVIRONMENT VARIABLES
 //   COINGECKO_API_KEY   free "Demo" key from coingecko.com/en/api (higher limits)
 //   COINGECKO_BASE      override the CoinGecko base URL (used by the tests)
+//   LLAMA_BASE          override the DefiLlama prices base URL (used by the tests)
 
 const { clientIp } = require("./client-ip");
 const { applyCors } = require("./cors");
 
 const COINGECKO_BASE = process.env.COINGECKO_BASE || "https://api.coingecko.com/api/v3";
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || "";
+// DefiLlama's free price service (no key): https://coins.llama.fi/prices/current/<chain:address,...>
+const LLAMA_BASE = process.env.LLAMA_BASE || "https://coins.llama.fi";
 const PREFIX = "/api/market";
 
 const ID_RE = "[a-z0-9][a-z0-9._-]{0,99}";
@@ -44,6 +48,8 @@ const ROUTES = [
   [/^\/exchanges$/, 10 * 60 * 1000],
   [/^\/search\/trending$/, 2 * 60 * 1000],
   [new RegExp("^/simple/token_price/" + ID_RE + "$"), 60 * 1000],
+  // DefiLlama current prices: /llama/prices/current/<chain:address-or-coingecko:id,...> (max 60 coins)
+  [/^\/llama\/prices\/current\/[A-Za-z0-9._:-]{1,80}(,[A-Za-z0-9._:-]{1,80}){0,59}$/, 30 * 1000],
 ];
 // "coins/list" is deliberately NOT here: the big coin list is handled by token-list-api.js.
 
@@ -84,11 +90,13 @@ function cleanQuery(search) {
 
 async function fetchUpstream(pathname, query) {
   const headers = { Accept: "application/json" };
-  if (COINGECKO_API_KEY) headers["x-cg-demo-api-key"] = COINGECKO_API_KEY;
+  const isLlama = pathname.startsWith("/llama/");
+  if (COINGECKO_API_KEY && !isLlama) headers["x-cg-demo-api-key"] = COINGECKO_API_KEY;
   const ctrl = typeof AbortController === "function" ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS) : null;
   try {
-    const res = await fetch(COINGECKO_BASE + pathname + (query ? "?" + query : ""), { headers, signal: ctrl ? ctrl.signal : undefined });
+    const url = isLlama ? LLAMA_BASE + pathname.slice("/llama".length) : COINGECKO_BASE + pathname + (query ? "?" + query : "");
+    const res = await fetch(url, { headers, signal: ctrl ? ctrl.signal : undefined });
     const text = await res.text();
     return { status: res.status, body: text };
   } finally {

@@ -56,9 +56,18 @@
 const { clientIp } = require("./client-ip");
 const { applyCors } = require("./cors");
 const { readBody: sharedReadBody } = require("./read-body");
-const TRANSAK_API_KEY = process.env.TRANSAK_API_KEY || "";
-const TRANSAK_API_SECRET = process.env.TRANSAK_API_SECRET || "";
-const TRANSAK_ENVIRONMENT = (process.env.TRANSAK_ENVIRONMENT || "staging").toLowerCase() === "production" ? "production" : "staging";
+// .trim(): a key or secret pasted into Railway with a stray space or line break on the end
+// is rejected by Transak as "Invalid API key" even though it looks right on screen.
+const TRANSAK_API_KEY = (process.env.TRANSAK_API_KEY || "").trim();
+const TRANSAK_API_SECRET = (process.env.TRANSAK_API_SECRET || "").trim();
+const TRANSAK_ENV_RAW = (process.env.TRANSAK_ENVIRONMENT || "").trim().toLowerCase();
+const TRANSAK_ENVIRONMENT = TRANSAK_ENV_RAW === "production" ? "production" : "staging";
+// One startup line (never the key or secret themselves) so a mismatch is visible in the Railway
+// logs: the environment actually in use, and how long the key/secret are.
+console.log(`[transak] environment=${TRANSAK_ENVIRONMENT} keyLength=${TRANSAK_API_KEY.length} secretLength=${TRANSAK_API_SECRET.length}`);
+if (TRANSAK_ENV_RAW && TRANSAK_ENV_RAW !== "production" && TRANSAK_ENV_RAW !== "staging") {
+  console.warn(`[transak] WARNING: TRANSAK_ENVIRONMENT is "${process.env.TRANSAK_ENVIRONMENT}" -- only "production" or "staging" are understood, so STAGING is being used.`);
+}
 const TRANSAK_REFERRER_DOMAIN = process.env.TRANSAK_REFERRER_DOMAIN || "tokenswaphub.org";
 
 const HOSTS = {
@@ -98,7 +107,7 @@ async function fetchNewAccessToken() {
   const data = body && body.data;
   if (!res.ok || !data || !data.accessToken) {
     const detail = (body && body.error && (body.error.message || body.error)) || (body && body.message) || `HTTP ${res.status}`;
-    throw new Error(`Transak declined the credentials: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
+    throw new Error(`Transak declined the credentials (environment in use: ${TRANSAK_ENVIRONMENT}): ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
   }
   return { accessToken: data.accessToken, expiresAt: Number(data.expiresAt) || Math.floor(Date.now() / 1000) + 6 * 24 * 3600 };
 }
