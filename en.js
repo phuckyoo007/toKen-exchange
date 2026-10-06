@@ -109,6 +109,7 @@
     "prices.currenciesNote": "What 1 unit of each currency is worth in your display currency.",
     "prices.noResults": "No results.",
     "prices.viewCoin": "View {name}",
+    "prices.volShort": "Vol",
     "prices.viewPeggedCoin": "View {name}, the stablecoin pegged to {currency}",
     "prices.availableOn": "✓ On {networks}",
     "coin.swapBtn": "Swap for {symbol}",
@@ -139,6 +140,8 @@
 
     "predictions.title": "Currencies & Stablecoins",
     "predictions.description": "National currencies and the stablecoins pegged to them, with live prices -- informational only. Nothing about your wallet is sent to look these up.",
+    "predictions.tabStable": "Stablecoins",
+    "predictions.tabTop": "Top coins",
     "predictions.loading": "Loading...",
     "predictions.empty": "No stablecoin prices right now.",
     "predictions.cardUnavailable": "Stablecoin prices unavailable right now.",

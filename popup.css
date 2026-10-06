@@ -1176,3 +1176,12 @@ html[dir="rtl"] .top-back-btn-coin { transform: scaleX(-1); }
 .cn-face .top-back-btn { position: sticky; top: 8px; left: auto; right: auto; align-self: flex-start; margin-bottom: 4px; }
 .cn-face .screen:has(.top-back-btn) { padding-top: 12px; }
 html[dir="rtl"] .cn-face .top-back-btn { align-self: flex-end; right: auto; left: auto; }
+
+.price-quote .price-vol { font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; line-height: 1.3; }
+
+.price-quote .price-change.plain { background: none; padding: 0; border-radius: 0; font-size: 12px; font-weight: 500; letter-spacing: 0.01em; }
+.price-row .price-id .price-vol { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.seg-tabs { display: flex; gap: 6px; margin: 12px 0 10px; }
+.seg-tab { flex: 1; padding: 8px 10px; border-radius: 999px; border: 1px solid var(--border, rgba(255,255,255,0.12)); background: transparent; color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.seg-tab.active { background: var(--accent, #f5c242); color: #1a1405; border-color: transparent; }

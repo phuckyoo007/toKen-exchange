@@ -977,6 +977,34 @@ async function getCurrencyStablecoins(currency) {
       }
     } catch (e) { /* keep what we have */ }
   }
+  // 3) 24-hour change, trading volume and logos: CoinGecko's market table (one call for the whole
+  //    list). Volume only exists there; if it's down the change still comes from DefiLlama and the
+  //    volume is simply left off the row. Never throws -- prices above are what matter.
+  const statsById = {};
+  try {
+    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids.join(","))}&per_page=50&price_change_percentage=24h`);
+    if (res.ok) {
+      const rows = await res.json();
+      (Array.isArray(rows) ? rows : []).forEach((r) => {
+        if (!r || typeof r.id !== "string") return;
+        statsById[r.id] = {
+          change24h: typeof r.price_change_percentage_24h === "number" && isFinite(r.price_change_percentage_24h) ? r.price_change_percentage_24h : null,
+          volume: typeof r.total_volume === "number" && isFinite(r.total_volume) ? r.total_volume : null,
+          image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null,
+          price: typeof r.current_price === "number" && isFinite(r.current_price) ? r.current_price : null,
+        };
+      });
+    }
+  } catch (e) { /* DefiLlama below */ }
+  if (ids.some((id) => !statsById[id] || statsById[id].change24h == null)) {
+    const json = await llamaJson(`/percentage/${ids.map((id) => "coingecko:" + id).join(",")}?period=1d`);
+    if (json && json.coins) ids.forEach((id) => {
+      const v = json.coins["coingecko:" + id];
+      if (typeof v === "number" && isFinite(v) && !(statsById[id] && statsById[id].change24h != null)) statsById[id] = Object.assign({ volume: null, image: null, price: null }, statsById[id], { change24h: v });
+    });
+  }
+  // A price CoinGecko's table has but the two price sources above didn't.
+  ids.forEach((id) => { if (priceById[id] == null && statsById[id] && statsById[id].price != null) priceById[id] = statsById[id].price; });
   if (!Object.keys(priceById).length) throw new Error("Couldn't load stablecoin prices. Check your internet connection.");
 
   // What 1 unit of each pegged currency is worth in the display currency, to measure the peg.
@@ -1000,12 +1028,69 @@ async function getCurrencyStablecoins(currency) {
         fiat: info.label, fiatName: info.name,
         price,
         peg: unit && unit > 0 ? (price / unit - 1) * 100 : null,
-        change24h: null, image: null,
+        change24h: statsById[c.id] ? statsById[c.id].change24h : null,
+        volume: statsById[c.id] ? statsById[c.id].volume : null,
+        image: statsById[c.id] ? statsById[c.id].image : null,
         url: `https://www.coingecko.com/en/coins/${encodeURIComponent(c.id)}`,
       });
     });
   });
   stablecoinListCache.fetchedAt = now; stablecoinListCache.key = vs; stablecoinListCache.data = data;
+  return data;
+}
+
+
+// ---- Top coins (the "Top coins" tab on the Currencies & Stablecoins screen) ----------------------------
+// A fixed list of large, well-known coins -- price, 24-hour change and 24-hour volume in the display
+// currency, laid out like an exchange's spot list. CoinGecko's market table supplies all three in one
+// call; if it's down, DefiLlama still gives price and change (volume is left off).
+const TOP_COINS = [
+  ["bitcoin", "BTC", "Bitcoin"], ["ethereum", "ETH", "Ethereum"], ["ripple", "XRP", "XRP"], ["binancecoin", "BNB", "BNB"],
+  ["solana", "SOL", "Solana"], ["tether", "USDT", "Tether"], ["usd-coin", "USDC", "USD Coin"], ["dogecoin", "DOGE", "Dogecoin"],
+  ["cardano", "ADA", "Cardano"], ["tron", "TRX", "TRON"], ["chainlink", "LINK", "Chainlink"], ["avalanche-2", "AVAX", "Avalanche"],
+  ["sui", "SUI", "Sui"], ["near", "NEAR", "NEAR Protocol"], ["hyperliquid", "HYPE", "Hyperliquid"], ["polkadot", "DOT", "Polkadot"],
+  ["litecoin", "LTC", "Litecoin"], ["uniswap", "UNI", "Uniswap"], ["stellar", "XLM", "Stellar"], ["bitcoin-cash", "BCH", "Bitcoin Cash"],
+].map(([id, symbol, name]) => ({ id, symbol, name }));
+const topCoinsCache = { fetchedAt: 0, key: "", data: null };
+
+async function getTopCoins(currency) {
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const now = Date.now();
+  if (topCoinsCache.data && topCoinsCache.key === vs && now - topCoinsCache.fetchedAt < CACHE_TTL_MS) return topCoinsCache.data;
+  const ids = TOP_COINS.map((c) => c.id);
+  const info = SUPPORTED_CURRENCIES[vs] || { label: String(vs).toUpperCase() };
+  const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
+  const byId = {};
+  try {
+    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids.join(","))}&per_page=50&price_change_percentage=24h`);
+    if (res.ok) {
+      const rows = await res.json();
+      (Array.isArray(rows) ? rows : []).forEach((r) => {
+        if (!r || typeof r.id !== "string" || num(r.current_price) == null) return;
+        byId[r.id] = { price: r.current_price, change24h: num(r.price_change_percentage_24h), volume: num(r.total_volume), image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null };
+      });
+    }
+  } catch (e) { /* DefiLlama below */ }
+  if (ids.some((id) => !byId[id])) {
+    try {
+      const miss = ids.filter((id) => !byId[id]);
+      const usd = await llamaUsdPrices(miss.map((id) => "coingecko:" + id));
+      const rate = usd.size ? await usdToDisplayRate(vs) : null;
+      const pct = await llamaJson(`/percentage/${miss.map((id) => "coingecko:" + id).join(",")}?period=1d`);
+      if (rate != null) miss.forEach((id) => {
+        const p = usd.get(("coingecko:" + id).toLowerCase());
+        if (p == null) return;
+        const ch = pct && pct.coins ? pct.coins["coingecko:" + id] : null;
+        byId[id] = { price: p * rate, change24h: num(ch), volume: null, image: null };
+      });
+    } catch (e) { /* keep what we have */ }
+  }
+  if (!Object.keys(byId).length) throw new Error("Couldn't load coin prices. Check your internet connection.");
+  const data = TOP_COINS.filter((c) => byId[c.id]).map((c) => Object.assign({
+    id: c.id, cgId: c.id, symbol: c.symbol, name: c.name, fiat: info.label, fiatName: info.name || info.label, peg: null,
+    url: `https://www.coingecko.com/en/coins/${encodeURIComponent(c.id)}`,
+  }, byId[c.id]));
+  topCoinsCache.fetchedAt = now; topCoinsCache.key = vs; topCoinsCache.data = data;
   return data;
 }
 
@@ -1021,6 +1106,8 @@ if (typeof self !== "undefined") {
     getTokenPricesByContract,
     stablecoinFallbackPrices,
     getCurrencyStablecoins,
+    getTopCoins,
+    TOP_COINS,
     CURRENCY_STABLECOINS,
     getTopExchanges,
     COINGECKO_IDS,
