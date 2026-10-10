@@ -51,18 +51,44 @@ let currentStatus = null;
 let currentNetworks = [];
 let currentNetwork = null;
 
+// ---------------------------------------------------------------- USERNAME (this device only)
+// A display name chosen when the wallet is created or imported. It is stored only on this device,
+// never sent anywhere, and is NOT a credential: the wallet password is what protects the keys.
+// It is shown on the unlock screen ("Welcome back, <name>") so the screen reads like a sign-in.
+const TM_USERNAME_KEY = "tm_wallet_username";
+function cleanUsername(raw) { return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 30); }
+function saveWalletUsername(name) {
+  return new Promise((resolve) => {
+    try { chrome.storage.local.set({ [TM_USERNAME_KEY]: name }, () => resolve()); } catch (e) { resolve(); }
+  });
+}
+function refreshUnlockWelcome() {
+  const el = document.getElementById("unlock-welcome");
+  if (!el) return;
+  try {
+    chrome.storage.local.get([TM_USERNAME_KEY], (res) => {
+      const name = cleanUsername(res && res[TM_USERNAME_KEY]);
+      if (name) { el.textContent = TM_I18N.t("unlock.welcomeBack", { name }); el.classList.remove("hidden"); }
+      else { el.textContent = ""; el.classList.add("hidden"); }
+    });
+  } catch (e) { el.classList.add("hidden"); }
+}
+
 // ---------------------------------------------------------------- ONBOARDING
 $("btn-goto-create").addEventListener("click", () => showScreen("screen-create"));
 $("btn-goto-import").addEventListener("click", () => showScreen("screen-import"));
 $("btn-goto-support-onboarding").addEventListener("click", () => openSupport("screen-onboarding"));
 
 $("btn-create-submit").addEventListener("click", async () => {
+  const username = cleanUsername($("create-username").value);
   const pw = $("create-password").value;
   const pw2 = $("create-password-confirm").value;
+  if (!username) return alert(TM_I18N.t("errors.usernameRequired"));
   if (pw.length < 8) return alert(TM_I18N.t("errors.passwordTooShort"));
   if (pw !== pw2) return alert(TM_I18N.t("errors.passwordMismatch"));
   try {
     const res = await sendMsg("TM_CREATE_WALLET", { password: pw });
+    await saveWalletUsername(username);
     $("mnemonic-display").textContent = res.mnemonic;
     $("create-step-password").classList.add("hidden");
     $("create-step-backup").classList.remove("hidden");
@@ -82,12 +108,15 @@ $("btn-backup-done").addEventListener("click", async () => {
 $("btn-import-submit").addEventListener("click", async () => {
   hideError("import-error");
   const mnemonic = $("import-mnemonic").value;
+  const username = cleanUsername($("import-username").value);
   const pw = $("import-password").value;
   const pw2 = $("import-password-confirm").value;
+  if (!username) return showError("import-error", TM_I18N.t("errors.usernameRequired"));
   if (pw.length < 8) return showError("import-error", TM_I18N.t("errors.passwordTooShort"));
   if (pw !== pw2) return showError("import-error", TM_I18N.t("errors.passwordMismatch"));
   try {
     await sendMsg("TM_IMPORT_MNEMONIC", { mnemonic, password: pw });
+    await saveWalletUsername(username);
     await refreshMain();
     showScreen("screen-main");
   } catch (e) {
@@ -1391,11 +1420,12 @@ $("btn-view-seed").addEventListener("click", () => showScreen("screen-view-seed"
 $("btn-goto-support-settings").addEventListener("click", () => openSupport("screen-settings"));
 $("btn-lock").addEventListener("click", async () => {
   await sendMsg("TM_LOCK", {});
-  showScreen("screen-unlock");
+  refreshUnlockWelcome(); showScreen("screen-unlock");
 });
 $("btn-goto-reset-2").addEventListener("click", () => showScreen("screen-reset"));
 $("btn-reset-confirm").addEventListener("click", async () => {
   await sendMsg("TM_RESET_WALLET", {});
+  await saveWalletUsername("");
   location.reload();
 });
 
@@ -2351,7 +2381,7 @@ document.querySelectorAll(".activity-tab").forEach((b) => b.addEventListener("cl
     showScreen("screen-onboarding");
     activateSplashLanding();
   } else if (!status.unlocked) {
-    showScreen("screen-unlock");
+    refreshUnlockWelcome(); showScreen("screen-unlock");
     activateSplashLanding();
   } else {
     await refreshMain();

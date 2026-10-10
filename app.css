@@ -1929,9 +1929,16 @@ html[dir="rtl"] .top-back-btn-coin { transform: scaleX(-1); }
 #app:has(> .screen:not(.hidden) .top-back-btn) #app-header {
   align-items: flex-end;
 }
+/* RTL: in a column flex container "flex-end" is the inline-end edge, which is
+   the LEFT in right-to-left, i.e. away from Back (on the right). The earlier
+   rule used flex-start here, which in RTL is the right edge and slid the
+   network badge under the Back button. Same value as LTR is the correct one. */
 html[dir="rtl"] #app:has(> .screen:not(.hidden) .top-back-btn) #app-header {
-  align-items: flex-start;
+  align-items: flex-end;
 }
+/* The account picker text ("Account 1 (0x...)") is Latin/hex; in RTL the
+   select clipped its start ("ccount 1"). Keep the control itself LTR. */
+html[dir="rtl"] #account-select { direction: ltr; text-align: left; }
 /* Right-aligning (above) is enough room at every normal width, but below
    ~340px there isn't space left over for both the Back pill and a long
    name even pushed to the far edge -- clip the badge instead of letting

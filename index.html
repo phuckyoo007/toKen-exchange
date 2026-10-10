@@ -76,8 +76,8 @@
     <p class="muted" data-i18n="onboarding.subtitle">Set up your wallet to get started.</p>
     <div class="warn onboarding-intro-card" style="text-align:left; margin: 10px 0;">
       <details class="intro-details">
-        <summary>You're using the website version -- the browser extension is safer for everyday use.</summary>
-        <p>
+        <summary data-i18n="onboarding.webNoticeSummary">You're using the website version -- the browser extension is safer for everyday use.</summary>
+        <p data-i18n="onboarding.webNoticeBody">
           This site encrypts your wallet and stores it only in this browser
           (nowhere else) -- but a website is an easier target for
           phishing/DNS/lookalike-domain tricks than an installed browser
@@ -89,25 +89,27 @@
     </div>
     <button id="btn-goto-create" class="primary" data-i18n="onboarding.createBtn">Create a new wallet</button>
     <button id="btn-goto-import" class="secondary" data-i18n="onboarding.importBtn">Import an existing wallet</button>
-    <button id="btn-goto-signin" class="link">Sign in to restore a backed-up wallet</button>
+    <button id="btn-goto-signin" class="link" data-i18n="onboarding.signInLink">Sign in to restore a backed-up wallet</button>
     <button id="btn-goto-support-onboarding" class="link" data-i18n="common.needHelp">Need help?</button>
   </section>
 
   <!-- SIGN IN (restore an encrypted backup from a Token Exchange account onto this device) -->
   <section id="screen-signin" class="screen hidden">
-    <h2>Sign in</h2>
-    <p class="muted">Restore a wallet you've already backed up to a Token Exchange account on another device.</p>
-    <input type="text" id="signin-username" placeholder="Username" autocomplete="username" />
-    <input type="password" id="signin-password" placeholder="Password" autocomplete="current-password" />
-    <button id="btn-signin-submit" class="primary">Sign in</button>
+    <h2 data-i18n="signin.title">Sign in</h2>
+    <p class="muted" data-i18n="signin.intro">Restore a wallet you've already backed up to a Token Exchange account on another device.</p>
+    <input type="text" id="signin-username" placeholder="Username" data-i18n-placeholder="common.usernamePlaceholder" autocomplete="username" />
+    <input type="password" id="signin-password" placeholder="Password" data-i18n-placeholder="common.passwordPlaceholder" autocomplete="current-password" />
+    <button id="btn-signin-submit" class="primary" data-i18n="signin.title">Sign in</button>
     <p id="signin-error" class="error hidden"></p>
-    <button class="back-btn top-back-btn" type="button" data-back="screen-onboarding"><span class="top-back-btn-coin" aria-hidden="true">&#8592;</span><span class="top-back-btn-label">Back</span></button>
+    <button class="back-btn top-back-btn" type="button" data-back="screen-onboarding"><span class="top-back-btn-coin" aria-hidden="true">&#8592;</span><span class="top-back-btn-label" data-i18n="common.back">Back</span></button>
   </section>
 
   <!-- CREATE -->
   <section id="screen-create" class="screen hidden">
     <h2 data-i18n="create.title">Create wallet</h2>
     <div id="create-step-password">
+      <label data-i18n="common.usernameLabel">Username (shown when you unlock)</label>
+      <input type="text" id="create-username" maxlength="30" autocomplete="username" data-i18n-placeholder="common.usernamePlaceholder" placeholder="Username" />
       <label data-i18n="create.passwordLabel">New password (min 8 characters)</label>
       <input type="password" id="create-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
       <input type="password" id="create-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
@@ -128,6 +130,8 @@
     <h2 data-i18n="import.title">Import wallet</h2>
     <label data-i18n="import.mnemonicLabel">Recovery phrase (12 or 24 words)</label>
     <textarea id="import-mnemonic" rows="3" data-i18n-placeholder="import.mnemonicPlaceholder" placeholder="word1 word2 word3 ..."></textarea>
+    <label data-i18n="common.usernameLabel">Username (shown when you unlock)</label>
+    <input type="text" id="import-username" maxlength="30" autocomplete="username" data-i18n-placeholder="common.usernamePlaceholder" placeholder="Username" />
     <label data-i18n="common.newPasswordLabel">New password (min 8 characters)</label>
     <input type="password" id="import-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
     <input type="password" id="import-password-confirm" data-i18n-placeholder="common.confirmPasswordPlaceholder" placeholder="Confirm password" />
@@ -139,6 +143,7 @@
   <!-- UNLOCK -->
   <section id="screen-unlock" class="screen hidden">
     <h2 data-i18n="unlock.title">Unlock</h2>
+    <p id="unlock-welcome" class="muted hidden"></p>
     <input type="password" id="unlock-password" data-i18n-placeholder="common.passwordPlaceholder" placeholder="Password" />
     <button id="btn-unlock-submit" class="primary" data-i18n="unlock.submitBtn">Unlock</button>
     <p id="unlock-error" class="error hidden"></p>
@@ -222,7 +227,7 @@
       <div class="tokens-header">
         <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
         <span class="tokens-header-actions">
-          <button id="btn-scan-tokens" class="link" type="button">🔍 Scan wallet</button>
+          <button id="btn-scan-tokens" class="link" type="button" data-i18n="scan.button">🔍 Scan wallet</button>
           <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
         </span>
       </div>
@@ -330,12 +335,12 @@
   <!-- ADD TOKEN -->
   <!-- SCAN WALLET FOR TOKENS (see token-scan.js / token-scan-ui.js) -->
   <section id="screen-scan-tokens" class="screen hidden">
-    <h2>Scan wallet</h2>
-    <p class="muted">Checks this account on the current network for popular, market-listed tokens and lists the ones it holds. Only public balances are read -- nothing is added until you tap Add, and tokens outside that list (including airdropped look-alikes) are never shown.</p>
+    <h2 data-i18n="scan.title">Scan wallet</h2>
+    <p class="muted" data-i18n="scan.intro">Checks this account on the current network for popular, market-listed tokens and lists the ones it holds. Only public balances are read -- nothing is added until you tap Add, and tokens outside that list (including airdropped look-alikes) are never shown.</p>
     <p id="scan-tokens-status" class="muted small"></p>
     <div id="scan-tokens-list" class="tokens-list"></div>
-    <button type="button" id="btn-scan-add-all" class="secondary hidden">Add all</button>
-    <button type="button" id="btn-scan-again" class="secondary">Scan again</button>
+    <button type="button" id="btn-scan-add-all" class="secondary hidden" data-i18n="scan.addAll">Add all</button>
+    <button type="button" id="btn-scan-again" class="secondary" data-i18n="scan.again">Scan again</button>
     <button class="back-btn top-back-btn" type="button" data-back="screen-main"><span class="top-back-btn-coin" aria-hidden="true">&#8592;</span><span class="top-back-btn-label" data-i18n="common.back">Back</span></button>
     <p id="scan-tokens-error" class="error hidden"></p>
   </section>
@@ -627,7 +632,7 @@
     <button id="btn-view-seed" class="secondary" data-i18n="settings.viewSeedBtn">View recovery phrase</button>
     <button id="btn-goto-support-settings" class="secondary" data-i18n="settings.helpBtn">Help &amp; support</button>
     <button id="btn-goto-feedback" class="secondary" data-i18n="settings.feedbackBtn">Request a feature</button>
-    <button id="btn-goto-account" class="secondary">Account backup</button>
+    <button id="btn-goto-account" class="secondary" data-i18n="account.title">Account backup</button>
     <div class="language-picker">
       <label data-i18n="common.languageLabel">Language</label>
       <select id="language-select-settings" class="language-select"></select>
@@ -700,44 +705,44 @@
 
   <!-- ACCOUNT (optional encrypted backup/sync via username+password) -->
   <section id="screen-account" class="screen hidden">
-    <h2>Account backup</h2>
-    <p class="muted">Optional: back up an encrypted copy of this wallet to a Token Exchange account so you can restore it on another device. Token Exchange never sees your password or your unencrypted wallet -- only your recovery phrase can restore your funds if you forget your account password.</p>
+    <h2 data-i18n="account.title">Account backup</h2>
+    <p class="muted" data-i18n="account.intro">Optional: back up an encrypted copy of this wallet to a Token Exchange account so you can restore it on another device. Token Exchange never sees your password or your unencrypted wallet -- only your recovery phrase can restore your funds if you forget your account password.</p>
 
-    <p id="account-unavailable" class="warn hidden">Account backup isn't available on this server right now.</p>
+    <p id="account-unavailable" class="warn hidden" data-i18n="account.unavailable">Account backup isn't available on this server right now.</p>
 
     <div id="account-signed-out">
-      <label>Username</label>
-      <input type="text" id="account-username" placeholder="Username" autocomplete="username" />
-      <label>Password (must match this wallet's password)</label>
-      <input type="password" id="account-password" placeholder="Password" autocomplete="new-password" />
-      <input type="password" id="account-password-confirm" placeholder="Confirm password" autocomplete="new-password" />
-      <button id="btn-account-create" class="primary">Create account &amp; back up</button>
+      <label data-i18n="account.usernameLabel">Username</label>
+      <input type="text" id="account-username" placeholder="Username" data-i18n-placeholder="common.usernamePlaceholder" autocomplete="username" />
+      <label data-i18n="account.passwordLabel">Password (must match this wallet's password)</label>
+      <input type="password" id="account-password" placeholder="Password" data-i18n-placeholder="common.passwordPlaceholder" autocomplete="new-password" />
+      <input type="password" id="account-password-confirm" placeholder="Confirm password" data-i18n-placeholder="common.confirmPasswordPlaceholder" autocomplete="new-password" />
+      <button id="btn-account-create" class="primary" data-i18n="account.createBtn">Create account &amp; back up</button>
     </div>
 
     <div id="account-signed-in" class="hidden">
       <p>Signed in as <strong id="account-name"></strong></p>
       <p id="account-sync-status" class="muted small"></p>
-      <button id="btn-account-sync" class="secondary">Back up now</button>
-      <button id="btn-account-signout" class="secondary">Sign out</button>
+      <button id="btn-account-sync" class="secondary" data-i18n="account.backupNow">Back up now</button>
+      <button id="btn-account-signout" class="secondary" data-i18n="account.signOut">Sign out</button>
 
-      <h3>Change password</h3>
-      <p class="muted small">Changes both your wallet password and your account password together -- they always match.</p>
-      <input type="password" id="pw-current" placeholder="Current password" autocomplete="current-password" />
-      <input type="password" id="pw-new" placeholder="New password" autocomplete="new-password" />
-      <input type="password" id="pw-new-confirm" placeholder="Confirm new password" autocomplete="new-password" />
-      <button id="btn-pw-change" class="secondary">Change password</button>
+      <h3 data-i18n="account.changePasswordTitle">Change password</h3>
+      <p class="muted small" data-i18n="account.changePasswordNote">Changes both your wallet password and your account password together -- they always match.</p>
+      <input type="password" id="pw-current" placeholder="Current password" data-i18n-placeholder="account.currentPasswordPlaceholder" autocomplete="current-password" />
+      <input type="password" id="pw-new" placeholder="New password" data-i18n-placeholder="account.newPasswordPlaceholder" autocomplete="new-password" />
+      <input type="password" id="pw-new-confirm" placeholder="Confirm new password" data-i18n-placeholder="account.confirmNewPasswordPlaceholder" autocomplete="new-password" />
+      <button id="btn-pw-change" class="secondary" data-i18n="account.changePasswordTitle">Change password</button>
     </div>
 
     <div id="account-delete-box" class="hidden">
-      <h3>Delete account</h3>
-      <p class="muted small">Deletes your online backup only -- the wallet on this device is unaffected.</p>
-      <input type="password" id="account-delete-password" placeholder="Password" autocomplete="current-password" />
-      <button id="btn-account-delete" class="danger">Delete account</button>
+      <h3 data-i18n="account.deleteTitle">Delete account</h3>
+      <p class="muted small" data-i18n="account.deleteNote">Deletes your online backup only -- the wallet on this device is unaffected.</p>
+      <input type="password" id="account-delete-password" placeholder="Password" data-i18n-placeholder="common.passwordPlaceholder" autocomplete="current-password" />
+      <button id="btn-account-delete" class="danger" data-i18n="account.deleteBtn">Delete account</button>
     </div>
 
     <p id="account-status" class="hint hidden"></p>
     <p id="account-error" class="error hidden"></p>
-    <button class="back-btn top-back-btn" type="button" data-back="screen-settings"><span class="top-back-btn-coin" aria-hidden="true">&#8592;</span><span class="top-back-btn-label">Back</span></button>
+    <button class="back-btn top-back-btn" type="button" data-back="screen-settings"><span class="top-back-btn-coin" aria-hidden="true">&#8592;</span><span class="top-back-btn-label" data-i18n="common.back">Back</span></button>
   </section>
 
   <section id="screen-feedback" class="screen hidden">

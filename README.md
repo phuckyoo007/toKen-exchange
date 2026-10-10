@@ -78,6 +78,11 @@ back to the on-chain router) instead of breaking.
 | `TRANSAK_ENVIRONMENT` | `production` or `staging` (default `staging`, so a forgotten variable cannot move real money). Use the key pair that matches. |
 | `TRANSAK_REFERRER_DOMAIN` | Optional. Default `tokenswaphub.org`; must match your Transak dashboard. |
 | `COINBASE_CDP_API_KEY_ID`, `COINBASE_CDP_API_SECRET` | Coinbase onramp/offramp sessions. Secret: never commit. |
+| `COINGECKO_API_KEY` | Optional free CoinGecko "Demo" key for the market relay (`market-api.js`) and token lists; raises rate limits. Never sent to the browser. |
+| `COINGECKO_BASE` | Override the CoinGecko base URL (tests only). Default `https://api.coingecko.com/api/v3`. |
+| `LLAMA_BASE` | Override the DefiLlama prices base URL (tests only). Default `https://coins.llama.fi`. |
+| `TOKEN_LIST_URLS` | Comma-separated standard token-list URLs for the token picker (`token-list-api.js`). Default `https://tokens.uniswap.org`. |
+| `TOKEN_LIST_THIN_MIN` | A network whose standard list has fewer tokens than this is topped up from CoinGecko. Default 40. |
 
 Known limit: rate-limit counters live in memory, so they reset on every
 redeploy and are not shared between instances. Run a single instance.

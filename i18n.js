@@ -144,6 +144,15 @@ async function persistLanguage(code) {
   } catch (e) {
     // best-effort only -- worst case the picker just resets next time the popup opens
   }
+  // The website and the Android app have no chrome.storage, so without this
+  // the chosen language was forgotten on every launch (it fell back to the
+  // browser/system language). localStorage covers those; the extension keeps
+  // using chrome.storage above.
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem("tm_language", code);
+  } catch (e) {
+    // private mode / storage blocked -- the picker simply resets next launch
+  }
 }
 
 function setLanguage(code, opts) {
@@ -165,6 +174,13 @@ async function initLanguage() {
     }
   } catch (e) {
     // fall through to browser-language detection below
+  }
+  if (!stored) {
+    try {
+      if (typeof localStorage !== "undefined") stored = localStorage.getItem("tm_language");
+    } catch (e) {
+      // storage blocked -- fall through to browser-language detection
+    }
   }
   const initial = supportedCodes().includes(stored) ? stored : detectDefaultLanguage();
   setLanguage(initial, { silent: true });

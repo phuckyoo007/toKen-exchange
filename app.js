@@ -135,17 +135,28 @@ function trustWalletLogoUrl(networkKey, address) {
 // common cases to a calm, plain-language line, and falls back to a
 // generic one for anything else that still looks like a raw technical
 // dump rather than a message meant for a person.
+// Looks up the translated message at the moment it is shown (so a language
+// switch takes effect immediately); falls back to the English default.
+function friendlyText(key, fallback) {
+  try {
+    if (typeof TM_I18N !== "undefined" && TM_I18N.t) {
+      const v = TM_I18N.t(key);
+      if (v && v !== key) return v;
+    }
+  } catch (e) { /* fall through to English */ }
+  return fallback;
+}
 const FRIENDLY_ERROR_PATTERNS = [
-  { re: /could not detect network|NETWORK_ERROR/i, text: "Couldn't reach the network. Check your connection and try again." },
-  { re: /insufficient funds|gas required exceeds allowance|exceeds allowance|max fee per gas less than block base fee/i, text: "Not enough of this network's coin (ETH on Base) to pay the network fee. Add a small amount and try again." },
-  { re: /user rejected|ACTION_REJECTED/i, text: "That request was cancelled." },
-  { re: /nonce has already been used|nonce too low/i, text: "That transaction couldn't be sent right now -- please try again." },
-  { re: /replacement (fee|transaction) too low|underpriced/i, text: "Network fees just changed -- please try again." },
-  { re: /timeout|ETIMEDOUT/i, text: "The network took too long to respond. Please try again." },
-  { re: /rate limit|too many requests|\b429\b/i, text: "Too many requests right now -- please wait a moment and try again." },
-  { re: /call_exception|execution reverted/i, text: "The network rejected this request. Double-check the details and try again." },
-  { re: /UNPREDICTABLE_GAS_LIMIT|cannot estimate gas/i, text: "The network wouldn't accept this transaction. Check you have enough ETH for the network fee, then try again." },
-  { re: /invalid response|server_error|processing response error/i, text: "Couldn't get a response from the network. Please try again." },
+  { re: /could not detect network|NETWORK_ERROR/i, get text() { return friendlyText("errors.net.unreachable", "Couldn't reach the network. Check your connection and try again."); } },
+  { re: /insufficient funds|gas required exceeds allowance|exceeds allowance|max fee per gas less than block base fee/i, get text() { return friendlyText("errors.net.noFunds", "Not enough of this network's coin (ETH on Base) to pay the network fee. Add a small amount and try again."); } },
+  { re: /user rejected|ACTION_REJECTED/i, get text() { return friendlyText("errors.net.cancelled", "That request was cancelled."); } },
+  { re: /nonce has already been used|nonce too low/i, get text() { return friendlyText("errors.net.nonce", "That transaction couldn't be sent right now -- please try again."); } },
+  { re: /replacement (fee|transaction) too low|underpriced/i, get text() { return friendlyText("errors.net.feesChanged", "Network fees just changed -- please try again."); } },
+  { re: /timeout|ETIMEDOUT/i, get text() { return friendlyText("errors.net.timeout", "The network took too long to respond. Please try again."); } },
+  { re: /rate limit|too many requests|\b429\b/i, get text() { return friendlyText("errors.net.rateLimit", "Too many requests right now -- please wait a moment and try again."); } },
+  { re: /call_exception|execution reverted/i, get text() { return friendlyText("errors.net.rejected", "The network rejected this request. Double-check the details and try again."); } },
+  { re: /UNPREDICTABLE_GAS_LIMIT|cannot estimate gas/i, get text() { return friendlyText("errors.net.gasEstimate", "The network wouldn't accept this transaction. Check you have enough ETH for the network fee, then try again."); } },
+  { re: /invalid response|server_error|processing response error/i, get text() { return friendlyText("errors.net.noResponse", "Couldn't get a response from the network. Please try again."); } },
 ];
 function friendlyErrorMessage(raw) {
   const msg = String(raw == null ? "" : raw);
@@ -157,7 +168,7 @@ function friendlyErrorMessage(raw) {
   // generic fallback instead of being shown as-is; genuinely short,
   // plain-language messages (this app's own thrown errors) pass through.
   const looksTechnical = /code=|version=providers|"jsonrpc"|\{[^}]*\}|event="/i.test(msg) || msg.length > 160;
-  return looksTechnical ? "Something went wrong talking to the network. Please try again." : msg;
+  return looksTechnical ? friendlyText("errors.net.generic", "Something went wrong talking to the network. Please try again.") : msg;
 }
 
 function showError(id, message) {
@@ -206,18 +217,44 @@ let currentStatus = null;
 let currentNetworks = [];
 let currentNetwork = null;
 
+// ---------------------------------------------------------------- USERNAME (this device only)
+// A display name chosen when the wallet is created or imported. It is stored only on this device,
+// never sent anywhere, and is NOT a credential: the wallet password is what protects the keys.
+// It is shown on the unlock screen ("Welcome back, <name>") so the screen reads like a sign-in.
+const TM_USERNAME_KEY = "tm_wallet_username";
+function cleanUsername(raw) { return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 30); }
+function saveWalletUsername(name) {
+  return new Promise((resolve) => {
+    try { chrome.storage.local.set({ [TM_USERNAME_KEY]: name }, () => resolve()); } catch (e) { resolve(); }
+  });
+}
+function refreshUnlockWelcome() {
+  const el = document.getElementById("unlock-welcome");
+  if (!el) return;
+  try {
+    chrome.storage.local.get([TM_USERNAME_KEY], (res) => {
+      const name = cleanUsername(res && res[TM_USERNAME_KEY]);
+      if (name) { el.textContent = TM_I18N.t("unlock.welcomeBack", { name }); el.classList.remove("hidden"); }
+      else { el.textContent = ""; el.classList.add("hidden"); }
+    });
+  } catch (e) { el.classList.add("hidden"); }
+}
+
 // ---------------------------------------------------------------- ONBOARDING
 $("btn-goto-create").addEventListener("click", () => showScreen("screen-create"));
 $("btn-goto-import").addEventListener("click", () => showScreen("screen-import"));
 $("btn-goto-support-onboarding").addEventListener("click", () => openSupport("screen-onboarding"));
 
 $("btn-create-submit").addEventListener("click", async () => {
+  const username = cleanUsername($("create-username").value);
   const pw = $("create-password").value;
   const pw2 = $("create-password-confirm").value;
+  if (!username) return alert(TM_I18N.t("errors.usernameRequired"));
   if (pw.length < 8) return alert(TM_I18N.t("errors.passwordTooShort"));
   if (pw !== pw2) return alert(TM_I18N.t("errors.passwordMismatch"));
   try {
     const res = await sendMsg("TM_CREATE_WALLET", { password: pw });
+    await saveWalletUsername(username);
     $("mnemonic-display").textContent = res.mnemonic;
     $("create-step-password").classList.add("hidden");
     $("create-step-backup").classList.remove("hidden");
@@ -237,12 +274,15 @@ $("btn-backup-done").addEventListener("click", async () => {
 $("btn-import-submit").addEventListener("click", async () => {
   hideError("import-error");
   const mnemonic = $("import-mnemonic").value;
+  const username = cleanUsername($("import-username").value);
   const pw = $("import-password").value;
   const pw2 = $("import-password-confirm").value;
+  if (!username) return showError("import-error", TM_I18N.t("errors.usernameRequired"));
   if (pw.length < 8) return showError("import-error", TM_I18N.t("errors.passwordTooShort"));
   if (pw !== pw2) return showError("import-error", TM_I18N.t("errors.passwordMismatch"));
   try {
     await sendMsg("TM_IMPORT_MNEMONIC", { mnemonic, password: pw });
+    await saveWalletUsername(username);
     await refreshMain();
     showScreen("screen-main");
   } catch (e) {
@@ -2494,11 +2534,12 @@ $("btn-goto-support-settings").addEventListener("click", () => openSupport("scre
 $("btn-lock").addEventListener("click", async () => {
   disarmAutoLock();
   await sendMsg("TM_LOCK", {});
-  showScreen("screen-unlock");
+  refreshUnlockWelcome(); showScreen("screen-unlock");
 });
 $("btn-goto-reset-2").addEventListener("click", () => showScreen("screen-reset"));
 $("btn-reset-confirm").addEventListener("click", async () => {
   await sendMsg("TM_RESET_WALLET", {});
+  await saveWalletUsername("");
   location.reload();
 });
 
@@ -2869,7 +2910,7 @@ function resetAutoLockTimer() {
       // nothing left to protect, so just make sure the UI reflects it.
     }
     resetSendConfirmUi();
-    showScreen("screen-unlock");
+    refreshUnlockWelcome(); showScreen("screen-unlock");
   }, currentAutoLockMinutes * 60 * 1000);
 }
 
@@ -4188,7 +4229,7 @@ function renderActivity() {
     showScreen("screen-onboarding");
     activateSplashLanding();
   } else if (!status.unlocked) {
-    showScreen("screen-unlock");
+    refreshUnlockWelcome(); showScreen("screen-unlock");
     activateSplashLanding();
   } else {
     await refreshMain();
