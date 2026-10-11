@@ -71,43 +71,4 @@ jobs:
           for pair in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
             d="$A/app/src/main/res/mipmap-${pair%%:*}"
             mkdir -p "$d"
-            convert icon-512.png -resize "${pair##*:}x${pair##*:}" "$d/ic_launcher.png"
-          done
-
-      - name: Bundle the website into the app
-        run: |
-          npm ci
-          node scripts/prepare-android-assets.js
-
-      - name: Decode the signing key
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          test -s "$RUNNER_TEMP/release.keystore"
-
-      - name: Build the release bundle
-        working-directory: android
-        env:
-          KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle --no-daemon bundleRelease
-
-      - name: Check the bundle is signed
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: |
-          AAB=android/app/build/outputs/bundle/release/app-release.aab
-          ls -l "$AAB"
-          jarsigner -verify "$AAB" | head -3
-          keytool -printcert -jarfile "$AAB" | grep -E "SHA1|SHA256|Owner" | head -4
-          unzip -p "$AAB" base/manifest/AndroidManifest.xml | strings | grep -c tokenexchange || true
-          cp "$AAB" TokenExchange-v2.1-code13.aab
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: TokenExchange-v2.1-code13-aab
-          path: TokenExchange-v2.1-code13.aab
-          retention-days: 14
+            convert icon-512.png -resize "${pair##*:}x${
