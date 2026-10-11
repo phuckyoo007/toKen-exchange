@@ -62,13 +62,13 @@ jobs:
           cp MainActivity.java LocalAssetServer.java android/app/src/main/java/com/tokenexchange/wallet/
           cp strings.xml android/app/src/main/res/values/strings.xml
           printf 'plugins {\n  id "com.android.application" version "8.11.1" apply false\n}\n' > android/build.gradle
-          # Launcher icons, made from the 512px app icon.
+          # Launcher icons: the 512px app icon, which Android scales down.
           mkdir -p android/app/src/main/res/mipmap-mdpi android/app/src/main/res/mipmap-hdpi android/app/src/main/res/mipmap-xhdpi android/app/src/main/res/mipmap-xxhdpi android/app/src/main/res/mipmap-xxxhdpi
-          convert icon-512.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          convert icon-512.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          convert icon-512.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          convert icon-512.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          convert icon-512.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp icon-512.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp icon-512.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp icon-512.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp icon-512.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp icon-512.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
       - name: Bundle the website into the app
         run: |
