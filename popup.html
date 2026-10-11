@@ -268,6 +268,19 @@
       <button id="btn-goto-buy" class="secondary" data-i18n="common.buy">Buy</button>
       <button id="btn-goto-sell" class="secondary" data-i18n="common.sell">Sell</button>
     </div>
+    <div class="tokens-section">
+      <div class="tokens-header">
+        <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
+        <span class="tokens-header-actions">
+          <button id="btn-scan-tokens" class="link" type="button" data-i18n="scan.button">🔍 Scan wallet</button>
+          <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
+        </span>
+      </div>
+      <div id="tokens-list" class="tokens-list"></div>
+      <button id="tokens-hidden-toggle" class="link hidden" type="button"></button>
+      <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
+    </div>
+
     <div class="prices-card">
       <div class="prices-card-header">
         <span class="prices-card-title" data-i18n="main.livePricesTitle">Live Prices</span>
@@ -282,18 +295,6 @@
         <button id="btn-goto-predictions" class="link" data-i18n="common.seeAll">See all</button>
       </div>
       <div id="predictions-card-list" class="prices-card-list"></div>
-    </div>
-
-    <div class="tokens-section">
-      <div class="tokens-header">
-        <span class="tokens-title" data-i18n="main.tokensTitle">Tokens</span>
-        <span class="tokens-header-actions">
-          <button id="btn-scan-tokens" class="link" type="button" data-i18n="scan.button">🔍 Scan wallet</button>
-          <button id="btn-goto-add-token" class="link" data-i18n="main.addTokenBtn">+ Add token</button>
-        </span>
-      </div>
-      <div id="tokens-list" class="tokens-list"></div>
-      <p id="tokens-empty" class="muted small hidden" data-i18n="main.tokensEmpty">No tokens added yet -- tap "+ Add token" and enter a contract address to track one.</p>
     </div>
 
     <div class="network-picker">
@@ -363,6 +364,9 @@
     <h2 data-i18n="addToken.title">Add token</h2>
     <p class="muted" data-i18n="addToken.description">Enter the token's contract address on the current network. Only add a token whose contract address you got from a source you trust -- a wallet can't tell a real token apart from a fake one with the same name.</p>
     <div id="add-token-quick" class="quick-add hidden"></div>
+    <input type="search" id="add-token-search" class="hidden" data-i18n-placeholder="addToken.searchPlaceholder" placeholder="Search by name or symbol" autocomplete="off" />
+    <div id="add-token-results" class="add-token-results"></div>
+    <p class="hint at-or" data-i18n="addToken.orPaste">Or paste a contract address</p>
     <label data-i18n="addToken.addressLabel">Token contract address</label>
     <input type="text" id="add-token-address" data-i18n-placeholder="common.addressPlaceholder0x" placeholder="0x..." />
     <button id="btn-token-lookup" class="secondary" data-i18n="addToken.lookupBtn">Look up</button>
@@ -500,6 +504,8 @@
         </select>
         <input type="text" id="swap-to-custom" class="hidden" data-i18n-placeholder="common.tokenAddressPlaceholderParen" placeholder="Token address (0x...)" />
       </div>
+      <div id="swap-quick-chips" class="quick-add hidden"></div>
+      <p id="swap-unverified-note" class="warn hidden" data-i18n="swap.unverifiedNote">This token isn't on the verified list. Double-check the contract address before you swap -- anyone can create a token with any name.</p>
       <button id="btn-swap-quote" class="secondary" data-i18n="swap.getQuoteBtn">Get quote</button>
       <div id="swap-quote-display" class="hidden">
         <p id="swap-fee-line" class="muted"></p>

@@ -1970,3 +1970,70 @@ html[dir="rtl"] .cn-face .top-back-btn { align-self: flex-end; right: auto; left
 .seg-tabs { display: flex; gap: 6px; margin: 12px 0 10px; }
 .seg-tab { flex: 1; padding: 8px 10px; border-radius: 999px; border: 1px solid var(--border, rgba(255,255,255,0.12)); background: transparent; color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .seg-tab.active { background: var(--accent, #f5c242); color: #1a1405; border-color: transparent; }
+
+/* Add token: search box + popular tokens list */
+#add-token-search { margin: 8px 0 4px; }
+.add-token-results { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 12px; max-height: 38vh; overflow-y: auto; }
+.at-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 12px; border: 1px solid transparent; background: transparent; color: inherit; text-align: start; cursor: pointer; }
+.at-row:hover, .at-row:focus-visible { background: var(--bg-hover); border-color: var(--line); }
+.at-icon { position: relative; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; font-size: 11px; font-weight: 700; background: var(--bg-hover); color: var(--text); }
+.at-icon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; background: #fff; }
+.at-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.at-symbol { font-weight: 600; font-size: 13px; }
+.at-sub { font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at-plus { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); font-size: 16px; line-height: 1; }
+.at-or { margin: 6px 0 2px; }
+
+
+/* ---- v1.11.9 polish ---- */
+/* Send / Swap / Buy / Sell: a simple icon above each label */
+.actions-row button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1.15; }
+.actions-row button::before { font-size: 17px; line-height: 1; font-weight: 700; }
+#btn-goto-send::before { content: "\2197"; }
+#btn-goto-swap::before { content: "\21C4"; }
+#btn-goto-buy::before { content: "\2193"; }
+#btn-goto-sell::before { content: "\2191"; }
+
+/* Plainer panel behind forms so grey text stays readable over the artwork */
+:root { --form-veil: rgba(12, 10, 6, 0.66); }
+html[data-theme="light"] { --form-veil: rgba(255, 250, 238, 0.78); }
+#screen-add-token, #screen-add-nft, #screen-swap, #screen-send, #screen-import, #screen-import-key,
+#screen-add-network, #screen-add-watch, #screen-contacts, #screen-feedback {
+  background: var(--form-veil); border-radius: 16px;
+}
+
+/* Short screens: the big footer logo takes too much room */
+@media (max-height: 760px) { #app-footer #brand-logo { display: none; } }
+
+/* Token list: star + hide */
+.tok-act { background: none; border: 0; color: var(--text-faint); font-size: 16px; line-height: 1; padding: 4px; cursor: pointer; }
+.tok-act:hover, .tok-act:focus-visible, .tok-act.on { color: var(--gold-deep, #ddac4d); }
+.chg-up { color: #3fb97a; }
+.chg-down { color: #e5585a; }
+
+/* Swap quick-pick chips + verified labels */
+.quick-add-chip.active { border-color: var(--gold-deep, #ddac4d); color: var(--gold-deep, #ddac4d); }
+.verified-badge { color: var(--success, #3fb97a); font-weight: 600; }
+.unverified-badge { color: var(--danger, #e5585a); font-weight: 600; }
+
+.token-row.pref-hidden { display: none; }
+.token-row.pref-dimmed { opacity: 0.55; }
+.tok-actions { display: inline-flex; align-items: center; flex-shrink: 0; }
+#tokens-hidden-toggle { display: block; margin: 6px auto 0; font-size: 12px; }
+#tokens-hidden-toggle.hidden { display: none; }
+
+/* One grouped account control: picture | account menu | settings */
+html .account-row {
+  align-items: center; gap: 6px; padding: 4px 6px 4px 8px;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--bg-raised);
+}
+html .account-row .account-picker { gap: 8px; min-width: 0; }
+html .account-row select, html .account-row #account-select {
+  border: 0; background: transparent; box-shadow: none; padding-left: 4px; min-width: 0; text-overflow: ellipsis;
+}
+html .account-row .icon-btn {
+  background: transparent; border: 0; border-left: 1px solid var(--line); border-radius: 0 999px 999px 0;
+  box-shadow: none; min-width: 36px; min-height: 32px; padding: 4px 10px;
+}
+html .account-row .icon-btn:hover { color: var(--gold-bright); }

@@ -16,7 +16,7 @@ const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 // rate-limits by IP and phones on mobile data share IPs, so asking it directly often failed
 // and the coin pages came up empty. We ask our server first and fall back to CoinGecko
 // directly if our server can't be reached, so nothing gets worse.
-const MARKET_PROXY_BASE = "https://web-wallet-production.up.railway.app/api/market";
+const MARKET_PROXY_BASE = "https://www.tokenswaphub.org/api/market";
 const MARKET_PROXY_TIMEOUT_MS = 12000;
 
 // `path` is the CoinGecko path + query, e.g. "/coins/usd-coin/market_chart?vs_currency=usd&days=7".

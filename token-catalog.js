@@ -25,14 +25,14 @@
   // device gets the same fast answer instead of each one downloading several MB from
   // CoinGecko (which rate-limits by IP). If our server can't be reached we fall back to
   // asking CoinGecko directly, exactly as before.
-  const SERVER_LIST_ENDPOINT = "https://web-wallet-production.up.railway.app/api/token-list";
+  const SERVER_LIST_ENDPOINT = "https://www.tokenswaphub.org/api/token-list";
   const SERVER_TIMEOUT_MS = 10000;
   const TTL_MS = 6 * 60 * 60 * 1000;
   const TRENDING_TTL_MS = 60 * 1000;
 
   // Market calls (trending, coin markets) go through our server's cached relay first
   // (market-api.js); the big coin list is handled by token-list-api.js and goes direct.
-  const MARKET_PROXY_BASE = "https://web-wallet-production.up.railway.app/api/market";
+  const MARKET_PROXY_BASE = "https://www.tokenswaphub.org/api/market";
   async function getJson(url) {
     let res;
     const path = url.startsWith(BASE + "/") ? url.slice(BASE.length) : null;

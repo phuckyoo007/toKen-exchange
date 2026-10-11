@@ -184,7 +184,7 @@ async function executeSwap({ network, signer, tokenIn, tokenOut, amountInWei, sl
 // "fall back to the plain on-chain router quote" (getQuote() above), which
 // is also exactly the right behavior for a token 0x has no liquidity data
 // for at all.
-const SWAP_QUOTE_ENDPOINT = "https://web-wallet-production.up.railway.app/api/swap-quote";
+const SWAP_QUOTE_ENDPOINT = "https://www.tokenswaphub.org/api/swap-quote";
 
 async function tryAggregatorQuote({ network, tokenIn, tokenOut, amountInWei, taker, slippageBps = DEFAULT_SLIPPAGE_BPS }) {
   try {

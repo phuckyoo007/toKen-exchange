@@ -168,7 +168,7 @@ async function refreshMain() {
   $("network-badge").innerHTML = networkDotHtml(currentNetwork.key) + `<span>${escapeHtml(currentNetwork.name)}</span>`;
   $("network-badge").classList.remove("hidden");
   if ($("network-select-dot")) $("network-select-dot").style.background = networkDotColor(currentNetwork.key);
-  $("address-display").textContent = currentStatus.selectedAddress || "";
+  setAddressDisplay(currentStatus.selectedAddress);
   updateAccountIdenticon(currentStatus.selectedAddress);
   refreshAddressQr();
 
@@ -214,7 +214,7 @@ async function refreshBalance() {
 $("account-select").addEventListener("change", async (e) => {
   await sendMsg("TM_SELECT_ACCOUNT", { address: e.target.value });
   currentStatus.selectedAddress = e.target.value;
-  $("address-display").textContent = e.target.value;
+  setAddressDisplay(e.target.value);
   updateAccountIdenticon(e.target.value);
   refreshAddressQr();
   await refreshBalance();
@@ -299,6 +299,7 @@ async function refreshTokens() {
   res.tokens.forEach((t) => {
     const row = document.createElement("div");
     row.className = "token-row";
+    row.dataset.tokId = String(t.address).toLowerCase();
     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
     const priceEntry = prices[t.address.toLowerCase()];
     const priceNum = priceEntry && typeof priceEntry.price === "number" ? priceEntry.price : null;
@@ -361,6 +362,7 @@ async function refreshTokens() {
     row.appendChild(removeBtn);
     list.appendChild(row);
   });
+  applyTokenListPrefs();
 }
 
 function resetAddTokenScreen() {
@@ -368,9 +370,264 @@ function resetAddTokenScreen() {
   $("add-token-address").value = "";
   $("add-token-preview").classList.add("hidden");
   delete $("add-token-preview").dataset.address;
+  if ($("add-token-search")) $("add-token-search").value = "";
+  renderAddTokenResults();
   renderQuickAddChips(currentNetwork && currentNetwork.chainId, (t) => {
     $("add-token-address").value = t.address;
     $("btn-token-lookup").click();
+  });
+}
+
+// ---- Add token: search + popular list (reuses the catalog the swap picker uses) ----
+
+function shortAddress(a) {
+  const s = String(a || "");
+  return /^0x[0-9a-fA-F]{40}$/.test(s) ? s.slice(0, 8) + "\u2026" + s.slice(-6) : s;
+}
+function setAddressDisplay(a) {
+  const el = $("address-display");
+  el.textContent = shortAddress(a);
+  el.title = a || "";
+}
+
+function isKnownVerifiedToken(address) {
+  if (!address || typeof TM_KNOWN_TOKENS === "undefined" || !currentNetwork) return false;
+  const a = String(address).toLowerCase();
+  return TM_KNOWN_TOKENS.forChain(currentNetwork.chainId).some((t) => t.address.toLowerCase() === a);
+}
+function knownTokenSymbol(address) {
+  if (!address || typeof TM_KNOWN_TOKENS === "undefined" || !currentNetwork) return null;
+  const a = String(address).toLowerCase();
+  const t = TM_KNOWN_TOKENS.forChain(currentNetwork.chainId).find((x) => x.address.toLowerCase() === a);
+  return t ? t.symbol : null;
+}
+function verifiedBadgeHtml(address) {
+  return isKnownVerifiedToken(address)
+    ? ` <span class="verified-badge" title="${escapeHtml(TM_I18N.t("swap.verifiedTitle"))}">&#10003; ${escapeHtml(TM_I18N.t("swap.verifiedBadge"))}</span>`
+    : "";
+}
+function unverifiedBadgeHtml() {
+  return ` <span class="unverified-badge">&#9888; ${escapeHtml(TM_I18N.t("swap.unverifiedBadge"))}</span>`;
+}
+
+function renderSwapQuickChips() {
+  const box = $("swap-quick-chips");
+  if (!box) return;
+  box.innerHTML = "";
+  const toSel = $("swap-to-select"), fromSel = $("swap-from-select");
+  if (!currentNetwork || !currentNetwork.swapRouter || !toSel || !fromSel) { box.classList.add("hidden"); return; }
+  const same = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
+  const curFrom = fromSel.value === "custom" ? $("swap-from-custom").value.trim() : fromSel.value;
+  const curTo = toSel.value === "custom" ? $("swap-to-custom").value.trim() : toSel.value;
+  const nc = currentNetwork.nativeCurrency || {};
+  const picks = [{ key: "native", symbol: nc.symbol || "ETH" }];
+  (typeof TM_KNOWN_TOKENS !== "undefined" ? TM_KNOWN_TOKENS.forChain(currentNetwork.chainId) : [])
+    .forEach((t) => picks.push({ key: t.address, symbol: t.symbol }));
+  const shown = picks.filter((p) => !same(p.key, curFrom));
+  if (shown.length < 2) { box.classList.add("hidden"); return; }
+  const label = document.createElement("span");
+  label.className = "quick-add-label muted";
+  label.textContent = TM_I18N.t("swap.quickPickLabel");
+  box.appendChild(label);
+  shown.forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "quick-add-chip" + (same(p.key, curTo) ? " active" : "");
+    b.textContent = p.symbol;
+    b.addEventListener("click", () => {
+      const hasOpt = [...toSel.options].some((o) => o.value === p.key);
+      if (hasOpt) { toSel.value = p.key; syncSwapAsset("to"); }
+      else { toSel.value = "custom"; syncSwapAsset("to"); $("swap-to-custom").value = p.key; renderSwapPill("to"); }
+      renderSwapQuickChips();
+    });
+    box.appendChild(b);
+  });
+  box.classList.remove("hidden");
+}
+
+function updateSwapUnverifiedNote() {
+  const el = $("swap-unverified-note");
+  if (!el) return;
+  const toSel = $("swap-to-select");
+  const v = toSel && toSel.value === "custom" ? $("swap-to-custom").value.trim() : "";
+  const unknown = /^0x[0-9a-fA-F]{40}$/.test(v) && !isKnownVerifiedToken(v);
+  el.classList.toggle("hidden", !unknown);
+}
+
+// ---- Token list: pin to top / hide (kept per network on this device) ----
+const TM_TOK_PINS_KEY = "tm_tok_pins";
+const TM_TOK_HIDDEN_KEY = "tm_tok_hidden";
+let tokPins = new Set();
+let tokHidden = new Set();
+let tokShowHidden = false;
+const TOK_EYE_OFF = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+const TOK_EYE = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+function loadTokenPrefs() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get([TM_TOK_PINS_KEY, TM_TOK_HIDDEN_KEY], (res) => {
+        const pins = res && res[TM_TOK_PINS_KEY];
+        const hid = res && res[TM_TOK_HIDDEN_KEY];
+        tokPins = new Set(Array.isArray(pins) ? pins.filter((x) => typeof x === "string") : []);
+        tokHidden = new Set(Array.isArray(hid) ? hid.filter((x) => typeof x === "string") : []);
+        resolve();
+      });
+    } catch (e) { resolve(); }
+  });
+}
+function saveTokenPrefs() {
+  try { chrome.storage.local.set({ [TM_TOK_PINS_KEY]: Array.from(tokPins), [TM_TOK_HIDDEN_KEY]: Array.from(tokHidden) }); } catch (e) { /* best-effort */ }
+}
+function tokPrefId(address) {
+  return `${currentNetwork ? currentNetwork.chainId : 0}:${String(address).toLowerCase()}`;
+}
+
+async function applyTokenListPrefs() {
+  const list = $("tokens-list");
+  if (!list) return;
+  await loadTokenPrefs();
+  const rows = Array.from(list.querySelectorAll(".token-row[data-tok-id]"));
+  rows.forEach((row) => {
+    const id = tokPrefId(row.dataset.tokId);
+    const pinned = tokPins.has(id);
+    const hidden = tokHidden.has(id);
+    const old = row.querySelector(".tok-actions");
+    if (old) old.remove();
+    const actions = document.createElement("span");
+    actions.className = "tok-actions";
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "tok-act" + (pinned ? " on" : "");
+    pin.innerHTML = pinned ? "&#9733;" : "&#9734;";
+    pin.title = TM_I18N.t(pinned ? "tokens.unpinTitle" : "tokens.pinTitle");
+    pin.setAttribute("aria-label", pin.title);
+    pin.setAttribute("aria-pressed", pinned ? "true" : "false");
+    pin.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (tokPins.has(id)) tokPins.delete(id); else tokPins.add(id);
+      saveTokenPrefs();
+      applyTokenListPrefs();
+    });
+    const hide = document.createElement("button");
+    hide.type = "button";
+    hide.className = "tok-act" + (hidden ? " on" : "");
+    hide.innerHTML = hidden ? TOK_EYE : TOK_EYE_OFF;
+    hide.title = TM_I18N.t(hidden ? "tokens.unhideTitle" : "tokens.hideTitle");
+    hide.setAttribute("aria-label", hide.title);
+    hide.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (tokHidden.has(id)) tokHidden.delete(id); else tokHidden.add(id);
+      saveTokenPrefs();
+      applyTokenListPrefs();
+    });
+    actions.appendChild(pin);
+    actions.appendChild(hide);
+    const removeBtn = row.querySelector(".token-remove-btn");
+    if (removeBtn) row.insertBefore(actions, removeBtn); else row.appendChild(actions);
+    row.classList.toggle("pref-hidden", hidden && !tokShowHidden);
+    row.classList.toggle("pref-dimmed", hidden && tokShowHidden);
+  });
+  // Pinned first; otherwise keep the order the list already had.
+  const isPinned = (r) => tokPins.has(tokPrefId(r.dataset.tokId));
+  rows.filter(isPinned).concat(rows.filter((r) => !isPinned(r))).forEach((r) => list.appendChild(r));
+  const hiddenCount = rows.filter((r) => tokHidden.has(tokPrefId(r.dataset.tokId))).length;
+  const toggle = $("tokens-hidden-toggle");
+  if (toggle) {
+    toggle.classList.toggle("hidden", hiddenCount === 0);
+    toggle.textContent = tokShowHidden ? TM_I18N.t("tokens.hideHidden") : TM_I18N.t("tokens.showHidden", { count: hiddenCount });
+  }
+}
+if ($("tokens-hidden-toggle")) {
+  $("tokens-hidden-toggle").addEventListener("click", () => { tokShowHidden = !tokShowHidden; applyTokenListPrefs(); });
+}
+
+let addTokenSearchGen = 0;
+let addTokenSearchTimer = null;
+
+function addTokenRowIcon(symbol, imageUrl) {
+  const s = String(symbol || "?").trim();
+  const initials = escapeHtml((s.slice(0, 2) || "?").toUpperCase());
+  const img = imageUrl
+    ? `<img class="at-icon-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" onerror="this.remove()" />`
+    : "";
+  return `<span class="at-icon">${initials}${img}</span>`;
+}
+
+function addTokenResultLogo(t) {
+  if (t.image) return t.image;
+  return typeof trustWalletLogoUrl === "function" && currentNetwork ? trustWalletLogoUrl(currentNetwork.key, t.address) : null;
+}
+
+async function renderAddTokenResults() {
+  const list = $("add-token-results");
+  const searchEl = $("add-token-search");
+  if (!list || !searchEl) return;
+  const gen = ++addTokenSearchGen;
+  list.innerHTML = "";
+  if (typeof TM_CATALOG === "undefined" || !currentNetwork || !TM_CATALOG.supports(currentNetwork.key)) {
+    // No token list for this network: the paste-an-address box below still works.
+    searchEl.classList.add("hidden");
+    return;
+  }
+  searchEl.classList.remove("hidden");
+  const query = searchEl.value.trim();
+  if (query && query.length < 2) return;
+  const status = document.createElement("p");
+  status.className = "hint";
+  status.textContent = TM_I18N.t("swap.pickerLoadingTokens");
+  list.appendChild(status);
+  let rows = [];
+  let failed = false;
+  try {
+    rows = query ? await TM_CATALOG.search(currentNetwork.key, query, 20) : await TM_CATALOG.top(currentNetwork.key, 20);
+  } catch (e) { rows = []; failed = true; }
+  if (gen !== addTokenSearchGen) return;
+  status.remove();
+  rows = (rows || []).filter((t) => t && t.symbol && t.address && ethers.utils.isAddress(t.address));
+  if (failed) {
+    const f = document.createElement("p");
+    f.className = "hint";
+    f.textContent = TM_I18N.t("swap.pickerLoadFailed");
+    list.appendChild(f);
+    return;
+  }
+  if (!rows.length) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = TM_I18N.t("swap.pickerNoMatch");
+    list.appendChild(p);
+    return;
+  }
+  const h = document.createElement("p");
+  h.className = "hint";
+  h.textContent = TM_I18N.t(query ? "swap.pickerSearchResults" : "swap.pickerTopTokens");
+  list.appendChild(h);
+  rows.forEach((t) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "at-row";
+    row.innerHTML =
+      addTokenRowIcon(t.symbol, addTokenResultLogo(t)) +
+      `<span class="at-main"><span class="at-symbol">${escapeHtml(t.symbol)}</span>` +
+      `<span class="at-sub">${escapeHtml(t.name || "")}${t.rank ? ` · #${escapeHtml(String(t.rank))}` : ""}</span></span>` +
+      `<span class="at-plus" aria-hidden="true">+</span>`;
+    row.addEventListener("click", () => {
+      // Fills the address and runs the normal look-up, which shows the
+      // on-chain name/symbol/decimals and still needs a tap on "Add to my wallet".
+      $("add-token-address").value = t.address;
+      $("btn-token-lookup").click();
+      const prev = $("add-token-preview");
+      if (prev && prev.scrollIntoView) setTimeout(() => prev.scrollIntoView({ block: "nearest", behavior: "smooth" }), 400);
+    });
+    list.appendChild(row);
+  });
+}
+
+if ($("add-token-search")) {
+  $("add-token-search").addEventListener("input", () => {
+    clearTimeout(addTokenSearchTimer);
+    addTokenSearchTimer = setTimeout(renderAddTokenResults, 350);
   });
 }
 
@@ -648,6 +905,8 @@ function syncSwapAsset(side) {
   }
   $("swap-quote-display").classList.add("hidden"); // a changed pair invalidates any shown quote
   renderSwapPill(side);
+  renderSwapQuickChips();
+  updateSwapUnverifiedNote();
 }
 
 // The pill button next to each hidden <select> shows what's currently chosen.
@@ -659,11 +918,15 @@ function renderSwapPill(side) {
   pill.removeAttribute("data-i18n");
   if (sel.value === "custom") {
     const v = $(`swap-${side}-custom`).value.trim();
-    pill.textContent = v ? `${v.slice(0, 6)}…${v.slice(-4)}` : TM_I18N.t("swap.customAddressOption");
+    pill.textContent = v ? (knownTokenSymbol(v) || `${v.slice(0, 6)}…${v.slice(-4)}`) : TM_I18N.t("swap.customAddressOption");
+    updateSwapUnverifiedNote();
+    renderSwapQuickChips();
     return;
   }
   const a = swapHeldAssets.find((x) => x.key === sel.value);
   pill.textContent = a ? a.symbol : TM_I18N.t("swap.selectBtn");
+  updateSwapUnverifiedNote();
+  renderSwapQuickChips();
 }
 
 async function populateSwapSelects(pre) {
@@ -814,7 +1077,7 @@ async function appendCatalogRows(side, query, list, items, sugg) {
     row.className = "asset-picker-row";
     row.innerHTML = tokenIconHtml(t.symbol) +
       `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(t.symbol)}</span>` +
-      `<span class="asset-picker-row-sub">${escapeHtml(t.name)}${t.rank ? ` · #${escapeHtml(String(t.rank))}` : ""}</span></span>`;
+      `<span class="asset-picker-row-sub">${escapeHtml(t.name)}${t.rank ? ` · #${escapeHtml(String(t.rank))}` : ""}${verifiedBadgeHtml(t.address)}</span></span>`;
     row.addEventListener("click", () => {
       $("swap-to-select").value = "custom";
       syncSwapAsset("to");
@@ -859,7 +1122,7 @@ function renderAssetPicker(side) {
     row.className = "asset-picker-row";
     row.innerHTML = tokenIconHtml("?") +
       `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(TM_I18N.t("swap.pickerUseAddress"))}</span>` +
-      `<span class="asset-picker-row-sub">${escapeHtml(query.slice(0, 8))}…${escapeHtml(query.slice(-6))}</span></span>`;
+      `<span class="asset-picker-row-sub">${escapeHtml(query.slice(0, 8))}…${escapeHtml(query.slice(-6))}${isKnownVerifiedToken(query) ? verifiedBadgeHtml(query) : unverifiedBadgeHtml()}</span></span>`;
     row.addEventListener("click", () => {
       $(`swap-${side}-select`).value = "custom";
       syncSwapAsset(side);
@@ -892,7 +1155,7 @@ function renderAssetPicker(side) {
     row.innerHTML =
       `<span class="token-icon-wrap">${tokenIconHtml(a.symbol)}<span class="token-net-badge" style="background:${networkDotColor(currentNetwork.key)}"></span></span>` +
       `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(a.symbol)}</span>` +
-      `<span class="asset-picker-row-sub">${escapeHtml(currentNetwork.name)}</span></span>` +
+      `<span class="asset-picker-row-sub">${escapeHtml(currentNetwork.name)}${verifiedBadgeHtml(a.address)}</span></span>` +
       `<span class="asset-picker-row-right"><span class="asset-picker-row-balance">${escapeHtml(Number(a.balance).toLocaleString(undefined, { maximumFractionDigits: 6 }))}</span>` +
       `<span class="asset-picker-row-usd"></span></span>` +
       `<button type="button" class="asset-picker-star${isFav ? " on" : ""}" aria-label="${escapeHtml(TM_I18N.t("swap.pickerStarTitle"))}">${isFav ? "&#9733;" : "&#9734;"}</button>` +
@@ -923,7 +1186,7 @@ function renderAssetPicker(side) {
       row.className = "asset-picker-row";
       row.innerHTML = tokenIconHtml(t.symbol) +
         `<span class="asset-picker-row-main"><span class="asset-picker-row-symbol">${escapeHtml(t.symbol)}</span>` +
-        `<span class="asset-picker-row-sub">${escapeHtml(t.name)}</span></span>`;
+        `<span class="asset-picker-row-sub">${escapeHtml(t.name)}${verifiedBadgeHtml(t.address)}</span></span>`;
       row.addEventListener("click", () => {
         $("swap-to-select").value = "custom";
         syncSwapAsset("to");

@@ -55,7 +55,7 @@ test("tryAggregatorQuote: builds the right request (native mapped to the pseudo 
     await S.tryAggregatorQuote({ network: BASE, tokenIn: "", tokenOut: USDC, amountInWei: BN.from("1000000000000000"), taker: TAKER, slippageBps: 50 });
     assert.equal(calls.length, 1);
     const u = new URL(calls[0]);
-    assert.equal(u.origin + u.pathname, "https://web-wallet-production.up.railway.app/api/swap-quote");
+    assert.equal(u.origin + u.pathname, "https://www.tokenswaphub.org/api/swap-quote");
     assert.equal(u.searchParams.get("chainId"), "8453");
     assert.equal(u.searchParams.get("sellToken"), S.NATIVE_PSEUDO_ADDRESS);
     assert.equal(u.searchParams.get("buyToken"), USDC);

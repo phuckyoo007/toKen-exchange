@@ -63,7 +63,7 @@
 // wrongly shown or hidden until fixed.
 const COINBASE_ONRAMP_SUPPORTED_NETWORKS = new Set(["ethereum", "base", "polygon", "arbitrum", "optimism"]);
 
-const COINBASE_ONRAMP_SESSION_ENDPOINT = "https://web-wallet-production.up.railway.app/api/coinbase-onramp-session";
+const COINBASE_ONRAMP_SESSION_ENDPOINT = "https://www.tokenswaphub.org/api/coinbase-onramp-session";
 const COINBASE_ONRAMP_WIDGET_BASE_URL = "https://pay.coinbase.com/buy/select-asset";
 
 function isCoinbaseOnrampSupportedNetwork(networkKey) {
@@ -114,7 +114,7 @@ async function buildCoinbaseOnrampUrl(networkKey, address) {
 }
 
 // ---- Sell / Offramp -----------------------------------------------------
-const COINBASE_OFFRAMP_STATUS_ENDPOINT = "https://web-wallet-production.up.railway.app/api/coinbase-offramp-status";
+const COINBASE_OFFRAMP_STATUS_ENDPOINT = "https://www.tokenswaphub.org/api/coinbase-offramp-status";
 const COINBASE_OFFRAMP_WIDGET_BASE_URL = "https://pay.coinbase.com/v3/sell/input";
 
 // Remembers the partnerUserRef from the most recent buildCoinbaseOfframpUrl()

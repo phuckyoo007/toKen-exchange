@@ -13,7 +13,7 @@
 // executable), so calling it from the extension doesn't conflict with the
 // extension's "no remote code fetched at runtime" store answer.
 
-const TRANSAK_SESSION_ENDPOINT = "https://web-wallet-production.up.railway.app/api/transak-session";
+const TRANSAK_SESSION_ENDPOINT = "https://www.tokenswaphub.org/api/transak-session";
 
 // Returns the URL to open. Throws Error with a user-facing message on any
 // failure (not configured yet, offline, Transak declined the request).

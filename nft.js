@@ -14,8 +14,8 @@
 // always fall back to the wallet's existing manual "type in a contract
 // address and token ID" flow (TM_LOOKUP_NFT / TM_ADD_TRACKED_NFT in
 // wallet-engine.js and background.js) instead of showing an error.
-const NFT_LIST_ENDPOINT = "https://web-wallet-production.up.railway.app/api/nft-list";
-const NFT_METADATA_ENDPOINT = "https://web-wallet-production.up.railway.app/api/nft-metadata";
+const NFT_LIST_ENDPOINT = "https://www.tokenswaphub.org/api/nft-list";
+const NFT_METADATA_ENDPOINT = "https://www.tokenswaphub.org/api/nft-metadata";
 
 // Returns { configured, supported, ok, nfts, pageKey } -- nfts is always an
 // array (empty on any failure), so a caller can render it directly without
