@@ -540,7 +540,7 @@ async function fetchPriceBoardMarkets(ids, currency) {
   if (priceBoardCache.data && priceBoardCache.cacheKey === cacheKey && now - priceBoardCache.fetchedAt < CACHE_TTL_MS) {
     return priceBoardCache.data;
   }
-  const url = `/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&per_page=250&price_change_percentage=24h`;
+  const url = `/coins/markets?vs_currency=${vsCurrency}&ids=${encodeURIComponent(idsKey)}&per_page=250&price_change_percentage=24h&sparkline=true`;
   let res;
   try {
     res = await cgFetch(url);
@@ -557,6 +557,39 @@ async function fetchPriceBoardMarkets(ids, currency) {
   });
   priceBoardCache = { fetchedAt: now, cacheKey, data: byId };
   return byId;
+}
+
+// 7-day mini chart: CoinGecko returns ~168 hourly points per coin when asked
+// for sparkline=true. Keep ~28 of them (every 6th hour) -- plenty for a 56px
+// line -- and throw away anything that isn't a plain finite number.
+function sparkPoints(entry) {
+  const raw = entry && entry.sparkline_in_7d && entry.sparkline_in_7d.price;
+  if (!Array.isArray(raw) || raw.length < 8) return null;
+  const clean = raw.filter((v) => typeof v === "number" && isFinite(v));
+  if (clean.length < 8) return null;
+  const step = Math.max(1, Math.floor(clean.length / 28));
+  const out = [];
+  for (let i = 0; i < clean.length; i += step) out.push(clean[i]);
+  if (out[out.length - 1] !== clean[clean.length - 1]) out.push(clean[clean.length - 1]);
+  return out;
+}
+
+// Tiny inline SVG line for a price row. Returns "" when there's no data, so
+// the row simply looks like it always did. Colour follows the 7-day direction.
+function sparklineSvg(points, label) {
+  if (!Array.isArray(points) || points.length < 2) return "";
+  const W = 56, H = 22, pad = 2;
+  let min = Infinity, max = -Infinity;
+  points.forEach((v) => { if (v < min) min = v; if (v > max) max = v; });
+  const span = max - min || 1;
+  const coords = points.map((v, i) => {
+    const x = (i / (points.length - 1)) * W;
+    const y = H - pad - ((v - min) / span) * (H - pad * 2);
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  const up = points[points.length - 1] >= points[0];
+  const t = String(label || "").replace(/[<>&"]/g, "");
+  return '<span class="price-spark ' + (up ? "up" : "down") + '" title="' + t + '"><svg viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" aria-hidden="true" focusable="false"><polyline fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="' + coords + '"/></svg></span>';
 }
 
 // Returns the fixed PRICE_BOARD list, each entry filled in with its live
@@ -579,6 +612,7 @@ async function getPriceBoard(currency) {
       price: entry ? entry.current_price : null,
       change24h: entry && typeof entry.price_change_percentage_24h === "number" ? entry.price_change_percentage_24h : null,
       image: entry ? entry.image : null,
+      spark: sparkPoints(entry),
       // Public CoinGecko page for this coin; the Prices screen links each row to it.
       url: `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}`,
     });
@@ -1097,6 +1131,7 @@ async function getTopCoins(currency) {
 if (typeof self !== "undefined") {
   self.TM_PRICES = {
     getPriceBoard,
+    sparklineSvg,
     getFiatRates,
     getCoinDetail,
     getCoinChart,

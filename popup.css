@@ -1252,3 +1252,54 @@ html .account-row .icon-btn {
   box-shadow: none; min-width: 36px; min-height: 32px; padding: 4px 10px;
 }
 html .account-row .icon-btn:hover { color: var(--gold-bright); }
+
+/* 7-day trend line on price rows (prices.js sparklineSvg) */
+.price-spark { flex: 0 0 auto; display: inline-flex; align-items: center; margin: 0 10px; opacity: 0.9; }
+.price-spark.up { color: #3fb97a; }
+.price-spark.down { color: #e5585a; }
+.price-spark svg { display: block; }
+@media (max-width: 340px) { .price-spark { display: none; } }
+
+/* ---- Convenience features shared by site and extension (explore-ui.js) ---- */
+.balance-box .tm-eye-btn {
+  position: absolute; top: 8px; inset-inline-end: 8px; z-index: 2;
+  width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-faint, currentColor); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.balance-box .tm-eye-btn:hover, .balance-box .tm-eye-btn:focus-visible { color: var(--gold-deep, #ddac4d); background: var(--bg-hover); }
+.tm-hide-bal .balance-native-row,
+.tm-hide-bal #balance-usd,
+.tm-hide-bal .token-balance-col,
+.tm-hide-bal .swap-panel-balance { filter: blur(9px); user-select: none; -webkit-user-select: none; pointer-events: none; }
+.tokens-list.tm-hide-zero .token-row[data-zero="1"] { display: none; }
+#tm-zero-toggle { display: block; margin: 6px auto 0; }
+.tm-recent, .tm-sort, .tm-pct { margin: 6px 0; }
+.tm-pct-note { flex-basis: 100%; margin: 2px 0 0; }
+.tm-label { display: block; margin-top: 10px; font-size: 12px; }
+.tm-req-msg { text-align: center; word-break: break-all; font-size: 12.5px; margin: 10px 0; }
+#screen-request .qr-box { margin-top: 12px; }
+.tm-mix { margin: 12px 0 4px; }
+.tm-mix-title { font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-faint, currentColor); margin-bottom: 6px; }
+.tm-mix-bar { display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden; }
+.tm-mix-seg { min-width: 4px; flex-basis: 0; }
+.tm-mix-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 11.5px; }
+.tm-mix-item { display: inline-flex; align-items: center; }
+.tm-mix-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 5px; }
+.tm-sec-score { font-weight: 600; margin: 6px 0; }
+.tm-sec-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px; margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.tm-sec-mark { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+.tm-sec-row.ok .tm-sec-mark { background: rgba(63, 185, 122, 0.18); color: #3fb97a; }
+.tm-sec-row.warn .tm-sec-mark { background: rgba(229, 168, 60, 0.2); color: #e5a83c; }
+.tm-apps-card .quick-add { margin: 8px 0 2px; }
+.tm-apps-card .quick-add-chip { text-decoration: none; }
+.tm-app-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.tm-app-left { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tm-app-name { color: inherit; font-weight: 600; text-decoration: none; }
+.tm-app-name:hover, .tm-app-name:focus-visible { text-decoration: underline; }
+.tm-app-host { text-align: end; word-break: break-all; }
+.tm-receipt-row { text-align: end; margin: -4px 0 8px; font-size: 12px; }
+/* The address row now also holds a Request link; let it wrap to a second line on narrow screens instead of breaking the address mid-word. */
+.address-row { flex-wrap: wrap; row-gap: 2px; }
+.address-row > :first-child { flex-basis: 100%; text-align: center; }
+@media (min-width: 420px) { .address-row > :first-child { flex-basis: auto; } }

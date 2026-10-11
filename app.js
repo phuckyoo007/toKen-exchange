@@ -21,6 +21,8 @@ let portfolioNativeUsd = null; // number | null (null = native price unavailable
 let portfolioTokensUsd = null; // number | null (null = tracked-token fetch failed; 0 = fetched, none priced)
 
 function renderPortfolioTotal() {
+  window.TM_NATIVE_USD = portfolioNativeUsd;
+  if (window.TM_EXPLORE) TM_EXPLORE.refreshAllocation();
   if (portfolioNativeUsd == null && portfolioTokensUsd == null) return showUsdUnavailable();
   const total = (portfolioNativeUsd || 0) + (portfolioTokensUsd || 0);
   document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
@@ -374,6 +376,7 @@ async function refreshMain() {
   if ($("balance-usd-label")) $("balance-usd-label").classList.add("hidden"); // shown once renderPortfolioTotal has a real number
   $("balance-amount").textContent = "";
   $("balance-symbol").textContent = "";
+  window.TM_NATIVE_USD = null;
   document.querySelector(".balance-native-row").classList.remove("balance-lead-fallback");
   // Fresh generation for the combined portfolio total (see PORTFOLIO TOTAL
   // above) -- an account/network switch invalidates any total still being
@@ -685,6 +688,7 @@ async function refreshTokens() {
   list.innerHTML = "";
   if (!res.tokens.length) {
     $("tokens-empty").classList.remove("hidden");
+    if (window.TM_EXPLORE) TM_EXPLORE.afterTokens();
     if (myGen === portfolioGen) {
       portfolioTokensUsd = 0;
       renderPortfolioTotal();
@@ -724,10 +728,13 @@ async function refreshTokens() {
     const row = document.createElement("div");
     row.className = "token-row";
     row.dataset.tokId = String(t.address).toLowerCase();
+    row.dataset.symbol = t.symbol;
+    row.dataset.decimals = String(t.decimals);
     const formatted = ethers.utils.formatUnits(t.balanceWei, t.decimals);
+    row.dataset.zero = Number(formatted) === 0 ? "1" : "0";
     const priceEntry = prices[t.address.toLowerCase()];
     const usdValue = priceEntry && typeof priceEntry.price === "number" ? Number(formatted) * priceEntry.price : 0;
-    if (usdValue) tokensUsdTotal += usdValue;
+    if (usdValue) { tokensUsdTotal += usdValue; row.dataset.usd = String(usdValue); }
     const usdText = usdValue ? formatCurrency(usdValue) : "";
     const nameEl = document.createElement("span");
     nameEl.className = "token-name muted small";
@@ -788,6 +795,7 @@ async function refreshTokens() {
     list.appendChild(row);
   });
   applyTokenListPrefs();
+  if (window.TM_EXPLORE) TM_EXPLORE.afterTokens();
 
   if (myGen === portfolioGen) {
     portfolioTokensUsd = tokensUsdTotal;
@@ -1430,11 +1438,12 @@ function renderPriceRow(c) {
     changeHtml = `<span class="price-change ${cls}">${sign}${c.change24h.toFixed(2)}%</span>`;
   }
   const starred = isWatchlisted(c.symbol);
+  const sparkHtml = TM_PRICES.sparklineSvg ? TM_PRICES.sparklineSvg(c.spark, TM_I18N.t("prices.sparkTitle")) : "";
   // The whole row (logo, name, price) opens the in-app coin screen; the
   // star is a separate button so pinning a coin doesn't navigate away.
   const linkLabel = TM_I18N.t("prices.viewCoin", { name: c.name });
   row.innerHTML = `
-    <button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>
+    <button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${c.name}</span><span class="price-symbol">${c.symbol}</span></span></span>${sparkHtml}<span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>
     <button type="button" class="star-btn ${starred ? "starred" : ""}" aria-label="${TM_I18N.t("prices.watchlistToggle")}">${starred ? "★" : "☆"}</button>
   `;
   row.querySelector(".price-link").addEventListener("click", () => {
@@ -2434,7 +2443,8 @@ async function refreshPredictions() {
   $("predictions-status").innerHTML = coinSpinnerHtml(TM_I18N.t("predictions.loading"));
   $("predictions-status").classList.remove("hidden");
   try {
-    const markets = predictionsTab === "top" ? await TM_PRICES.getTopCoins(currentCurrency) : await TM_PRICES.getCurrencyStablecoins(currentCurrency);
+    const rawMarkets = predictionsTab === "top" ? await TM_PRICES.getTopCoins(currentCurrency) : await TM_PRICES.getCurrencyStablecoins(currentCurrency);
+    const markets = window.TM_EXPLORE ? TM_EXPLORE.sortMarkets(rawMarkets) : rawMarkets;
     const list = $("predictions-list");
     list.innerHTML = "";
     if (!markets.length) {
@@ -4465,6 +4475,7 @@ function renderActivity() {
       card.appendChild(icon);
       card.appendChild(body);
       root.appendChild(card);
+      if (window.TM_EXPLORE) TM_EXPLORE.addReceiptRow(root, item, explorerUrl);
     });
   });
 }
