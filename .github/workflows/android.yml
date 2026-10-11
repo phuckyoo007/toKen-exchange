@@ -54,21 +54,55 @@ jobs:
           done
           mkdir -p scripts
           if [ ! -f scripts/prepare-android-assets.js ]; then cp prepare-android-assets.js scripts/prepare-android-assets.js; fi
-          A=android
-          rm -rf "$A"
-          mkdir -p "$A/app/src/main/java/com/tokenexchange/wallet" "$A/app/src/main/res/values"
-          cp settings.gradle gradle.properties "$A/"
-          cp build.gradle "$A/app/build.gradle"
-          cp AndroidManifest.xml "$A/app/src/main/AndroidManifest.xml"
-          cp MainActivity.java LocalAssetServer.java "$A/app/src/main/java/com/tokenexchange/wallet/"
-          cp strings.xml "$A/app/src/main/res/values/strings.xml"
-          cat > "$A/build.gradle" <<'GRADLE'
-          plugins {
-              id "com.android.application" version "8.11.1" apply false
-          }
-          GRADLE
+          rm -rf android
+          mkdir -p android/app/src/main/java/com/tokenexchange/wallet android/app/src/main/res/values
+          cp settings.gradle gradle.properties android/
+          cp build.gradle android/app/build.gradle
+          cp AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          cp MainActivity.java LocalAssetServer.java android/app/src/main/java/com/tokenexchange/wallet/
+          cp strings.xml android/app/src/main/res/values/strings.xml
+          printf 'plugins {\n  id "com.android.application" version "8.11.1" apply false\n}\n' > android/build.gradle
           # Launcher icons, made from the 512px app icon.
-          for pair in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
-            d="$A/app/src/main/res/mipmap-${pair%%:*}"
-            mkdir -p "$d"
-            convert icon-512.png -resize "${pair##*:}x${
+          mkdir -p android/app/src/main/res/mipmap-mdpi android/app/src/main/res/mipmap-hdpi android/app/src/main/res/mipmap-xhdpi android/app/src/main/res/mipmap-xxhdpi android/app/src/main/res/mipmap-xxxhdpi
+          convert icon-512.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert icon-512.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert icon-512.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert icon-512.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert icon-512.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: Bundle the website into the app
+        run: |
+          npm ci
+          node scripts/prepare-android-assets.js
+
+      - name: Decode the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          test -s "$RUNNER_TEMP/release.keystore"
+
+      - name: Build the release bundle
+        working-directory: android
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle --no-daemon bundleRelease
+
+      - name: Check the bundle is signed
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          ls -l "$AAB"
+          jarsigner -verify "$AAB" | head -3
+          keytool -printcert -jarfile "$AAB" | grep -E "SHA1|SHA256|Owner" | head -4
+          cp "$AAB" TokenExchange-v2.1-code13.aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TokenExchange-v2.1-code13-aab
+          path: TokenExchange-v2.1-code13.aab
+          retention-days: 14
