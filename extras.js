@@ -104,6 +104,15 @@
       try {
         const codes = await detector.detect(video);
         if (!codes.length) return;
+        // A payment link (amount, token, network) fills the whole Send form, not only the address.
+        const raw = String(codes[0].rawValue || "").trim();
+        if (/^ethereum:/i.test(raw) && window.TM_EXPLORE && typeof window.TM_EXPLORE.applyPaymentLink === "function") {
+          const res = window.TM_EXPLORE.applyPaymentLink(raw);
+          if (!res.ok) { hint.textContent = res.message; return; }
+          stopScan();
+          toast(res.message);
+          return;
+        }
         const addr = addressFromQr(codes[0].rawValue);
         if (!addr) { hint.textContent = tr("send.scanNoAddress", "That QR code doesn't contain a valid wallet address."); return; }
         stopScan();

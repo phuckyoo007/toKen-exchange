@@ -2088,3 +2088,33 @@ html .account-row .icon-btn:hover { color: var(--gold-bright); }
 .address-row { flex-wrap: wrap; row-gap: 2px; }
 .address-row > :first-child { flex-basis: 100%; text-align: center; }
 @media (min-width: 420px) { .address-row > :first-child { flex-basis: auto; } }
+/* ---- v7: converter, recurring-buy reminders, portfolio history, pay-a-link, activity summary */
+.tm-hide-bal #tm-hist .tm-hist-row { filter: blur(9px); user-select: none; -webkit-user-select: none; pointer-events: none; }
+.tm-tools-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
+.tm-tools-chips .quick-add-chip { cursor: pointer; }
+.tm-conv-swap { display: block; margin: 10px auto 0; }
+.tm-conv-result { margin: 14px 0 4px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; text-align: center; font-weight: 600; word-break: break-word; }
+.tm-conv-result:empty { display: none; }
+.tm-due-banner { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--gold-deep, #ddac4d); border-radius: 12px; font-size: 13px; }
+.tm-due-banner.hidden { display: none; }
+.tm-due-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.tm-due-actions .secondary { width: auto; padding: 6px 16px; }
+.tm-rem-list { margin: 14px 0 6px; }
+.tm-rem-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.tm-rem-left { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tm-hist { margin: 12px 0 4px; }
+.tm-hist-row { display: flex; align-items: center; gap: 12px; }
+.tm-hist-spark { flex: 0 0 110px; height: 30px; display: inline-block; }
+.tm-hist-spark svg { width: 100%; height: 100%; display: block; }
+.tm-hist-up .tm-hist-spark, .tm-hist-up .tm-hist-text { color: #3fb97a; }
+.tm-hist-down .tm-hist-spark, .tm-hist-down .tm-hist-text { color: #e0625a; }
+.tm-hist-text { font-weight: 600; font-size: 13px; }
+.tm-pay-toggle { display: inline-block; margin: 6px 0 0; }
+.tm-pay-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: center; }
+.tm-pay-row.hidden { display: none; }
+.tm-pay-row input { flex: 1 1 180px; min-width: 0; }
+.tm-pay-row .secondary { width: auto; padding: 8px 16px; }
+#tm-pay-note { flex-basis: 100%; margin: 0; font-size: 12px; white-space: normal; overflow: visible; text-overflow: clip; }
+.tm-act-sum { margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; }
+.tm-act-sum.hidden { display: none; }
+.tm-sum-line { margin: 2px 0; }

@@ -10,6 +10,8 @@
 //   3  Request payment (amount + QR)       8  Explore apps (curated official dapps)
 //   4  Gainers / losers / volume sorting   9  Copy a receipt for any activity entry
 //   5  Portfolio mix bar                  10  25 / 50 / 75 / Max on Send, 25 / 50 / 75 on Swap
+//   Found in Crypto.com: 11 converter, 12 recurring-buy reminders, 13 portfolio history,
+//   14 pay from a payment link or QR, 15 this-month activity summary (see the section further down)
 //
 // Everything is best-effort and local: nothing here sends data anywhere, and if any one piece
 // can't find its anchor element or throws, the rest of the wallet is unaffected.
@@ -364,6 +366,7 @@
       if (isFinite(usd) && usd > 0) parts.push({ label: row.dataset.symbol || "?", usd });
     });
     const total = parts.reduce((s, p) => s + p.usd, 0);
+    safe(() => recordPortfolio(total));
     if (parts.length < 2 || !(total > 0)) { mixBox.classList.add("hidden"); mixBox.innerHTML = ""; return; }
     parts.sort((a, b) => b.usd - a.usd);
     const top = parts.slice(0, 4);
@@ -678,9 +681,548 @@
     }
   }
 
+  // ---------------------------------------------------------------- 11-15. FOUND IN CRYPTO.COM
+  //   11 Converter            13 Portfolio history       15 Activity summary (this month)
+  //   12 Recurring-buy        14 Pay from a payment link or QR
+  //      reminders
+  // All local. Reminders are reminders only: nothing here ever buys or sends by itself.
+
+  // ---- screen-open hook: Send/Activity/Home are cube faces, so watch showScreen and nav clicks
+  const openHooks = [];
+  function onScreenOpen(fn) { openHooks.push(fn); }
+  function initScreenHooks() {
+    if (typeof showScreen === "function") {
+      const original = showScreen;
+      window.showScreen = function (id) {
+        const r = original.apply(this, arguments);
+        openHooks.forEach((h) => { try { h(id); } catch (e) { /* best-effort */ } });
+        return r;
+      };
+    }
+    document.addEventListener("click", (e) => {
+      const t = e.target && e.target.closest ? e.target.closest("[data-cube-goto], #btn-goto-send, .cube-tab, .splash-tab, .globe-tab") : null;
+      if (t) setTimeout(() => openHooks.forEach((h) => { try { h(null); } catch (err) { /* best-effort */ } }), 80);
+    });
+  }
+
+  // ---- tools card on Home
+  function initTools() {
+    const anchor = document.querySelector(".tm-apps-card") || ($id("btn-goto-predictions") && $id("btn-goto-predictions").closest(".prices-card"));
+    if (!anchor) return;
+    const card = el("div", "prices-card tm-tools-card");
+    const head = el("div", "prices-card-header");
+    const title = el("span", "prices-card-title");
+    head.appendChild(title);
+    const chips = el("div", "quick-add tm-tools-chips");
+    const mk = (id, goto) => { const b = el("button", "quick-add-chip"); b.type = "button"; b.id = id; b.addEventListener("click", goto); chips.appendChild(b); return b; };
+    const bConv = mk("tm-tool-conv", () => openConverter());
+    const bRem = mk("tm-tool-rem", () => openReminders());
+    const bPay = mk("tm-tool-pay", () => { showScreen("screen-send"); setTimeout(() => safe(() => togglePayRow(true)), 120); });
+    const setText = () => {
+      title.textContent = tr("explore.toolsTitle", "Tools");
+      bConv.textContent = tr("explore.toolConverter", "Converter");
+      bRem.textContent = tr("explore.toolReminders", "Recurring buy");
+      bPay.textContent = tr("explore.toolPayLink", "Pay a link");
+    };
+    setText();
+    card.appendChild(head);
+    card.appendChild(chips);
+    anchor.insertAdjacentElement("afterend", card);
+    onScreenOpen((id) => { if (id === "screen-main" || id == null) setText(); });
+  }
+
+  // ---- 11. CONVERTER
+  // Numbers, codes and dates stay left-to-right even inside Arabic sentences.
+  function ltr(t) { return t ? "\u2066" + t + "\u2069" : t; }
+  function currencyCode() { return String(safe(() => currentCurrency) || "USD").toUpperCase(); }
+  function convertAmount(amount, fromRow, toRow) {
+    if (!fromRow || !toRow || !(fromRow.price > 0) || !(toRow.price > 0) || !isFinite(amount)) return null;
+    const v = (amount * fromRow.price) / toRow.price;
+    return isFinite(v) ? v : null;
+  }
+  function formatConverted(n) {
+    if (typeof n !== "number" || !isFinite(n)) return "";
+    const abs = Math.abs(n);
+    if (abs === 0) return "0";
+    if (abs >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    if (abs >= 1) return n.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+    const digits = Math.min(12, Math.max(4, 3 - Math.floor(Math.log10(abs))));
+    return n.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
+  }
+  let convRows = [];
+  function convRow(sym) { return convRows.find((r) => r.symbol === sym) || null; }
+  function renderConverter() {
+    const out = $id("tm-conv-result");
+    if (!out) return;
+    if (convRows.length < 2) { out.textContent = tr("explore.convNoPrices", "Prices aren't available right now. Try again in a moment."); return; }
+    const amountStr = $id("tm-conv-amount").value.trim().replace(",", ".");
+    const amount = Number(amountStr);
+    if (!amountStr || !(amount >= 0) || !isFinite(amount)) { out.textContent = ""; return; }
+    const from = convRow($id("tm-conv-from").value);
+    const to = convRow($id("tm-conv-to").value);
+    const v = convertAmount(amount, from, to);
+    out.textContent = v == null ? "" : tr("explore.convResult", "{amount} {from} ≈ {value} {to}", { amount: ltr(amountStr), from: ltr(from.symbol), value: ltr(formatConverted(v)), to: ltr(to.symbol) });
+  }
+  async function openConverter() {
+    const fromSel = $id("tm-conv-from");
+    const toSel = $id("tm-conv-to");
+    showScreen("screen-converter");
+    $id("tm-conv-result").textContent = tr("explore.convLoading", "Loading prices…");
+    const code = currencyCode();
+    let board = [];
+    try { board = await TM_PRICES.getPriceBoard(code); } catch (e) { board = []; }
+    convRows = [{ symbol: code, price: 1 }];
+    board.forEach((c) => { if (c && typeof c.price === "number" && c.price > 0) convRows.push({ symbol: c.symbol, price: c.price }); });
+    const keepFrom = fromSel.value;
+    const keepTo = toSel.value;
+    [fromSel, toSel].forEach((sel) => {
+      sel.innerHTML = "";
+      convRows.forEach((r) => { const o = el("option", null, r.symbol); o.value = r.symbol; sel.appendChild(o); });
+    });
+    fromSel.value = convRow(keepFrom) ? keepFrom : (convRow("ETH") ? "ETH" : convRows[Math.min(1, convRows.length - 1)].symbol);
+    toSel.value = convRow(keepTo) ? keepTo : code;
+    renderConverter();
+  }
+  function initConverter() {
+    const section = addScreen("screen-converter");
+    section.innerHTML =
+      '<h2 id="tm-conv-title"></h2><p class="muted" id="tm-conv-intro"></p>' +
+      '<label class="tm-label" for="tm-conv-amount" id="tm-conv-amount-label"></label>' +
+      '<input type="text" id="tm-conv-amount" inputmode="decimal" autocomplete="off" value="1" />' +
+      '<label class="tm-label" for="tm-conv-from" id="tm-conv-from-label"></label><select id="tm-conv-from"></select>' +
+      '<button type="button" id="tm-conv-swap" class="link tm-conv-swap"></button>' +
+      '<label class="tm-label" for="tm-conv-to" id="tm-conv-to-label"></label><select id="tm-conv-to"></select>' +
+      '<p id="tm-conv-result" class="tm-conv-result"></p>';
+    section.appendChild(makeBackBtn("screen-main"));
+    const setText = () => {
+      $id("tm-conv-title").textContent = tr("explore.convTitle", "Coin converter");
+      $id("tm-conv-intro").textContent = tr("explore.convIntro", "See what an amount is worth in another coin or currency, using the live prices from your Prices list.");
+      $id("tm-conv-amount-label").textContent = tr("explore.convAmount", "Amount");
+      $id("tm-conv-from-label").textContent = tr("explore.convFrom", "From");
+      $id("tm-conv-to-label").textContent = tr("explore.convTo", "To");
+      $id("tm-conv-swap").textContent = "⇅ " + tr("explore.convSwap", "Swap sides");
+    };
+    setText();
+    onScreenOpen((id) => { if (id === "screen-converter") setText(); });
+    $id("tm-conv-amount").addEventListener("input", renderConverter);
+    $id("tm-conv-from").addEventListener("change", renderConverter);
+    $id("tm-conv-to").addEventListener("change", renderConverter);
+    $id("tm-conv-swap").addEventListener("click", () => {
+      const a = $id("tm-conv-from").value;
+      $id("tm-conv-from").value = $id("tm-conv-to").value;
+      $id("tm-conv-to").value = a;
+      renderConverter();
+    });
+  }
+
+  // ---- 12. RECURRING-BUY REMINDERS
+  const REM_KEY = "tm_buy_reminders";
+  const FREQS = [["weekly", "explore.remWeekly", "Every week"], ["biweekly", "explore.remBiweekly", "Every 2 weeks"], ["monthly", "explore.remMonthly", "Every month"]];
+  function addInterval(ts, freq) {
+    const d = new Date(ts);
+    if (freq === "monthly") d.setMonth(d.getMonth() + 1);
+    else d.setDate(d.getDate() + (freq === "biweekly" ? 14 : 7));
+    return d.getTime();
+  }
+  // Moves a reminder's next date forward, past `now`, one interval at a time.
+  function advanceReminder(r, now) {
+    let next = Number(r.next) || now;
+    for (let i = 0; i < 500 && next <= now; i++) next = addInterval(next, r.freq);
+    return Object.assign({}, r, { next });
+  }
+  function dueReminders(list, now) {
+    return (Array.isArray(list) ? list : []).filter((r) => r && FREQS.some((f) => f[0] === r.freq) && Number(r.next) <= now).sort((a, b) => a.next - b.next);
+  }
+  function cleanReminders(list) {
+    return (Array.isArray(list) ? list : []).filter((r) => r && typeof r.id === "string" && FREQS.some((f) => f[0] === r.freq) && isFinite(Number(r.next)));
+  }
+  async function loadReminders() { return cleanReminders((await storeGet([REM_KEY]))[REM_KEY]); }
+  function saveReminders(list) { storeSet({ [REM_KEY]: list }); }
+  function reminderWhat(r) {
+    const bits = [];
+    if (r.amount) bits.push(r.amount + " " + currencyCode());
+    if (r.asset) bits.push(r.asset);
+    return ltr(bits.join(" · "));
+  }
+  function freqLabel(f) { const x = FREQS.find((q) => q[0] === f); return x ? tr(x[1], x[2]) : f; }
+
+  let dueBox = null;
+  async function renderDue() {
+    if (!dueBox) return;
+    const list = await loadReminders();
+    const due = dueReminders(list, Date.now());
+    dueBox.innerHTML = "";
+    dueBox.classList.toggle("hidden", !due.length);
+    if (!due.length) return;
+    const r = due[0];
+    const titleKey = { weekly: ["explore.remDueWeekly", "Time for your weekly buy"], biweekly: ["explore.remDueBiweekly", "Time for your buy (every 2 weeks)"], monthly: ["explore.remDueMonthly", "Time for your monthly buy"] }[r.freq];
+    dueBox.appendChild(el("strong", "tm-due-title", tr(titleKey[0], titleKey[1])));
+    const what = reminderWhat(r);
+    if (what) dueBox.appendChild(el("span", "tm-due-what muted", tr("explore.remPlanned", "Planned: {what}", { what })));
+    const row = el("div", "tm-due-actions");
+    const buy = el("button", "secondary", tr("explore.remBuyNow", "Buy"));
+    const done = el("button", "link", tr("explore.remDone", "Done"));
+    const later = el("button", "link", tr("explore.remTomorrow", "Tomorrow"));
+    [buy, done, later].forEach((b) => { b.type = "button"; row.appendChild(b); });
+    dueBox.appendChild(row);
+    buy.addEventListener("click", () => { const g = $id("btn-goto-buy"); if (g) g.click(); else showScreen("screen-buy"); });
+    done.addEventListener("click", async () => {
+      const cur = await loadReminders();
+      saveReminders(cur.map((x) => (x.id === r.id ? advanceReminder(x, Date.now()) : x)));
+      renderDue();
+    });
+    later.addEventListener("click", async () => {
+      const cur = await loadReminders();
+      saveReminders(cur.map((x) => (x.id === r.id ? Object.assign({}, x, { next: Date.now() + 864e5 }) : x)));
+      renderDue();
+    });
+  }
+
+  async function renderReminderList() {
+    const root = $id("tm-rem-list");
+    if (!root) return;
+    const list = await loadReminders();
+    root.innerHTML = "";
+    if (!list.length) { root.appendChild(el("p", "muted", tr("explore.remEmpty", "No reminders yet."))); return; }
+    list.sort((a, b) => a.next - b.next).forEach((r) => {
+      const row = el("div", "tm-rem-row");
+      const left = el("span", "tm-rem-left");
+      const what = reminderWhat(r);
+      left.appendChild(el("strong", null, freqLabel(r.freq) + (what ? " · " + what : "")));
+      left.appendChild(el("span", "muted small", tr("explore.remNext", "Next: {date}", { date: ltr(new Date(r.next).toLocaleDateString()) })));
+      const del = el("button", "link", tr("explore.remRemove", "Remove"));
+      del.type = "button";
+      del.addEventListener("click", async () => {
+        saveReminders((await loadReminders()).filter((x) => x.id !== r.id));
+        renderReminderList();
+        renderDue();
+      });
+      row.appendChild(left);
+      row.appendChild(del);
+      root.appendChild(row);
+    });
+  }
+  function openReminders() {
+    const sel = $id("tm-rem-freq");
+    sel.innerHTML = "";
+    FREQS.forEach((f) => { const o = el("option", null, tr(f[1], f[2])); o.value = f[0]; sel.appendChild(o); });
+    $id("tm-rem-error").classList.add("hidden");
+    $id("tm-rem-amount-label").textContent = tr("explore.remAmount", "Amount in {currency} (optional)", { currency: currencyCode() });
+    renderReminderList();
+    showScreen("screen-reminders");
+  }
+  function initReminders() {
+    const section = addScreen("screen-reminders");
+    section.innerHTML =
+      '<h2 id="tm-rem-title"></h2><p class="muted" id="tm-rem-intro"></p>' +
+      '<label class="tm-label" for="tm-rem-freq" id="tm-rem-freq-label"></label><select id="tm-rem-freq"></select>' +
+      '<label class="tm-label" for="tm-rem-amount" id="tm-rem-amount-label"></label>' +
+      '<input type="text" id="tm-rem-amount" inputmode="decimal" autocomplete="off" placeholder="25" />' +
+      '<label class="tm-label" for="tm-rem-asset" id="tm-rem-asset-label"></label>' +
+      '<input type="text" id="tm-rem-asset" autocomplete="off" maxlength="12" placeholder="ETH" />' +
+      '<p id="tm-rem-error" class="error hidden"></p>' +
+      '<button type="button" id="tm-rem-add" class="secondary"></button>' +
+      '<div id="tm-rem-list" class="tm-rem-list"></div>' +
+      '<p class="warn small" id="tm-rem-note"></p>';
+    section.appendChild(makeBackBtn("screen-main"));
+    const setText = () => {
+      $id("tm-rem-title").textContent = tr("explore.remTitle", "Recurring buy reminders");
+      $id("tm-rem-intro").textContent = tr("explore.remIntro", "Get a nudge on a schedule to buy a coin.");
+      $id("tm-rem-freq-label").textContent = tr("explore.remFreq", "How often");
+      $id("tm-rem-asset-label").textContent = tr("explore.remAsset", "Coin (optional)");
+      $id("tm-rem-add").textContent = tr("explore.remAdd", "Add reminder");
+      $id("tm-rem-note").textContent = tr("explore.remNote", "This is a reminder only. Token Exchange never buys anything for you automatically -- you finish each purchase yourself.");
+    };
+    setText();
+    onScreenOpen((id) => { if (id === "screen-reminders") setText(); if (id === "screen-main" || id == null) renderDue(); });
+    $id("tm-rem-add").addEventListener("click", async () => {
+      const err = $id("tm-rem-error");
+      const amountStr = $id("tm-rem-amount").value.trim().replace(",", ".");
+      const asset = $id("tm-rem-asset").value.trim().toUpperCase();
+      if ((amountStr && !(/^\d+(\.\d+)?$/.test(amountStr) && Number(amountStr) > 0)) || (asset && !/^[A-Z0-9]{1,12}$/.test(asset))) {
+        err.textContent = tr("explore.remBad", "Enter a valid amount and coin, or leave them blank.");
+        err.classList.remove("hidden");
+        return;
+      }
+      err.classList.add("hidden");
+      const freq = $id("tm-rem-freq").value;
+      const list = await loadReminders();
+      if (list.length >= 20) { err.textContent = tr("explore.remTooMany", "That's the limit of 20 reminders."); err.classList.remove("hidden"); return; }
+      list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), freq, amount: amountStr, asset, next: addInterval(Date.now(), freq) });
+      saveReminders(list);
+      $id("tm-rem-amount").value = "";
+      $id("tm-rem-asset").value = "";
+      renderReminderList();
+    });
+    const balance = document.querySelector(".balance-box");
+    if (balance && balance.parentNode) {
+      dueBox = el("div", "tm-due-banner hidden");
+      dueBox.id = "tm-due-banner";
+      balance.insertAdjacentElement("beforebegin", dueBox);
+    }
+    renderDue();
+    setInterval(renderDue, 60000);
+  }
+
+  // ---- 13. PORTFOLIO HISTORY (snapshots of the total, saved on this device only)
+  const HIST_KEY = "tm_portfolio_hist";
+  const HIST_GAP_MS = 6 * 3600 * 1000;
+  const HIST_MAX = 180;
+  function addHistoryPoint(points, ts, usd, maxPts) {
+    const out = (Array.isArray(points) ? points : []).filter((p) => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]));
+    if (!isFinite(usd) || usd <= 0) return out;
+    const last = out[out.length - 1];
+    if (last && ts - last[0] < HIST_GAP_MS) out[out.length - 1] = [last[0], usd];
+    else out.push([ts, usd]);
+    return out.slice(-(maxPts || HIST_MAX));
+  }
+  function historyChange(points, now, windowMs) {
+    const recent = (points || []).filter((p) => now - p[0] <= windowMs);
+    if (recent.length < 2) return null;
+    const first = recent[0];
+    const last = recent[recent.length - 1];
+    if (!(first[1] > 0)) return null;
+    return { pct: ((last[1] - first[1]) / first[1]) * 100, since: first[0], values: recent.map((p) => p[1]) };
+  }
+  function sparkSvg(values) {
+    const w = 100, h = 28;
+    const min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    const span = max - min || 1;
+    const pts = values.map((v, i) => (i * (w / Math.max(values.length - 1, 1))).toFixed(1) + "," + (h - 2 - ((v - min) / span) * (h - 4)).toFixed(1));
+    return '<svg viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" points="' + pts.join(" ") + '"/></svg>';
+  }
+  let histBox = null;
+  function initHistory() {
+    if (!mixBox || !mixBox.parentNode) return;
+    histBox = el("div", "tm-hist hidden");
+    histBox.id = "tm-hist";
+    mixBox.insertAdjacentElement("afterend", histBox);
+  }
+  async function recordPortfolio(total) {
+    if (!histBox) return;
+    const addr = safe(() => String(currentStatus.selectedAddress || "").toLowerCase());
+    if (!addr || !(total > 0)) { histBox.classList.add("hidden"); return; }
+    const all = (await storeGet([HIST_KEY]))[HIST_KEY] || {};
+    const before = all[addr] || [];
+    const after = addHistoryPoint(before, Date.now(), total, HIST_MAX);
+    const lastBefore = before[before.length - 1];
+    const lastAfter = after[after.length - 1];
+    if (!lastBefore || lastBefore[0] !== lastAfter[0] || Math.abs(lastBefore[1] - lastAfter[1]) >= 0.005) {
+      all[addr] = after;
+      const keys = Object.keys(all);
+      if (keys.length > 20) delete all[keys[0]];
+      storeSet({ [HIST_KEY]: all });
+    }
+    const ch = historyChange(after, Date.now(), 30 * 864e5);
+    histBox.innerHTML = "";
+    if (!ch) { histBox.classList.add("hidden"); return; }
+    const up = ch.pct >= 0;
+    histBox.className = "tm-hist " + (up ? "tm-hist-up" : "tm-hist-down");
+    histBox.appendChild(el("div", "tm-mix-title", tr("explore.histTitle", "Portfolio history")));
+    const row = el("div", "tm-hist-row");
+    const spark = el("span", "tm-hist-spark");
+    spark.innerHTML = sparkSvg(ch.values);
+    const pct = (up ? "+" : "") + ch.pct.toFixed(Math.abs(ch.pct) < 10 ? 2 : 1) + "%";
+    row.appendChild(spark);
+    row.appendChild(el("span", "tm-hist-text", tr("explore.histChange", "{pct} since {date}", { pct: ltr(pct), date: ltr(new Date(ch.since).toLocaleDateString()) })));
+    histBox.appendChild(row);
+    histBox.appendChild(el("div", "muted small", tr("explore.histNote", "Saved on this device only.")));
+  }
+
+  // ---- 14. PAY FROM A PAYMENT LINK OR QR
+  // Turns "1.5e18"-style EIP-681 numbers into a plain integer string (null if not a whole number).
+  function sciToInt(str) {
+    const m = /^(\d+)(?:\.(\d+))?(?:[eE]\+?(\d+))?$/.exec(String(str).trim());
+    if (!m) return null;
+    const frac = m[2] || "";
+    const exp = Number(m[3] || 0);
+    let digits = m[1] + frac;
+    const shift = exp - frac.length;
+    if (shift >= 0) digits += "0".repeat(shift);
+    else {
+      const cut = digits.slice(shift);
+      if (/[1-9]/.test(cut)) return null;
+      digits = digits.slice(0, shift);
+    }
+    digits = digits.replace(/^0+(?=\d)/, "");
+    if (!digits) digits = "0";
+    return digits.length > 78 ? null : digits;
+  }
+  function parsePaymentLink(raw) {
+    const s = String(raw || "").trim();
+    if (ADDRESS_RE.test(s)) return { to: s, chainId: null };
+    const m = /^ethereum:(?:pay-)?(0x[0-9a-fA-F]{40})(?:@(\d+))?(\/[A-Za-z]+)?(?:\?(.*))?$/i.exec(s);
+    if (!m) return null;
+    const out = { chainId: m[2] ? Number(m[2]) : null };
+    const params = {};
+    try {
+      (m[4] || "").split("&").forEach((kv) => {
+        const i = kv.indexOf("=");
+        if (i > 0) params[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1));
+      });
+    } catch (e) { return null; }
+    const fn = (m[3] || "").toLowerCase();
+    if (fn === "/transfer") {
+      if (!ADDRESS_RE.test(params.address || "")) return null;
+      out.token = m[1];
+      out.to = params.address;
+      if (params.uint256 != null) { const u = sciToInt(params.uint256); if (u == null) return null; out.units = u; }
+    } else if (fn === "") {
+      out.to = m[1];
+      if (params.value != null) { const v = sciToInt(params.value); if (v == null) return null; out.valueWei = v; }
+    } else return null;
+    return out;
+  }
+  function setPayNote(text, isError) {
+    const n = $id("tm-pay-note");
+    if (!n) return;
+    n.textContent = text || "";
+    n.classList.toggle("hidden", !text);
+    n.classList.toggle("error", !!isError);
+  }
+  function fireInput(node) { node.dispatchEvent(new Event("input", { bubbles: true })); }
+  // Fills the Send form from a payment link. Returns { ok, message } so a QR scanner can report it too.
+  function applyPaymentLink(raw) {
+    const fail = (key, fb, vars) => { const m = tr(key, fb, vars); setPayNote(m, true); return { ok: false, message: m }; };
+    const p = parsePaymentLink(raw);
+    if (!p) return fail("explore.payInvalid", "That doesn't look like a payment link or a wallet address.");
+    try {
+      p.to = ethers.utils.getAddress(p.to);
+      if (p.token) p.token = ethers.utils.getAddress(p.token);
+    } catch (e) { return fail("explore.payBadChecksum", "That address has a typo (the checksum doesn't match), so it wasn't filled in."); }
+    const net = typeof currentNetwork !== "undefined" ? currentNetwork : null;
+    if (p.chainId && net && p.chainId !== net.chainId) {
+      return fail("explore.payWrongNetwork", "That link is for a different network (chain {chainId}). Switch networks first, then try again.", { chainId: p.chainId });
+    }
+    const to = $id("send-to");
+    const sel = $id("send-asset-select");
+    const amountInput = $id("send-amount");
+    if (!to || !sel || !amountInput) return fail("explore.payInvalid", "That doesn't look like a payment link or a wallet address.");
+    to.value = p.to;
+    fireInput(to);
+    let note = tr("explore.payFilled", "Filled in from the payment link. Double-check everything before you send.");
+    if (p.token) {
+      sel.value = "token";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      const tokenInput = $id("send-token-address");
+      tokenInput.value = p.token;
+      fireInput(tokenInput);
+      let decimals = null;
+      document.querySelectorAll("#tokens-list .token-row[data-tok-id]").forEach((row) => {
+        if (row.dataset.tokId.toLowerCase() === p.token.toLowerCase() && isFinite(Number(row.dataset.decimals))) decimals = Number(row.dataset.decimals);
+      });
+      if (p.units != null && decimals != null) {
+        amountInput.value = trimNumber(ethers.utils.formatUnits(p.units, decimals));
+      } else {
+        amountInput.value = "";
+        if (p.units != null) note = tr("explore.payTokenAmount", "Token filled in. Enter the amount yourself -- this token isn't in your list yet.");
+      }
+      fireInput(amountInput);
+    } else {
+      sel.value = "native";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      if (p.valueWei != null) {
+        const dec = (net && net.nativeCurrency && net.nativeCurrency.decimals) || 18;
+        amountInput.value = trimNumber(ethers.utils.formatUnits(p.valueWei, dec));
+      } else amountInput.value = "";
+      fireInput(amountInput);
+    }
+    setPayNote(note, false);
+    return { ok: true, message: note };
+  }
+  function togglePayRow(show) {
+    const row = $id("tm-pay-row");
+    if (!row) return;
+    const open = typeof show === "boolean" ? show : row.classList.contains("hidden");
+    row.classList.toggle("hidden", !open);
+    if (open) { const i = $id("tm-pay-input"); if (i) i.focus(); }
+    else setPayNote("", false);
+  }
+  function initPayLink() {
+    const anchor = $id("btn-scan-qr") || $id("send-to-resolved") || $id("send-to");
+    if (!anchor) return;
+    const btn = el("button", "link tm-pay-toggle");
+    btn.type = "button";
+    btn.id = "tm-pay-toggle";
+    const row = el("div", "tm-pay-row hidden");
+    row.id = "tm-pay-row";
+    const input = el("input");
+    input.type = "text";
+    input.id = "tm-pay-input";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    const go = el("button", "secondary");
+    go.type = "button";
+    row.appendChild(input);
+    row.appendChild(go);
+    const note = el("p", "muted small hidden");
+    note.id = "tm-pay-note";
+    anchor.insertAdjacentElement("afterend", btn);
+    btn.insertAdjacentElement("afterend", row);
+    row.insertAdjacentElement("afterend", note);
+    const setText = () => {
+      btn.textContent = tr("explore.payToggle", "Paste payment link");
+      input.placeholder = tr("explore.payPlaceholder", "ethereum:0x… or a wallet address");
+      go.textContent = tr("explore.payApply", "Fill in");
+    };
+    setText();
+    onScreenOpen((id) => { if (id === "screen-send" || id == null) setText(); });
+    btn.addEventListener("click", () => togglePayRow());
+    go.addEventListener("click", () => { if (applyPaymentLink(input.value).ok) input.value = ""; });
+    input.addEventListener("paste", () => setTimeout(() => { if (input.value.trim() && applyPaymentLink(input.value).ok) input.value = ""; }, 0));
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
+  }
+
+  // ---- 15. ACTIVITY SUMMARY (this calendar month)
+  function summarizeActivity(list, now) {
+    const d = new Date(now);
+    const y = d.getFullYear(), mo = d.getMonth();
+    const res = { sent: { count: 0, by: {} }, recv: { count: 0, by: {} } };
+    (Array.isArray(list) ? list : []).forEach((it) => {
+      if (!it || !it.ts) return;
+      const t = new Date(it.ts);
+      if (t.getFullYear() !== y || t.getMonth() !== mo) return;
+      const bucket = it.direction === "in" ? res.recv : res.sent;
+      bucket.count += 1;
+      const amt = Number(it.amount);
+      const sym = String(it.asset || "").slice(0, 12);
+      if (sym && isFinite(amt) && amt > 0) bucket.by[sym] = Math.round(((bucket.by[sym] || 0) + amt) * 1e8) / 1e8;
+    });
+    return res;
+  }
+  function assetsText(by) {
+    return Object.keys(by).sort((a, b) => by[b] - by[a]).slice(0, 3).map((s) => trimNumber(String(by[s])) + " " + s).join(", ");
+  }
+  let sumBox = null;
+  async function renderActivitySummary() {
+    if (!sumBox) return;
+    const data = await storeGet(["tm_activity"]);
+    const s = summarizeActivity(data.tm_activity, Date.now());
+    sumBox.innerHTML = "";
+    sumBox.appendChild(el("div", "tm-mix-title", tr("explore.sumTitle", "This month")));
+    if (!s.sent.count && !s.recv.count) { sumBox.appendChild(el("div", "muted small", tr("explore.sumNone", "Nothing yet this month."))); return; }
+    const line = (key, fb, b) => {
+      if (!b.count) return;
+      const assets = assetsText(b.by);
+      sumBox.appendChild(el("div", "tm-sum-line", tr(key, fb, { count: b.count }) + (assets ? " · " + ltr(assets) : "")));
+    };
+    line("explore.sumSent", "Sent: {count}", s.sent);
+    line("explore.sumReceived", "Received: {count}", s.recv);
+  }
+  function initActivitySummary() {
+    const list = $id("activity-list");
+    if (!list || !list.parentNode) return;
+    sumBox = el("div", "tm-act-sum");
+    sumBox.id = "tm-act-sum";
+    list.insertAdjacentElement("beforebegin", sumBox);
+    renderActivitySummary();
+    onScreenOpen((id) => { if (id === "screen-activity" || id == null) renderActivitySummary(); });
+    try { new MutationObserver(() => renderActivitySummary()).observe(list, { childList: true }); } catch (e) { /* no observer */ }
+  }
+
   // ---------------------------------------------------------------- start
   function init() {
-    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent].forEach((f) => {
+    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary].forEach((f) => {
       try { const r = f(); if (r && typeof r.catch === "function") r.catch(() => {}); } catch (e) { /* one feature failing must not affect the others */ }
     });
   }
@@ -689,5 +1231,6 @@
 
   function setSortMode(mode) { if (SORTS.some((x) => x[0] === mode)) { sortMode = mode; markSortActive(); } }
 
-  window.TM_EXPLORE = { sortMarkets, setSortMode, afterTokens, refreshAllocation, receiptText, addReceiptRow, buildPaymentLink };
+  window.TM_EXPLORE = { sortMarkets, setSortMode, afterTokens, refreshAllocation, receiptText, addReceiptRow, buildPaymentLink,
+    convertAmount, formatConverted, advanceReminder, dueReminders, addHistoryPoint, historyChange, sciToInt, parsePaymentLink, applyPaymentLink, summarizeActivity };
 })();

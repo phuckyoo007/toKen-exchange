@@ -69,7 +69,9 @@ test("receiptText lists what happened, to whom, and the transaction", () => {
 test("every explore.* key the module asks for exists in all nine languages with matching placeholders", () => {
   const keys = new Set([...src.matchAll(/\btr\(\s*"(explore\.[\w.]+)"/g)].map((m) => m[1]).filter((k) => !k.endsWith(".")));
   for (const m of src.matchAll(/"(explore\.cat\.)" \+ a\[2\]/g)) ["swap", "lending", "staking", "nft", "names", "bridge", "explorer"].forEach((c) => keys.add(m[1] + c));
-  assert.ok(keys.size > 40, "found the keys the module uses");
+  // Keys chosen by variable (frequency titles, activity lines) rather than a literal tr("...") call.
+  for (const m of src.matchAll(/"(explore\.(?:rem|sum)[A-Za-z]+)"/g)) keys.add(m[1]);
+  assert.ok(keys.size > 80, "found the keys the module uses");
   const ph = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(",");
   const LANGS = ["en", "es", "fr", "pt", "ru", "zh", "ja", "hi", "ar"];
   globalThis.self = globalThis;
@@ -91,4 +93,115 @@ test("both pages, the service worker and the server load lib/explore-ui.js", () 
   assert.ok(read("popup.html").includes('src="../lib/explore-ui.js"'));
   assert.ok(read("sw.js").includes('"/lib/explore-ui.js"'));
   assert.ok(/"explore-ui\.js"/.test(read("server.js")), "server.js LIB_FILES must list explore-ui.js");
+});
+
+test("convertAmount and formatConverted", () => {
+  const { api } = load();
+  const usd = { symbol: "USD", price: 1 }, eth = { symbol: "ETH", price: 2000 }, btc = { symbol: "BTC", price: 60000 };
+  assert.equal(api.convertAmount(1, eth, usd), 2000);
+  assert.equal(api.convertAmount(30, eth, btc), 1);
+  assert.equal(api.convertAmount(1, eth, { symbol: "X", price: 0 }), null, "no price, no answer");
+  assert.equal(api.convertAmount(NaN, eth, usd), null);
+  assert.equal(api.formatConverted(1234.5678), "1,234.57");
+  assert.equal(api.formatConverted(2.5), "2.5");
+  assert.equal(api.formatConverted(0.000123), "0.000123");
+  assert.equal(api.formatConverted(0), "0");
+  assert.equal(api.formatConverted(Infinity), "");
+});
+
+test("advanceReminder moves past now; dueReminders ignores future and malformed ones", () => {
+  const { api } = load();
+  const J = (v) => JSON.parse(JSON.stringify(v));
+  const day = 864e5;
+  const t0 = Date.UTC(2026, 0, 31, 12);
+  const w = api.advanceReminder({ id: "a", freq: "weekly", next: t0 }, t0 + 15 * day);
+  assert.equal(w.next, t0 + 21 * day, "three weekly steps lands after now");
+  const b = api.advanceReminder({ id: "b", freq: "biweekly", next: t0 }, t0 + 1);
+  assert.equal(b.next, t0 + 14 * day);
+  const m = api.advanceReminder({ id: "c", freq: "monthly", next: t0 }, t0 + 1);
+  assert.ok(m.next > t0 + 27 * day && m.next < t0 + 32 * day);
+  const list = [{ id: "1", freq: "weekly", next: t0 + 5 }, { id: "2", freq: "weekly", next: t0 - 5 }, { id: "3", freq: "bogus", next: t0 - 9 }, null];
+  assert.deepEqual(J(api.dueReminders(list, t0).map((r) => r.id)), ["2"]);
+  assert.deepEqual(J(api.dueReminders("nope", t0)), []);
+});
+
+test("portfolio history: points are spaced, capped and summarised as a percent", () => {
+  const { api } = load();
+  const J = (v) => JSON.parse(JSON.stringify(v));
+  const H = 3600 * 1000;
+  let pts = api.addHistoryPoint([], 0, 100, 5);
+  pts = api.addHistoryPoint(pts, 1 * H, 110, 5);
+  assert.equal(pts.length, 1, "a second reading inside six hours replaces the first");
+  assert.deepEqual(J(pts[0]), [0, 110]);
+  pts = api.addHistoryPoint(pts, 7 * H, 121, 5);
+  assert.equal(pts.length, 2);
+  assert.deepEqual(J(api.addHistoryPoint(pts, 99 * H, 0, 5)), J(pts), "a zero or missing total is never recorded");
+  assert.deepEqual(J(api.addHistoryPoint(pts, 99 * H, NaN, 5)), J(pts));
+  let many = [];
+  for (let i = 0; i < 10; i++) many = api.addHistoryPoint(many, i * 10 * H, 100 + i, 4);
+  assert.equal(many.length, 4);
+  const day = 864e5;
+  const ch = api.historyChange([[0, 100], [10 * day, 125]], 12 * day, 30 * day);
+  assert.equal(Math.round(ch.pct * 100) / 100, 25);
+  assert.equal(api.historyChange([[0, 100]], day, 30 * day), null, "one point is not a trend");
+  assert.equal(api.historyChange([[0, 100], [40 * day, 110]], 41 * day, 30 * day), null, "old points fall out of the window");
+});
+
+test("sciToInt reads whole numbers, including scientific notation, and refuses fractions", () => {
+  const { api } = load();
+  assert.equal(api.sciToInt("1500000"), "1500000");
+  assert.equal(api.sciToInt("1.5e18"), "1500000000000000000");
+  assert.equal(api.sciToInt("2e6"), "2000000");
+  assert.equal(api.sciToInt("1e0"), "1");
+  assert.equal(api.sciToInt("0.5"), null);
+  assert.equal(api.sciToInt("1.234e2"), null, "1.234e2 is 123.4, not whole");
+  assert.equal(api.sciToInt("abc"), null);
+  assert.equal(api.sciToInt("-5"), null);
+  assert.equal(api.sciToInt("1e90"), null, "absurdly large values are refused");
+});
+
+test("parsePaymentLink understands EIP-681 coin and token links and rejects junk", () => {
+  const { api } = load();
+  assert.deepEqual(JSON.parse(JSON.stringify(api.parsePaymentLink(ME))), { to: ME, chainId: null });
+  const coin = api.parsePaymentLink("ethereum:" + ME + "@8453?value=2.5e17");
+  assert.equal(coin.to, ME);
+  assert.equal(coin.chainId, 8453);
+  assert.equal(coin.valueWei, "250000000000000000");
+  assert.equal(api.parsePaymentLink("ethereum:pay-" + ME + "@1").to, ME);
+  const tok = api.parsePaymentLink("ethereum:" + USDC + "@8453/transfer?address=" + ME + "&uint256=2500000");
+  assert.equal(tok.token, USDC);
+  assert.equal(tok.to, ME);
+  assert.equal(tok.units, "2500000");
+  assert.equal(api.parsePaymentLink("ethereum:" + USDC + "@8453/transfer"), null, "a transfer needs a recipient");
+  assert.equal(api.parsePaymentLink("ethereum:" + ME + "/approve?address=" + ME), null, "only plain sends and transfers");
+  assert.equal(api.parsePaymentLink("ethereum:" + ME + "?value=0.5"), null);
+  assert.equal(api.parsePaymentLink("https://example.com/pay"), null);
+  assert.equal(api.parsePaymentLink(""), null);
+  assert.equal(api.parsePaymentLink("ethereum:" + ME + "?value=%E0%A4%A"), null, "bad escapes do not throw");
+});
+
+test("summarizeActivity counts only this month, split by direction, and sums per coin", () => {
+  const { api } = load();
+  const now = new Date(2026, 9, 15, 12).getTime();
+  const inMonth = (d) => new Date(2026, 9, d, 9).getTime();
+  const list = [
+    { ts: inMonth(2), direction: "out", amount: "0.5", asset: "ETH" },
+    { ts: inMonth(3), direction: "out", amount: "0.25", asset: "ETH" },
+    { ts: inMonth(4), direction: "in", amount: "100", asset: "USDC" },
+    { ts: new Date(2026, 8, 30, 9).getTime(), direction: "out", amount: "9", asset: "ETH" },
+    { ts: inMonth(5), direction: "out", amount: "junk", asset: "DAI" },
+    null,
+  ];
+  const s = api.summarizeActivity(list, now);
+  assert.equal(s.sent.count, 3);
+  assert.equal(s.sent.by.ETH, 0.75);
+  assert.ok(!("DAI" in s.sent.by), "an unreadable amount is counted but not summed");
+  assert.equal(s.recv.count, 1);
+  assert.equal(s.recv.by.USDC, 100);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.summarizeActivity(undefined, now))), { sent: { count: 0, by: {} }, recv: { count: 0, by: {} } });
+});
+
+test("the QR scanner hands ethereum: links to the payment-link filler", () => {
+  const extras = read("extras.js");
+  assert.ok(/TM_EXPLORE\.applyPaymentLink/.test(extras));
 });
