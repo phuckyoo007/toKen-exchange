@@ -1079,6 +1079,7 @@
     n.textContent = text || "";
     n.classList.toggle("hidden", !text);
     n.classList.toggle("error", !!isError);
+    if (text) safe(() => n.scrollIntoView({ block: "nearest", behavior: "smooth" }));
   }
   function fireInput(node) { node.dispatchEvent(new Event("input", { bubbles: true })); }
   // Fills the Send form from a payment link. Returns { ok, message } so a QR scanner can report it too.
