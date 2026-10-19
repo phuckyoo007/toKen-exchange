@@ -194,6 +194,7 @@
     "explore.sumNone": "В этом месяце пока ничего нет.",
     "explore.sumSent": "Отправлено: {count}",
     "explore.sumReceived": "Получено: {count}",
+    "explore.accountSwitch": "Сменить аккаунт",
     "prices.volShort": "Объём",
     "coin.swapBtn": "Обменять на {symbol}",
     "coin.swapHint": "На следующем экране вы выберете, каким из своих активов платить.",

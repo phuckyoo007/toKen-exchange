@@ -193,6 +193,7 @@
     "explore.sumNone": "Nada ainda neste mês.",
     "explore.sumSent": "Enviado: {count}",
     "explore.sumReceived": "Recebido: {count}",
+    "explore.accountSwitch": "Trocar de conta",
     "prices.volShort": "Vol.",
     "coin.swapBtn": "Trocar por {symbol}",
     "coin.swapHint": "Na próxima tela você escolhe com qual dos seus ativos pagar.",

@@ -195,6 +195,7 @@
     "explore.sumNone": "इस महीने अभी कुछ नहीं।",
     "explore.sumSent": "भेजे गए: {count}",
     "explore.sumReceived": "प्राप्त हुए: {count}",
+    "explore.accountSwitch": "खाता बदलें",
     "prices.volShort": "वॉल्यूम",
     "coin.swapBtn": "{symbol} में स्वैप करें",
     "coin.swapHint": "अगली स्क्रीन पर आप चुनेंगे कि अपनी किस होल्डिंग से भुगतान करना है।",

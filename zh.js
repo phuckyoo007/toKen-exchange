@@ -195,6 +195,7 @@
     "explore.sumNone": "本月暂无记录。",
     "explore.sumSent": "已发送：{count}",
     "explore.sumReceived": "已收到：{count}",
+    "explore.accountSwitch": "切换账户",
     "prices.volShort": "成交量",
     "coin.swapBtn": "兑换为 {symbol}",
     "coin.swapHint": "下一屏您可以选择用哪种持有资产来支付。",

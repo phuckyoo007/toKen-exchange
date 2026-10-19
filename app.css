@@ -2118,3 +2118,11 @@ html .account-row .icon-btn:hover { color: var(--gold-bright); }
 .tm-act-sum { margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; }
 .tm-act-sum.hidden { display: none; }
 .tm-sum-line { margin: 2px 0; }
+
+/* ---- v8: larger tap targets (no layout change) and keyboard focus rings */
+.quick-add-chip { min-height: 32px; display: inline-flex; align-items: center; padding: 4px 12px; }
+.star-btn { position: relative; }
+.star-btn::after { content: ""; position: absolute; inset: -9px -8px; }
+.tm-app-name { display: inline-block; padding: 7px 0; }
+.swap-flip-btn { min-height: 32px; min-width: 32px; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--gold-deep, #ddac4d); outline-offset: 2px; }

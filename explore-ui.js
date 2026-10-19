@@ -1221,9 +1221,24 @@
     try { new MutationObserver(() => renderActivitySummary()).observe(list, { childList: true }); } catch (e) { /* no observer */ }
   }
 
+
+  // ---- 16. SCREEN-READER LABELS: tie each bare <label> to the field right after it, and name the account switcher
+  function initA11y() {
+    const run = () => {
+      document.querySelectorAll("label:not([for])").forEach((lab) => {
+        const nxt = lab.nextElementSibling;
+        if (nxt && /^(SELECT|INPUT|TEXTAREA)$/.test(nxt.tagName) && nxt.id && !nxt.labels.length) lab.htmlFor = nxt.id;
+      });
+      const acct = $id("account-select");
+      if (acct) acct.setAttribute("aria-label", tr("explore.accountSwitch", "Switch account"));
+    };
+    run();
+    onScreenOpen(() => run());
+  }
+
   // ---------------------------------------------------------------- start
   function init() {
-    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary].forEach((f) => {
+    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary, initA11y].forEach((f) => {
       try { const r = f(); if (r && typeof r.catch === "function") r.catch(() => {}); } catch (e) { /* one feature failing must not affect the others */ }
     });
   }

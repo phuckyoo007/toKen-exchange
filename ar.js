@@ -194,6 +194,7 @@
     "explore.sumNone": "لا شيء بعد هذا الشهر.",
     "explore.sumSent": "المُرسَل: {count}",
     "explore.sumReceived": "المُستلَم: {count}",
+    "explore.accountSwitch": "تبديل الحساب",
     "prices.volShort": "الحجم",
     "coin.swapBtn": "مبادلة إلى {symbol}",
     "coin.swapHint": "ستختار من الشاشة التالية أيًّا من أصولك تريد الدفع به.",

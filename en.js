@@ -224,6 +224,7 @@
     "explore.sumNone": "Nothing yet this month.",
     "explore.sumSent": "Sent: {count}",
     "explore.sumReceived": "Received: {count}",
+    "explore.accountSwitch": "Switch account",
     "prices.volShort": "Vol",
     "prices.viewPeggedCoin": "View {name}, the stablecoin pegged to {currency}",
     "prices.availableOn": "✓ On {networks}",

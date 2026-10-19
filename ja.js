@@ -194,6 +194,7 @@
     "explore.sumNone": "今月はまだありません。",
     "explore.sumSent": "送金：{count}",
     "explore.sumReceived": "受取：{count}",
+    "explore.accountSwitch": "アカウントを切り替え",
     "prices.volShort": "出来高",
     "coin.swapBtn": "{symbol} にスワップ",
     "coin.swapHint": "次の画面で、保有資産のうちどれで支払うかを選べます。",
