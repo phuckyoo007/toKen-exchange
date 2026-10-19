@@ -2427,8 +2427,8 @@ function renderStablecoinRow(c) {
 // Which tab of the Currencies & Stablecoins screen is showing: the stablecoins, or the top coins.
 let predictionsTab = "stable";
 function setPredictionsTab(tab) {
-  predictionsTab = tab === "top" ? "top" : "stable";
-  [["pred-tab-stable", "stable"], ["pred-tab-top", "top"]].forEach(([id, t]) => {
+  predictionsTab = tab === "top" || tab === "trending" ? tab : "stable";
+  [["pred-tab-stable", "stable"], ["pred-tab-top", "top"], ["pred-tab-trending", "trending"]].forEach(([id, t]) => {
     const b = $(id); if (!b) return;
     b.classList.toggle("active", predictionsTab === t);
     b.setAttribute("aria-selected", predictionsTab === t ? "true" : "false");
@@ -2437,13 +2437,14 @@ function setPredictionsTab(tab) {
 }
 $("pred-tab-stable").addEventListener("click", () => setPredictionsTab("stable"));
 $("pred-tab-top").addEventListener("click", () => setPredictionsTab("top"));
+$("pred-tab-trending").addEventListener("click", () => setPredictionsTab("trending"));
 
 async function refreshPredictions() {
   hideError("predictions-error");
   $("predictions-status").innerHTML = coinSpinnerHtml(TM_I18N.t("predictions.loading"));
   $("predictions-status").classList.remove("hidden");
   try {
-    const rawMarkets = predictionsTab === "top" ? await TM_PRICES.getTopCoins(currentCurrency) : await TM_PRICES.getCurrencyStablecoins(currentCurrency);
+    const rawMarkets = predictionsTab === "top" ? await TM_PRICES.getTopCoins(currentCurrency) : predictionsTab === "trending" ? await TM_PRICES.getTrendingCoins(currentCurrency) : await TM_PRICES.getCurrencyStablecoins(currentCurrency);
     const markets = window.TM_EXPLORE ? TM_EXPLORE.sortMarkets(rawMarkets) : rawMarkets;
     const list = $("predictions-list");
     list.innerHTML = "";

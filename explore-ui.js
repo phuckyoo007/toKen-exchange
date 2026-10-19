@@ -303,8 +303,13 @@
   // ---------------------------------------------------------------- 4. RANKING SORT
   let sortMode = "rank";
   let sortBox = null;
-  const SORTS = [["rank", "explore.sortRank", "Top"], ["gainers", "explore.sortGainers", "Gainers"], ["losers", "explore.sortLosers", "Losers"], ["volume", "explore.sortVolume", "Volume"]];
+  const SORTS = [["rank", "explore.sortRank", "Top"], ["cap", "explore.sortCap", "Market cap"], ["gainers", "explore.sortGainers", "Gainers"], ["losers", "explore.sortLosers", "Losers"], ["volume", "explore.sortVolume", "Volume"]];
 
+  // The chips are built before the saved language is applied, so their wording is refreshed whenever a list loads.
+  function relabelSort() {
+    if (!sortBox) return;
+    sortBox.querySelectorAll("button").forEach((b) => { if (b.dataset.k) b.textContent = tr(b.dataset.k, b.dataset.fb); });
+  }
   function markSortActive() {
     if (!sortBox) return;
     sortBox.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.sort === sortMode));
@@ -318,6 +323,8 @@
       const b = el("button", "quick-add-chip", tr(key, fb));
       b.type = "button";
       b.dataset.sort = mode;
+      b.dataset.k = key;
+      b.dataset.fb = fb;
       b.addEventListener("click", () => {
         sortMode = mode;
         markSortActive();
@@ -332,9 +339,12 @@
   function sortMarkets(markets) {
     const onTop = typeof predictionsTab !== "undefined" && predictionsTab === "top";
     if (sortBox) sortBox.classList.toggle("hidden", !onTop);
+    safe(() => rememberCoins(markets));
+    safe(relabelSort);
+    safe(() => updatePulse(markets, onTop));
     if (!onTop || sortMode === "rank" || !Array.isArray(markets)) return markets;
     const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
-    const key = (m) => (sortMode === "volume" ? num(m.volume) : num(m.change24h));
+    const key = (m) => (sortMode === "volume" ? num(m.volume) : sortMode === "cap" ? num(m.marketCap) : num(m.change24h));
     const dir = sortMode === "losers" ? 1 : -1;
     return markets.slice().sort((a, b) => {
       const x = key(a), y = key(b);
@@ -717,11 +727,13 @@
     const mk = (id, goto) => { const b = el("button", "quick-add-chip"); b.type = "button"; b.id = id; b.addEventListener("click", goto); chips.appendChild(b); return b; };
     const bConv = mk("tm-tool-conv", () => openConverter());
     const bRem = mk("tm-tool-rem", () => openReminders());
+    const bAlerts = mk("tm-tool-alerts", () => openAlerts());
     const bPay = mk("tm-tool-pay", () => { showScreen("screen-send"); setTimeout(() => safe(() => togglePayRow(true)), 120); });
     const setText = () => {
       title.textContent = tr("explore.toolsTitle", "Tools");
       bConv.textContent = tr("explore.toolConverter", "Converter");
       bRem.textContent = tr("explore.toolReminders", "Recurring buy");
+      bAlerts.textContent = tr("explore.toolAlerts", "Coin alerts");
       bPay.textContent = tr("explore.toolPayLink", "Pay a link");
     };
     setText();
@@ -1236,9 +1248,269 @@
     onScreenOpen(() => run());
   }
 
+  // ---- 17. COIN-LIST EXTRAS (FROM CRYPTO.COM): market pulse strip, market-cap sort, coin price alerts
+  const isNum = (v) => typeof v === "number" && isFinite(v);
+  const knownCoins = new Map(); // CoinGecko id -> { id, symbol, name } for every coin a list has shown
+  function rememberCoins(markets) {
+    (Array.isArray(markets) ? markets : []).forEach((m) => {
+      const id = m && (m.cgId || m.id);
+      if (typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,99}$/.test(id) && m.symbol) knownCoins.set(id, { id, symbol: String(m.symbol), name: String(m.name || m.symbol) });
+    });
+  }
+
+  // Totals for the coins in the current list: market cap, the cap-weighted 24h move, BTC/ETH share, how many are up/down.
+  function marketPulse(markets) {
+    const rows = (Array.isArray(markets) ? markets : []).filter((m) => m && isNum(m.marketCap) && m.marketCap > 0);
+    if (rows.length < 2) return null;
+    let cap = 0, capMoved = 0, capBefore = 0, up = 0, down = 0;
+    rows.forEach((m) => {
+      cap += m.marketCap;
+      if (isNum(m.change24h) && m.change24h > -100) { capMoved += m.marketCap; capBefore += m.marketCap / (1 + m.change24h / 100); }
+      if (isNum(m.change24h)) { if (m.change24h > 0) up++; else if (m.change24h < 0) down++; }
+    });
+    const share = (sym) => { const r = rows.find((x) => x.symbol === sym); return r ? (r.marketCap / cap) * 100 : null; };
+    return { count: rows.length, cap, change: capBefore > 0 ? (capMoved / capBefore - 1) * 100 : null, up, down, btc: share("BTC"), eth: share("ETH") };
+  }
+  function money(v, compact) {
+    return safe(() => (compact ? TM_PRICES.formatMoneyCompact : TM_PRICES.formatMoney)(v, safe(() => currentCurrency) || "usd", compact ? undefined : { price: true })) || String(v);
+  }
+  let pulseBox = null;
+  function updatePulse(markets, show) {
+    if (!pulseBox) return;
+    const p = show ? marketPulse(markets) : null;
+    pulseBox.classList.toggle("hidden", !p);
+    pulseBox.innerHTML = "";
+    if (!p) return;
+    pulseBox.appendChild(el("div", "tm-mix-title", tr("explore.pulseTitle", "Market pulse · top {count} coins", { count: p.count })));
+    const grid = el("div", "tm-pulse-grid");
+    const tile = (label, value, cls) => {
+      const t = el("div", "tm-pulse-tile");
+      t.appendChild(el("span", "tm-pulse-label muted small", label));
+      t.appendChild(el("strong", "tm-pulse-value" + (cls ? " " + cls : ""), value));
+      grid.appendChild(t);
+    };
+    tile(tr("explore.pulseCap", "Market cap"), ltr(money(p.cap, true)));
+    if (p.change != null) tile(tr("explore.pulseChange", "24h change"), ltr((p.change >= 0 ? "+" : "") + p.change.toFixed(2) + "%"), p.change >= 0 ? "up" : "down");
+    if (p.btc != null) tile(tr("explore.pulseBtc", "BTC share"), ltr(p.btc.toFixed(1) + "%"));
+    if (p.eth != null) tile(tr("explore.pulseEth", "ETH share"), ltr(p.eth.toFixed(1) + "%"));
+    pulseBox.appendChild(grid);
+    const total = p.up + p.down;
+    if (total) {
+      const bar = el("div", "tm-pulse-bar");
+      const g = el("span", "tm-pulse-up"); g.style.flexGrow = String(p.up);
+      const r = el("span", "tm-pulse-down"); r.style.flexGrow = String(p.down);
+      bar.appendChild(g); bar.appendChild(r);
+      pulseBox.appendChild(bar);
+      pulseBox.appendChild(el("div", "muted small", tr("explore.pulseBreadth", "{up} up · {down} down", { up: p.up, down: p.down })));
+    }
+  }
+
+  // ---- coin price alerts (like Crypto.com's bell): goes above / drops below / moves X% either way
+  const ALERT_KEY = "tm_coin_alerts";
+  const ALERT_KINDS = [["above", "explore.alertKindAbove", "Goes above a price"], ["below", "explore.alertKindBelow", "Drops below a price"], ["move", "explore.alertKindMove", "Moves up or down by a percent"]];
+  const ID_RE = /^[a-z0-9][a-z0-9._-]{0,99}$/;
+  function parseAlertValue(str, kind) {
+    const s = String(str == null ? "" : str).trim().replace(",", ".");
+    if (!/^\d+(\.\d+)?$/.test(s)) return null;
+    const v = Number(s);
+    if (!isFinite(v) || !(v > 0)) return null;
+    if (kind === "move") return v <= 1000 ? v : null;
+    return v < 1e15 ? v : null;
+  }
+  function alertState(a, price) {
+    if (!a || !isNum(price) || !(price > 0)) return "wait";
+    if (a.kind === "above") return price >= a.value ? "hit" : "wait";
+    if (a.kind === "below") return price <= a.value ? "hit" : "wait";
+    if (a.kind === "move") return isNum(a.base) && a.base > 0 && Math.abs(price / a.base - 1) * 100 >= a.value ? "hit" : "wait";
+    return "wait";
+  }
+  function cleanAlerts(list) {
+    return (Array.isArray(list) ? list : []).filter((a) => a && typeof a.id === "string" && ID_RE.test(String(a.cg)) && ALERT_KINDS.some((k) => k[0] === a.kind) && isNum(a.value) && a.value > 0 && typeof a.cur === "string");
+  }
+  async function loadAlerts() { return cleanAlerts((await storeGet([ALERT_KEY]))[ALERT_KEY]); }
+  function saveAlerts(list) { storeSet({ [ALERT_KEY]: list }); }
+  function alertText(a) {
+    const price = (v) => ltr(safe(() => TM_PRICES.formatMoney(v, a.cur, { price: true })) || String(v));
+    if (a.kind === "above") return tr("explore.alertAbove", "{sym} goes above {price}", { sym: a.sym, price: price(a.value) });
+    if (a.kind === "below") return tr("explore.alertBelow", "{sym} drops below {price}", { sym: a.sym, price: price(a.value) });
+    return tr("explore.alertMove", "{sym} moves {pct} either way (from {base})", { sym: a.sym, pct: ltr(trimNumber(String(a.value)) + "%"), base: price(a.base) });
+  }
+
+  let alertBanner = null;
+  function showAlertBanner(list) {
+    if (!alertBanner) return;
+    const hits = list.filter((a) => a.firedAt);
+    alertBanner.innerHTML = "";
+    alertBanner.classList.toggle("hidden", !hits.length);
+    if (!hits.length) return;
+    alertBanner.appendChild(el("strong", "tm-due-title", tr("explore.alertHitTitle", "Price alert")));
+    hits.slice(0, 3).forEach((a) => {
+      const now = ltr(safe(() => TM_PRICES.formatMoney(a.firedPrice, a.cur, { price: true })) || String(a.firedPrice));
+      alertBanner.appendChild(el("span", "tm-due-what muted", alertText(a) + " — " + tr("explore.alertNow", "now {price}", { price: now })));
+    });
+    const row = el("div", "tm-due-actions");
+    const dismiss = el("button", "link", tr("explore.alertDismiss", "Dismiss"));
+    dismiss.type = "button";
+    row.appendChild(dismiss);
+    alertBanner.appendChild(row);
+    dismiss.addEventListener("click", async () => {
+      saveAlerts((await loadAlerts()).filter((a) => !a.firedAt));
+      showAlertBanner([]);
+      renderAlertList();
+    });
+  }
+  function notifyHit(a) {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    safe(() => new Notification("Token Exchange", { body: alertText(a) + " — " + tr("explore.alertNow", "now {price}", { price: safe(() => TM_PRICES.formatMoney(a.firedPrice, a.cur, { price: true })) || String(a.firedPrice) }) }));
+  }
+  let lastAlertCheck = 0;
+  async function checkAlerts(force) {
+    if (!force && Date.now() - lastAlertCheck < 30000) return;
+    lastAlertCheck = Date.now();
+    const list = await loadAlerts();
+    const active = list.filter((a) => !a.firedAt);
+    if (active.length && typeof TM_PRICES !== "undefined" && TM_PRICES.getCoinPrices) {
+      const byCur = {};
+      active.forEach((a) => { (byCur[a.cur] = byCur[a.cur] || new Set()).add(a.cg); });
+      const prices = {};
+      for (const cur of Object.keys(byCur)) prices[cur] = await TM_PRICES.getCoinPrices([...byCur[cur]], cur);
+      let changed = false;
+      active.forEach((a) => {
+        const p = prices[a.cur] && prices[a.cur].get(a.cg);
+        if (alertState(a, p) === "hit") { a.firedAt = Date.now(); a.firedPrice = p; changed = true; notifyHit(a); }
+      });
+      if (changed) saveAlerts(list);
+    }
+    showAlertBanner(list);
+  }
+
+  async function renderAlertList() {
+    const root = $id("tm-al-list");
+    if (!root) return;
+    const list = await loadAlerts();
+    root.innerHTML = "";
+    if (!list.length) { root.appendChild(el("p", "muted", tr("explore.alertEmpty", "No alerts yet."))); return; }
+    const prices = {};
+    for (const cur of [...new Set(list.map((a) => a.cur))]) prices[cur] = await TM_PRICES.getCoinPrices(list.filter((a) => a.cur === cur).map((a) => a.cg), cur);
+    list.forEach((a) => {
+      const row = el("div", "tm-rem-row");
+      const left = el("span", "tm-rem-left");
+      left.appendChild(el("strong", null, alertText(a)));
+      const p = prices[a.cur] && prices[a.cur].get(a.cg);
+      const status = a.firedAt ? tr("explore.alertHit", "Triggered") : (p != null ? tr("explore.alertNow", "now {price}", { price: ltr(safe(() => TM_PRICES.formatMoney(p, a.cur, { price: true })) || String(p)) }) : "");
+      if (status) left.appendChild(el("span", "muted small", status));
+      const del = el("button", "link", tr("explore.remRemove", "Remove"));
+      del.type = "button";
+      del.addEventListener("click", async () => { saveAlerts((await loadAlerts()).filter((x) => x.id !== a.id)); renderAlertList(); showAlertBanner(await loadAlerts()); });
+      row.appendChild(left); row.appendChild(del);
+      root.appendChild(row);
+    });
+  }
+  async function fillAlertCoins() {
+    const sel = $id("tm-al-coin");
+    if (!sel) return;
+    if (knownCoins.size < 2 && typeof TM_PRICES !== "undefined") { try { rememberCoins(await TM_PRICES.getTopCoins(currencyCode().toLowerCase())); } catch (e) { /* offline: list stays short */ } }
+    const keep = sel.value;
+    sel.innerHTML = "";
+    [...knownCoins.values()].forEach((c) => { const o = el("option", null, c.symbol + " · " + c.name); o.value = c.id; sel.appendChild(o); });
+    if (keep && knownCoins.has(keep)) sel.value = keep;
+  }
+  function updateAlertValueLabel() {
+    const kind = $id("tm-al-kind").value;
+    $id("tm-al-value-label").textContent = kind === "move" ? tr("explore.alertValuePct", "Percent move") : tr("explore.alertValuePrice", "Price in {currency}", { currency: currencyCode() });
+    $id("tm-al-value").placeholder = kind === "move" ? "5" : "";
+  }
+  function openAlerts() {
+    const kindSel = $id("tm-al-kind");
+    const keepKind = kindSel.value;
+    kindSel.innerHTML = "";
+    ALERT_KINDS.forEach((k) => { const o = el("option", null, tr(k[1], k[2])); o.value = k[0]; kindSel.appendChild(o); });
+    if (keepKind) kindSel.value = keepKind;
+    $id("tm-al-error").classList.add("hidden");
+    updateAlertValueLabel();
+    fillAlertCoins();
+    renderAlertList();
+    showScreen("screen-coin-alerts");
+  }
+  function initAlerts() {
+    const section = addScreen("screen-coin-alerts");
+    section.innerHTML =
+      '<h2 id="tm-al-title"></h2><p class="muted" id="tm-al-intro"></p>' +
+      '<label class="tm-label" for="tm-al-coin" id="tm-al-coin-label"></label><select id="tm-al-coin"></select>' +
+      '<label class="tm-label" for="tm-al-kind" id="tm-al-kind-label"></label><select id="tm-al-kind"></select>' +
+      '<label class="tm-label" for="tm-al-value" id="tm-al-value-label"></label>' +
+      '<input type="text" id="tm-al-value" inputmode="decimal" autocomplete="off" />' +
+      '<p id="tm-al-error" class="error hidden"></p>' +
+      '<button type="button" id="tm-al-add" class="secondary"></button>' +
+      '<div id="tm-al-list" class="tm-rem-list"></div>' +
+      '<p class="warn small" id="tm-al-note"></p>';
+    section.appendChild(makeBackBtn("screen-main"));
+    const setText = () => {
+      $id("tm-al-title").textContent = tr("explore.alertsTitle", "Coin alerts");
+      $id("tm-al-intro").textContent = tr("explore.alertsIntro", "Get a heads-up when a coin reaches a price or moves a lot.");
+      $id("tm-al-coin-label").textContent = tr("explore.alertCoin", "Coin");
+      $id("tm-al-kind-label").textContent = tr("explore.alertKind", "Alert me when it");
+      $id("tm-al-add").textContent = tr("explore.alertAdd", "Add alert");
+      $id("tm-al-note").textContent = tr("explore.alertNote", "Alerts are checked while Token Exchange is open on this device. Nothing is sent anywhere except a public price lookup.");
+    };
+    setText();
+    $id("tm-al-kind").addEventListener("change", updateAlertValueLabel);
+    onScreenOpen((id) => { if (id === "screen-coin-alerts") setText(); if (id === "screen-main" || id == null) checkAlerts(false); });
+    $id("tm-al-add").addEventListener("click", async () => {
+      const err = $id("tm-al-error");
+      const cg = $id("tm-al-coin").value;
+      const kind = $id("tm-al-kind").value;
+      const value = parseAlertValue($id("tm-al-value").value, kind);
+      const coin = knownCoins.get(cg);
+      if (!coin || value == null) {
+        err.textContent = tr("explore.alertBad", "Choose a coin and enter a number above zero.");
+        err.classList.remove("hidden");
+        return;
+      }
+      const cur = (safe(() => currentCurrency) || "usd");
+      const list = await loadAlerts();
+      if (list.length >= 20) { err.textContent = tr("explore.alertTooMany", "That's the limit of 20 alerts."); err.classList.remove("hidden"); return; }
+      const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), cg, sym: coin.symbol.slice(0, 12), kind, value, cur, created: Date.now() };
+      if (kind === "move") {
+        const now = (await TM_PRICES.getCoinPrices([cg], cur)).get(cg);
+        if (now == null) { err.textContent = tr("explore.alertNoPrice", "Couldn't get that coin's price right now. Try again in a moment."); err.classList.remove("hidden"); return; }
+        entry.base = now;
+      }
+      err.classList.add("hidden");
+      list.push(entry);
+      saveAlerts(list);
+      $id("tm-al-value").value = "";
+      renderAlertList();
+      // Ask for browser notifications once, only on the website and only because the user just made an alert.
+      if (typeof Notification !== "undefined" && Notification.permission === "default" && /^https?:$/.test(location.protocol)) safe(() => Notification.requestPermission());
+    });
+    const balance = document.querySelector(".balance-box");
+    if (balance && balance.parentNode) {
+      alertBanner = el("div", "tm-due-banner hidden");
+      alertBanner.id = "tm-alert-banner";
+      balance.insertAdjacentElement("beforebegin", alertBanner);
+    }
+    // A shortcut on the coin-list screen, and the pulse strip above the sort chips.
+    const list = $id("predictions-list");
+    if (list && list.parentNode) {
+      const link = el("button", "link tm-alerts-link", "🔔 " + tr("explore.alertsLink", "Coin alerts"));
+      link.type = "button";
+      link.id = "tm-alerts-link";
+      link.addEventListener("click", () => openAlerts());
+      pulseBox = el("div", "tm-pulse hidden");
+      pulseBox.id = "tm-pulse";
+      const before = sortBox || list;
+      before.parentNode.insertBefore(link, before);
+      before.parentNode.insertBefore(pulseBox, before);
+      onScreenOpen(() => { link.firstChild.nodeValue = "🔔 " + tr("explore.alertsLink", "Coin alerts"); });
+    }
+    setTimeout(() => checkAlerts(true), 2500);
+    setInterval(() => checkAlerts(true), 120000);
+  }
+
   // ---------------------------------------------------------------- start
   function init() {
-    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary, initA11y].forEach((f) => {
+    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary, initAlerts, initA11y].forEach((f) => {
       try { const r = f(); if (r && typeof r.catch === "function") r.catch(() => {}); } catch (e) { /* one feature failing must not affect the others */ }
     });
   }
@@ -1248,5 +1520,5 @@
   function setSortMode(mode) { if (SORTS.some((x) => x[0] === mode)) { sortMode = mode; markSortActive(); } }
 
   window.TM_EXPLORE = { sortMarkets, setSortMode, afterTokens, refreshAllocation, receiptText, addReceiptRow, buildPaymentLink,
-    convertAmount, formatConverted, advanceReminder, dueReminders, addHistoryPoint, historyChange, sciToInt, parsePaymentLink, applyPaymentLink, summarizeActivity };
+    convertAmount, formatConverted, advanceReminder, dueReminders, addHistoryPoint, historyChange, sciToInt, parsePaymentLink, applyPaymentLink, summarizeActivity, marketPulse, parseAlertValue, alertState, checkAlerts };
 })();

@@ -70,7 +70,8 @@ test("every explore.* key the module asks for exists in all nine languages with 
   const keys = new Set([...src.matchAll(/\btr\(\s*"(explore\.[\w.]+)"/g)].map((m) => m[1]).filter((k) => !k.endsWith(".")));
   for (const m of src.matchAll(/"(explore\.cat\.)" \+ a\[2\]/g)) ["swap", "lending", "staking", "nft", "names", "bridge", "explorer"].forEach((c) => keys.add(m[1] + c));
   // Keys chosen by variable (frequency titles, activity lines) rather than a literal tr("...") call.
-  for (const m of src.matchAll(/"(explore\.(?:rem|sum)[A-Za-z]+)"/g)) keys.add(m[1]);
+  for (const m of src.matchAll(/"(explore\.(?:rem|sum|alert|pulse)[A-Za-z]+)"/g)) keys.add(m[1]);
+  keys.add("predictions.tabTrending");
   assert.ok(keys.size > 80, "found the keys the module uses");
   const ph = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(",");
   const LANGS = ["en", "es", "fr", "pt", "ru", "zh", "ja", "hi", "ar"];
@@ -204,4 +205,103 @@ test("summarizeActivity counts only this month, split by direction, and sums per
 test("the QR scanner hands ethereum: links to the payment-link filler", () => {
   const extras = read("extras.js");
   assert.ok(/TM_EXPLORE\.applyPaymentLink/.test(extras));
+});
+
+test("marketPulse totals the list: cap, cap-weighted 24h move, BTC/ETH share, breadth", () => {
+  const { api } = load();
+  const J = (v) => JSON.parse(JSON.stringify(v));
+  const rows = [
+    { symbol: "BTC", marketCap: 600, change24h: 10 },
+    { symbol: "ETH", marketCap: 300, change24h: -10 },
+    { symbol: "XRP", marketCap: 100, change24h: 0 },
+    { symbol: "ODD", marketCap: null, change24h: 50 },
+  ];
+  const p = J(api.marketPulse(rows));
+  assert.equal(p.count, 3, "a coin with no market cap is left out");
+  assert.equal(p.cap, 1000);
+  assert.equal(p.btc, 60);
+  assert.equal(p.eth, 30);
+  assert.equal(p.up, 1);
+  assert.equal(p.down, 1);
+  // before: 600/1.1 + 300/0.9 + 100 = 545.45 + 333.33 + 100 = 978.79; now 1000 -> +2.17%
+  assert.ok(Math.abs(p.change - 2.1672) < 0.01, "change was " + p.change);
+  assert.equal(api.marketPulse([rows[0]]), null, "one coin is not a market");
+  assert.equal(api.marketPulse(undefined), null);
+  const noChange = J(api.marketPulse([{ symbol: "A", marketCap: 5 }, { symbol: "B", marketCap: 5 }]));
+  assert.equal(noChange.change, null);
+  assert.equal(noChange.btc, null);
+});
+
+test("sortMarkets can sort by market cap", () => {
+  const { api } = load({ predictionsTab: "top" });
+  const rows = [{ symbol: "A", marketCap: 5 }, { symbol: "B", marketCap: 50 }, { symbol: "C", marketCap: null }];
+  api.setSortMode("cap");
+  assert.deepEqual(api.sortMarkets(rows).map((m) => m.symbol), ["B", "A", "C"]);
+});
+
+test("parseAlertValue accepts positive numbers and caps percentages", () => {
+  const { api } = load();
+  assert.equal(api.parseAlertValue("3000", "above"), 3000);
+  assert.equal(api.parseAlertValue(" 0,5 ", "below"), 0.5);
+  assert.equal(api.parseAlertValue("5", "move"), 5);
+  assert.equal(api.parseAlertValue("1000", "move"), 1000);
+  assert.equal(api.parseAlertValue("1001", "move"), null);
+  for (const bad of ["", "0", "-3", "abc", "1e5", "1.2.3", null, undefined]) assert.equal(api.parseAlertValue(bad, "above"), null, String(bad));
+});
+
+test("alertState: above, below and percent-move alerts fire at the right price", () => {
+  const { api } = load();
+  assert.equal(api.alertState({ kind: "above", value: 100 }, 100), "hit");
+  assert.equal(api.alertState({ kind: "above", value: 100 }, 99.9), "wait");
+  assert.equal(api.alertState({ kind: "below", value: 100 }, 100), "hit");
+  assert.equal(api.alertState({ kind: "below", value: 100 }, 100.1), "wait");
+  const mv = { kind: "move", value: 5, base: 200 };
+  assert.equal(api.alertState(mv, 209.9), "wait");
+  assert.equal(api.alertState(mv, 210), "hit");
+  assert.equal(api.alertState(mv, 190), "hit", "a fall counts too");
+  assert.equal(api.alertState(mv, 195), "wait");
+  assert.equal(api.alertState({ kind: "move", value: 5 }, 300), "wait", "no starting price, no alert");
+  assert.equal(api.alertState({ kind: "above", value: 1 }, null), "wait");
+  assert.equal(api.alertState({ kind: "weird", value: 1 }, 5), "wait");
+  assert.equal(api.alertState(null, 5), "wait");
+});
+
+test("trendingIdsFrom keeps clean, unique CoinGecko ids in order", () => {
+  const vm2 = require("node:vm");
+  const ctx = vm2.createContext({ self: {}, console, fetch: async () => ({ ok: false }), AbortController, setTimeout, clearTimeout });
+  vm2.runInContext(read("prices.js"), ctx, { filename: "prices.js" });
+  const P = ctx.self.TM_PRICES;
+  assert.equal(typeof P.getTrendingCoins, "function");
+  assert.equal(typeof P.getCoinPrices, "function");
+  const ids = P.trendingIdsFrom({ coins: [{ item: { id: "pepe" } }, { item: { id: "bad id!" } }, { item: { id: "pepe" } }, { item: {} }, null, { item: { id: "sui" } }] });
+  assert.deepEqual(JSON.parse(JSON.stringify(ids)), ["pepe", "sui"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(P.trendingIdsFrom(null))), []);
+  const many = { coins: Array.from({ length: 30 }, (_, i) => ({ item: { id: "coin-" + i } })) };
+  assert.equal(P.trendingIdsFrom(many).length, 15, "capped at 15");
+});
+
+test("the Trending tab exists on both pages and is wired in both scripts", () => {
+  for (const f of ["index.html", "popup.html"]) assert.ok(read(f).includes('id="pred-tab-trending"'), f);
+  for (const f of ["app.js", "popup.js"]) {
+    const t = read(f);
+    assert.ok(t.includes('"pred-tab-trending"') && t.includes("getTrendingCoins"), f);
+  }
+});
+
+test("getCoinPrices never throws and ignores junk ids", async () => {
+  const vm2 = require("node:vm");
+  const calls = [];
+  const ctx = vm2.createContext({ self: {}, console, AbortController, setTimeout, clearTimeout,
+    fetch: async (url) => { calls.push(String(url)); return { ok: true, json: async () => ({ bitcoin: { usd: 65000 }, ethereum: { usd: "x" } }) }; } });
+  vm2.runInContext(read("prices.js"), ctx, { filename: "prices.js" });
+  const P = ctx.self.TM_PRICES;
+  const m = await P.getCoinPrices(["bitcoin", "ethereum", "Bad Id", "bitcoin"], "usd");
+  assert.equal(m.get("bitcoin"), 65000);
+  assert.ok(!m.has("ethereum"));
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].includes("ids=bitcoin%2Cethereum") && !calls[0].includes("Bad"));
+  const down = vm2.createContext({ self: {}, console, AbortController, setTimeout, clearTimeout, fetch: async () => { throw new Error("offline"); } });
+  vm2.runInContext(read("prices.js"), down, { filename: "prices.js" });
+  assert.equal((await down.self.TM_PRICES.getCoinPrices(["bitcoin"], "usd")).size, 0);
+  assert.equal((await down.self.TM_PRICES.getCoinPrices([], "usd")).size, 0);
 });
