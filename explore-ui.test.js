@@ -70,7 +70,7 @@ test("every explore.* key the module asks for exists in all nine languages with 
   const keys = new Set([...src.matchAll(/\btr\(\s*"(explore\.[\w.]+)"/g)].map((m) => m[1]).filter((k) => !k.endsWith(".")));
   for (const m of src.matchAll(/"(explore\.cat\.)" \+ a\[2\]/g)) ["swap", "lending", "staking", "nft", "names", "bridge", "explorer"].forEach((c) => keys.add(m[1] + c));
   // Keys chosen by variable (frequency titles, activity lines) rather than a literal tr("...") call.
-  for (const m of src.matchAll(/"(explore\.(?:rem|sum|alert|pulse)[A-Za-z]+)"/g)) keys.add(m[1]);
+  for (const m of src.matchAll(/"(explore\.(?:rem|sum|alert|pulse|coll|fav|range)[A-Za-z]+)"/g)) keys.add(m[1]);
   keys.add("predictions.tabTrending");
   assert.ok(keys.size > 80, "found the keys the module uses");
   const ph = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(",");
@@ -304,4 +304,63 @@ test("getCoinPrices never throws and ignores junk ids", async () => {
   vm2.runInContext(read("prices.js"), down, { filename: "prices.js" });
   assert.equal((await down.self.TM_PRICES.getCoinPrices(["bitcoin"], "usd")).size, 0);
   assert.equal((await down.self.TM_PRICES.getCoinPrices([], "usd")).size, 0);
+});
+
+test("favouriteIds merges starred ids and watchlist symbols, cleaned, unique and capped", () => {
+  const { api } = load();
+  const map = { BTC: "bitcoin", ETH: "ethereum" };
+  const out = JSON.parse(JSON.stringify(api.favouriteIds(["pepe", "bad id!", "bitcoin"], ["btc", "eth", "ZZZ"], map)));
+  assert.deepEqual(out, ["pepe", "bitcoin", "ethereum"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.favouriteIds(null, null, null))), []);
+  const many = Array.from({ length: 80 }, (_, i) => "coin-" + i);
+  assert.equal(api.favouriteIds(many, [], {}).length, 50, "capped at 50");
+});
+
+test("rangePosition places the price between the day's low and high", () => {
+  const { api } = load();
+  assert.equal(api.rangePosition(100, 200, 150), 50);
+  assert.equal(api.rangePosition(100, 200, 100), 0);
+  assert.equal(api.rangePosition(100, 200, 250), 100, "clamped");
+  assert.equal(api.rangePosition(100, 200, 50), 0, "clamped");
+  assert.equal(api.rangePosition(200, 200, 200), null, "flat day cannot be drawn");
+  assert.equal(api.rangePosition(null, 200, 150), null);
+  assert.equal(api.rangePosition(100, 200, undefined), null);
+});
+
+test("baskets only list coins the app already knows, and topSource follows the chosen collection", async () => {
+  const vm2 = require("node:vm");
+  const calls = [];
+  const ctx = vm2.createContext({ self: {}, console, AbortController, setTimeout, clearTimeout,
+    fetch: async (url) => { calls.push(String(url)); return { ok: true, json: async () => [{ id: "uniswap", symbol: "uni", name: "Uniswap", current_price: 7, market_cap: 5, market_cap_rank: 30, price_change_percentage_24h: 1 }, { id: "aave", symbol: "aave", name: "Aave", current_price: 90 }] }; } });
+  vm2.runInContext(read("prices.js"), ctx, { filename: "prices.js" });
+  const P = ctx.self.TM_PRICES;
+  const keys = Object.keys(P.BASKETS);
+  assert.ok(keys.length >= 6);
+  const known = new Set([...Object.values(P.COINGECKO_IDS), ...P.TOP_COINS.map((c) => (Array.isArray(c) ? c[0] : c.id))]);
+  for (const k of keys) {
+    assert.ok(P.BASKETS[k].length >= 4, k + " has enough coins");
+    for (const id of P.BASKETS[k]) assert.ok(known.has(id), k + ": unknown coin " + id);
+  }
+  const rows = await P.getBasketCoins("defi", "usd");
+  assert.deepEqual(JSON.parse(JSON.stringify(rows.map((r) => r.id))), ["uniswap", "aave"]);
+  assert.equal(rows[0].cgId, "uniswap");
+  assert.ok(calls.some((u) => u.includes("/coins/markets") && u.includes("ids=")), "one request for the whole basket");
+  await assert.rejects(() => P.getBasketCoins("nope", "usd"));
+
+  const seen = [];
+  const fake = { getTopCoins: async () => { seen.push("top"); return []; }, getBasketCoins: async (k) => { seen.push("basket:" + k); return []; }, getCoinsByIds: async (ids) => { seen.push("ids:" + ids.join(",")); return []; }, BASKETS: P.BASKETS, COINGECKO_IDS: { BTC: "bitcoin" } };
+  const { api } = load({ TM_PRICES: fake, isWatchlisted: (s) => s === "BTC" });
+  await api.topSource("usd");
+  api.setCollection("meme"); await api.topSource("usd");
+  api.setCollection("fav"); await api.topSource("usd");
+  api.setCollection("bogus"); await api.topSource("usd");
+  assert.deepEqual(seen, ["top", "basket:meme", "ids:bitcoin", "ids:bitcoin"]);
+});
+
+test("the coin hooks are wired in both scripts and the collection UI is in both stylesheets", () => {
+  for (const f of ["app.js", "popup.js"]) {
+    const t = read(f);
+    assert.ok(t.includes("TM_EXPLORE.onCoinOpen") && t.includes("TM_EXPLORE.onCoinInfo") && t.includes("TM_EXPLORE.topSource"), f);
+  }
+  for (const f of ["app.css", "popup.css"]) assert.ok(read(f).includes(".tm-range-bar") && read(f).includes(".tm-collection"), f);
 });

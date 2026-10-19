@@ -339,10 +339,16 @@
   function sortMarkets(markets) {
     const onTop = typeof predictionsTab !== "undefined" && predictionsTab === "top";
     if (sortBox) sortBox.classList.toggle("hidden", !onTop);
+    if (collBox) collBox.classList.toggle("hidden", !onTop);
     safe(() => rememberCoins(markets));
+    safe(relabelCollections);
     safe(relabelSort);
     safe(() => updatePulse(markets, onTop));
-    if (!onTop || sortMode === "rank" || !Array.isArray(markets)) return markets;
+    if (!onTop || !Array.isArray(markets)) return markets;
+    if (sortMode === "rank") {
+      if (collection === "top") return markets;
+      return markets.slice().sort((a, b) => (isNum(a.rank) ? a.rank : 1e9) - (isNum(b.rank) ? b.rank : 1e9));
+    }
     const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
     const key = (m) => (sortMode === "volume" ? num(m.volume) : sortMode === "cap" ? num(m.marketCap) : num(m.change24h));
     const dir = sortMode === "losers" ? 1 : -1;
@@ -1281,7 +1287,7 @@
     pulseBox.classList.toggle("hidden", !p);
     pulseBox.innerHTML = "";
     if (!p) return;
-    pulseBox.appendChild(el("div", "tm-mix-title", tr("explore.pulseTitle", "Market pulse · top {count} coins", { count: p.count })));
+    pulseBox.appendChild(el("div", "tm-mix-title", (collection === "top" ? tr("explore.pulseTitle", "Market pulse · top {count} coins", { count: p.count }) : tr("explore.pulseSet", "Market pulse · {count} coins", { count: p.count }))));
     const grid = el("div", "tm-pulse-grid");
     const tile = (label, value, cls) => {
       const t = el("div", "tm-pulse-tile");
@@ -1420,7 +1426,7 @@
     $id("tm-al-value-label").textContent = kind === "move" ? tr("explore.alertValuePct", "Percent move") : tr("explore.alertValuePrice", "Price in {currency}", { currency: currencyCode() });
     $id("tm-al-value").placeholder = kind === "move" ? "5" : "";
   }
-  function openAlerts() {
+  function openAlerts(preId) {
     const kindSel = $id("tm-al-kind");
     const keepKind = kindSel.value;
     kindSel.innerHTML = "";
@@ -1428,7 +1434,7 @@
     if (keepKind) kindSel.value = keepKind;
     $id("tm-al-error").classList.add("hidden");
     updateAlertValueLabel();
-    fillAlertCoins();
+    fillAlertCoins().then(() => { const sel = $id("tm-al-coin"); if (typeof preId === "string" && sel && knownCoins.has(preId)) sel.value = preId; });
     renderAlertList();
     showScreen("screen-coin-alerts");
   }
@@ -1508,9 +1514,186 @@
     setInterval(() => checkAlerts(true), 120000);
   }
 
+
+  // ---- 18. COLLECTIONS (FROM CRYPTO.COM): coin baskets, favourites, coin-page star / alert shortcut / 24h range bar
+  const FAV_KEY = "tm_fav_ids";
+  const FAV_MAX = 50;
+  const COLLECTIONS = [
+    ["top", "explore.collTop", "Top coins"], ["fav", "explore.collFav", "★ Favourites"],
+    ["defi", "explore.collDefi", "DeFi"], ["layer1", "explore.collLayer1", "Layer 1"], ["layer2", "explore.collLayer2", "Layer 2"],
+    ["meme", "explore.collMeme", "Memecoins"], ["ai", "explore.collAi", "AI"], ["payments", "explore.collPayments", "Payments"], ["gaming", "explore.collGaming", "Gaming"],
+  ];
+  let collection = "top";
+  let collBox = null;
+  let favIds = new Set();
+
+  // Favourites = coins starred here (by CoinGecko id) plus coins starred on the Prices screen (by symbol).
+  function favouriteIds(stored, watchSymbols, idBySymbol) {
+    const out = [];
+    const add = (id) => { if (typeof id === "string" && ID_RE.test(id) && !out.includes(id)) out.push(id); };
+    (Array.isArray(stored) ? stored : []).forEach(add);
+    (Array.isArray(watchSymbols) ? watchSymbols : []).forEach((s) => add(idBySymbol && idBySymbol[String(s).toUpperCase()]));
+    return out.slice(0, FAV_MAX);
+  }
+  // Where a price sits between the day's low and high, 0-100 (null when it can't be drawn).
+  function rangePosition(low, high, price) {
+    if (!isNum(low) || !isNum(high) || !isNum(price) || high <= low) return null;
+    return Math.max(0, Math.min(100, ((price - low) / (high - low)) * 100));
+  }
+  const idMap = () => safe(() => TM_PRICES.COINGECKO_IDS) || {};
+  function watchedSymbols() { return Object.keys(idMap()).filter((s) => safe(() => isWatchlisted(s))); }
+  function allFavIds() { return favouriteIds([...favIds], watchedSymbols(), idMap()); }
+  function coinId(c) {
+    const id = c && (c.cgId || c.id || idMap()[String(c.symbol || "").toUpperCase()]);
+    return typeof id === "string" && ID_RE.test(id) ? id : null;
+  }
+  function isFav(id) { return !!id && allFavIds().includes(id); }
+  function setFav(id, symbol, on) {
+    if (!id) return;
+    if (on) { if (favIds.size < FAV_MAX) favIds.add(id); } else favIds.delete(id);
+    const sym = String(symbol || "").toUpperCase();
+    if (sym && idMap()[sym] === id && !!safe(() => isWatchlisted(sym)) !== on) safe(() => toggleWatchlist(sym));
+    storeSet({ [FAV_KEY]: [...favIds] });
+  }
+
+  async function topSource(currency) {
+    if (collection === "fav") {
+      const ids = allFavIds();
+      return ids.length ? TM_PRICES.getCoinsByIds(ids, currency) : [];
+    }
+    if (collection !== "top" && TM_PRICES.BASKETS && TM_PRICES.BASKETS[collection]) return TM_PRICES.getBasketCoins(collection, currency);
+    return TM_PRICES.getTopCoins(currency);
+  }
+
+  function relabelCollections() {
+    if (!collBox) return;
+    collBox.querySelectorAll("option").forEach((o) => { o.textContent = tr(o.dataset.k, o.dataset.fb); });
+    const sel = collBox.querySelector("select");
+    if (sel) sel.setAttribute("aria-label", tr("explore.collLabel", "Coin collection"));
+    const hint = collBox.querySelector(".tm-fav-hint");
+    if (hint) {
+      hint.textContent = tr("explore.favHint", "Tap the ☆ on any coin to add it to your favourites.");
+      hint.classList.toggle("hidden", collection !== "fav");
+    }
+  }
+  function decorateStars() {
+    const list = $id("predictions-list");
+    if (!list) return;
+    // An empty favourites list is hidden: the hint above it already says what to do.
+    list.classList.toggle("hidden", collection === "fav" && !list.querySelector(".price-row"));
+    list.querySelectorAll(".price-row[data-cg]").forEach((row) => {
+      if (row.querySelector(".star-btn")) return;
+      const id = row.dataset.cg, sym = row.dataset.symbol || "";
+      const b = el("button", "star-btn");
+      b.type = "button";
+      const paint = () => {
+        const on = isFav(id);
+        b.className = "star-btn" + (on ? " starred" : "");
+        b.textContent = on ? "★" : "☆";
+        b.setAttribute("aria-label", on ? tr("explore.favRemove", "Remove from favourites") : tr("explore.favAdd", "Add to favourites"));
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      };
+      paint();
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setFav(id, sym, !isFav(id));
+        if (collection === "fav" && !isFav(id)) {
+          row.remove();
+          if (!list.querySelector(".price-row")) safe(() => refreshPredictions());
+        } else paint();
+      });
+      row.appendChild(b);
+    });
+  }
+
+  let coinBar = null, rangeBox = null, curCoin = null;
+  function paintCoinBar() {
+    if (!coinBar || !curCoin) return;
+    const id = coinId(curCoin);
+    const fav = coinBar.querySelector(".tm-coin-fav");
+    const on = isFav(id);
+    fav.textContent = (on ? "★ " : "☆ ") + (on ? tr("explore.favRemove", "Remove from favourites") : tr("explore.favAdd", "Add to favourites"));
+    fav.setAttribute("aria-pressed", on ? "true" : "false");
+    fav.disabled = !id;
+    coinBar.querySelector(".tm-coin-alert").textContent = "🔔 " + tr("explore.coinAlert", "Set price alert");
+    coinBar.querySelector(".tm-coin-alert").disabled = !id;
+  }
+  function onCoinOpen(c) {
+    curCoin = c;
+    const id = coinId(c);
+    if (id && c.symbol) knownCoins.set(id, { id, symbol: String(c.symbol), name: String(c.name || c.symbol) });
+    if (rangeBox) rangeBox.classList.add("hidden");
+    paintCoinBar();
+  }
+  function onCoinInfo(d, c) {
+    if (!rangeBox || !d) return;
+    const pos = rangePosition(d.low24h, d.high24h, d.price);
+    rangeBox.classList.toggle("hidden", pos == null);
+    if (pos == null) return;
+    rangeBox.innerHTML = "";
+    rangeBox.appendChild(el("div", "tm-range-title muted small", tr("explore.rangeTitle", "24h range")));
+    const bar = el("div", "tm-range-bar");
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", tr("explore.rangeAria", "{pct}% of the way from today's low to today's high", { pct: Math.round(pos) }));
+    const mark = el("span", "tm-range-mark");
+    mark.style.insetInlineStart = pos.toFixed(1) + "%";
+    bar.appendChild(mark);
+    rangeBox.appendChild(bar);
+    const ends = el("div", "tm-range-ends small");
+    ends.appendChild(el("span", null, ltr(money(d.low24h))));
+    ends.appendChild(el("span", null, ltr(money(d.high24h))));
+    rangeBox.appendChild(ends);
+  }
+
+  function initCollections() {
+    const stored = storeGet([FAV_KEY]).then((r) => { favIds = new Set(favouriteIds(r[FAV_KEY], [], {})); });
+    const anchor = sortBox || $id("predictions-list");
+    if (anchor && anchor.parentNode) {
+      collBox = el("div", "tm-collection hidden");
+      const sel = el("select");
+      sel.id = "tm-collection";
+      COLLECTIONS.forEach(([v, k, fb]) => { const o = el("option", null, tr(k, fb)); o.value = v; o.dataset.k = k; o.dataset.fb = fb; sel.appendChild(o); });
+      sel.addEventListener("change", () => { collection = sel.value; relabelCollections(); safe(() => refreshPredictions()); });
+      collBox.appendChild(sel);
+      collBox.appendChild(el("p", "muted small tm-fav-hint hidden"));
+      anchor.parentNode.insertBefore(collBox, anchor);
+      relabelCollections();
+      // Show the picker and sort chips on the Top coins tab only, even when a list fails to load.
+      ["pred-tab-stable", "pred-tab-top", "pred-tab-trending"].forEach((tid) => {
+        const t = $id(tid);
+        if (t) t.addEventListener("click", () => { const onTop = safe(() => predictionsTab) === "top"; collBox.classList.toggle("hidden", !onTop); if (sortBox) sortBox.classList.toggle("hidden", !onTop); });
+      });
+      const list = $id("predictions-list");
+      if (list) new MutationObserver(decorateStars).observe(list, { childList: true });
+      onScreenOpen((id) => { if (id === "screen-predictions") { relabelCollections(); decorateStars(); } });
+    }
+    const card = document.querySelector(".coin-swap-card");
+    if (card && card.parentNode) {
+      coinBar = el("div", "tm-coin-actions");
+      const fav = el("button", "secondary tm-coin-fav");
+      fav.type = "button";
+      fav.addEventListener("click", () => {
+        const id = coinId(curCoin);
+        if (!id) return;
+        setFav(id, curCoin.symbol, !isFav(id));
+        paintCoinBar();
+      });
+      const al = el("button", "secondary tm-coin-alert");
+      al.type = "button";
+      al.addEventListener("click", () => { const id = coinId(curCoin); if (id) openAlerts(id); });
+      coinBar.appendChild(fav); coinBar.appendChild(al);
+      card.parentNode.insertBefore(coinBar, card);
+      rangeBox = el("div", "tm-range hidden");
+      const stats = $id("coin-stats");
+      if (stats && stats.parentNode) stats.parentNode.insertBefore(rangeBox, stats);
+      onScreenOpen((id) => { if (id === "screen-coin") paintCoinBar(); });
+    }
+    return stored;
+  }
+
   // ---------------------------------------------------------------- start
   function init() {
-    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary, initAlerts, initA11y].forEach((f) => {
+    [initHideBalances, initRecent, initRequest, initSort, initMix, initZero, initSecurity, initApps, initPercent, initScreenHooks, initTools, initConverter, initReminders, initHistory, initPayLink, initActivitySummary, initAlerts, initCollections, initA11y].forEach((f) => {
       try { const r = f(); if (r && typeof r.catch === "function") r.catch(() => {}); } catch (e) { /* one feature failing must not affect the others */ }
     });
   }
@@ -1520,5 +1703,6 @@
   function setSortMode(mode) { if (SORTS.some((x) => x[0] === mode)) { sortMode = mode; markSortActive(); } }
 
   window.TM_EXPLORE = { sortMarkets, setSortMode, afterTokens, refreshAllocation, receiptText, addReceiptRow, buildPaymentLink,
-    convertAmount, formatConverted, advanceReminder, dueReminders, addHistoryPoint, historyChange, sciToInt, parsePaymentLink, applyPaymentLink, summarizeActivity, marketPulse, parseAlertValue, alertState, checkAlerts };
+    convertAmount, formatConverted, advanceReminder, dueReminders, addHistoryPoint, historyChange, sciToInt, parsePaymentLink, applyPaymentLink, summarizeActivity, marketPulse, parseAlertValue, alertState, checkAlerts,
+    topSource, onCoinOpen, onCoinInfo, favouriteIds, rangePosition, setCollection: (v) => { if (COLLECTIONS.some((x) => x[0] === v)) collection = v; } };
 })();

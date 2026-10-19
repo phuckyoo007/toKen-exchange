@@ -2145,3 +2145,21 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .seg-tab { display: flex; align-items: center; justify-content: center; text-align: center; white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15; padding: 6px 4px; word-break: break-word; }
 .seg-tab { word-break: normal; overflow-wrap: break-word; }
 @media (max-width: 360px) { .seg-tab { font-size: 11.5px; padding: 6px 3px; } }
+/* ---- v10: coin collections (baskets, favourites), coin-page shortcuts and 24h range bar */
+.tm-collection { margin: 2px 0 8px; }
+.tm-collection.hidden { display: none; }
+.tm-collection select { width: 100%; }
+.tm-fav-hint { margin: 6px 2px 0; }
+.tm-fav-hint.hidden { display: none; }
+.tm-coin-actions { display: flex; gap: 8px; margin: 0 0 12px; }
+.tm-coin-actions .secondary { flex: 1 1 0; width: auto; min-width: 0; padding: 8px 6px; font-size: 12.5px; white-space: normal; line-height: 1.2; }
+.tm-range { margin: 0 0 14px; }
+.tm-range.hidden { display: none; }
+.tm-range-title { margin-bottom: 8px; }
+.tm-range-bar { position: relative; height: 6px; border-radius: 999px; background: linear-gradient(90deg, #e0625a, #d9a441 50%, #3fb97a); }
+.tm-range-mark { position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; margin-inline-start: -7px; border-radius: 50%; background: var(--text); border: 2px solid var(--bg-raised); box-sizing: border-box; box-shadow: 0 0 0 1px var(--line); }
+.tm-range-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.price-row .star-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 32px; padding: 0; flex: 0 0 auto; font-size: 16px; }
+.tm-sort { gap: 6px; }
+.tm-sort .quick-add-chip { padding: 4px 8px; font-size: 12px; }
+.tm-range-bar, .tm-range-ends { direction: ltr; }

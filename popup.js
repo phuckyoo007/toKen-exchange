@@ -1308,6 +1308,7 @@ async function openCoinDetail(c, fromScreen) {
   $("coin-swap-note").classList.add("hidden");
   document.querySelectorAll(".coin-range").forEach((b) => b.classList.toggle("active", b.dataset.days === String(coinDetail.days)));
   showScreen("screen-coin");
+  if (window.TM_EXPLORE && TM_EXPLORE.onCoinOpen) { try { TM_EXPLORE.onCoinOpen(c); } catch (e) { /* extras never block the coin page */ } }
   loadCoinChart(gen);
   loadCoinInfo(gen);
   loadCoinSwapState(gen);
@@ -1338,6 +1339,7 @@ async function loadCoinInfo(gen) {
       const pct = d.athChange != null ? ` (${d.athChange.toFixed(1)}%)` : "";
       stats.appendChild(coinStat(TM_I18N.t("coin.ath"), fm(d.ath) + pct));
     }
+    if (window.TM_EXPLORE && TM_EXPLORE.onCoinInfo) { try { TM_EXPLORE.onCoinInfo(d, c); } catch (e) { /* optional extras */ } }
     $("coin-about").textContent = d.description || TM_I18N.t("coin.aboutUnavailable");
   } catch (e) {
     if (gen !== coinDetail.gen) return;
@@ -1532,6 +1534,7 @@ async function refreshMainPricesCard() {
 function renderStablecoinRow(c) {
   const row = document.createElement("div");
   row.className = "price-row";
+  if (c.cgId || c.id) { row.dataset.cg = String(c.cgId || c.id); row.dataset.symbol = String(c.symbol || ""); }
   const priceText =
     c.price == null
       ? TM_I18N.t("prices.naText")
@@ -1571,7 +1574,7 @@ async function refreshPredictions() {
   $("predictions-status").innerHTML = coinSpinnerHtml(TM_I18N.t("predictions.loading"));
   $("predictions-status").classList.remove("hidden");
   try {
-    const rawMarkets = predictionsTab === "top" ? await TM_PRICES.getTopCoins(currentCurrency) : predictionsTab === "trending" ? await TM_PRICES.getTrendingCoins(currentCurrency) : await TM_PRICES.getCurrencyStablecoins(currentCurrency);
+    const rawMarkets = predictionsTab === "top" ? await (window.TM_EXPLORE && TM_EXPLORE.topSource ? TM_EXPLORE.topSource(currentCurrency) : TM_PRICES.getTopCoins(currentCurrency)) : predictionsTab === "trending" ? await TM_PRICES.getTrendingCoins(currentCurrency) : await TM_PRICES.getCurrencyStablecoins(currentCurrency);
     const markets = window.TM_EXPLORE ? TM_EXPLORE.sortMarkets(rawMarkets) : rawMarkets;
     const list = $("predictions-list");
     list.innerHTML = "";

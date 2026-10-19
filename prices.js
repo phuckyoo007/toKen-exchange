@@ -1142,6 +1142,47 @@ function trendingIdsFrom(json) {
   });
   return out.slice(0, 15);
 }
+// Rows for a list of CoinGecko ids, in the order given, priced in one display currency and shaped
+// like a Top-coins row. Coins CoinGecko doesn't return are left out; throws if none come back.
+const coinsByIdsCache = new Map();
+async function getCoinsByIds(ids, currency) {
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const clean = [...new Set((ids || []).filter((id) => typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,99}$/.test(id)))].slice(0, 50);
+  const fail = () => new Error("Couldn't load these coins. Check your internet connection.");
+  if (!clean.length) return [];
+  const key = vs + "|" + clean.join(",");
+  const hit = coinsByIdsCache.get(key);
+  if (hit && Date.now() - hit.at < 60 * 1000) return hit.data;
+  const info = SUPPORTED_CURRENCIES[vs] || { label: String(vs).toUpperCase() };
+  const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
+  const byId = {};
+  try {
+    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(clean.join(","))}&per_page=50&price_change_percentage=24h`);
+    if (res.ok) {
+      const rows = await res.json();
+      (Array.isArray(rows) ? rows : []).forEach((r) => {
+        if (!r || typeof r.id !== "string" || num(r.current_price) == null) return;
+        byId[r.id] = r;
+      });
+    }
+  } catch (e) { /* handled below */ }
+  const data = clean.filter((id) => byId[id]).map((id) => {
+    const r = byId[id];
+    return {
+      id, cgId: id, symbol: String(r.symbol || "").toUpperCase().slice(0, 12), name: String(r.name || id).slice(0, 60),
+      fiat: info.label, fiatName: info.name || info.label, peg: null,
+      url: `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}`,
+      price: r.current_price, change24h: num(r.price_change_percentage_24h), volume: num(r.total_volume),
+      marketCap: num(r.market_cap), rank: num(r.market_cap_rank),
+      image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null,
+    };
+  });
+  if (!data.length) throw fail();
+  coinsByIdsCache.set(key, { at: Date.now(), data });
+  if (coinsByIdsCache.size > 30) coinsByIdsCache.delete(coinsByIdsCache.keys().next().value);
+  return data;
+}
+
 async function getTrendingCoins(currency) {
   const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
   const now = Date.now();
@@ -1154,33 +1195,28 @@ async function getTrendingCoins(currency) {
     ids = trendingIdsFrom(await res.json());
   } catch (e) { throw fail(); }
   if (!ids.length) throw fail();
-  const info = SUPPORTED_CURRENCIES[vs] || { label: String(vs).toUpperCase() };
-  const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
-  const byId = {};
-  try {
-    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids.join(","))}&per_page=50&price_change_percentage=24h`);
-    if (res.ok) {
-      const rows = await res.json();
-      (Array.isArray(rows) ? rows : []).forEach((r) => {
-        if (!r || typeof r.id !== "string" || num(r.current_price) == null) return;
-        byId[r.id] = r;
-      });
-    }
-  } catch (e) { /* handled below */ }
-  const data = ids.filter((id) => byId[id]).map((id) => {
-    const r = byId[id];
-    return {
-      id, cgId: id, symbol: String(r.symbol || "").toUpperCase().slice(0, 12), name: String(r.name || id).slice(0, 60),
-      fiat: info.label, fiatName: info.name || info.label, peg: null,
-      url: `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}`,
-      price: r.current_price, change24h: num(r.price_change_percentage_24h), volume: num(r.total_volume),
-      marketCap: num(r.market_cap), rank: num(r.market_cap_rank),
-      image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null,
-    };
-  });
-  if (!data.length) throw fail();
+  let data;
+  try { data = await getCoinsByIds(ids, vs); } catch (e) { throw fail(); }
   trendingCache.fetchedAt = now; trendingCache.key = vs; trendingCache.data = data;
   return data;
+}
+
+// ---- Coin baskets: hand-picked themed groups (the counterpart of Crypto.com's "Crypto Baskets") ----
+// Every id below is already used elsewhere in this file (COINGECKO_IDS), so each was checked against
+// CoinGecko's own coin pages. A basket is a plain list: it is not advice and not a fund.
+const BASKETS = {
+  defi: ["uniswap", "aave", "maker", "lido-dao", "curve-dao-token", "compound-governance-token", "havven", "chainlink", "the-graph", "ondo-finance"],
+  layer1: ["ethereum", "solana", "cardano", "avalanche-2", "near", "sui", "aptos", "polkadot", "cosmos", "algorand", "the-open-network", "kaspa", "tezos", "internet-computer", "hedera-hashgraph", "sei-network"],
+  layer2: ["arbitrum", "optimism", "mantle", "polygon-ecosystem-token"],
+  meme: ["dogecoin", "shiba-inu", "pepe", "bonk", "floki", "dogwifcoin"],
+  ai: ["render-token", "bittensor", "fetch-ai", "worldcoin-wld", "the-graph", "near"],
+  payments: ["ripple", "stellar", "litecoin", "bitcoin-cash", "tron", "monero"],
+  gaming: ["the-sandbox", "decentraland", "gala", "flow", "chiliz"],
+};
+async function getBasketCoins(key, currency) {
+  const ids = BASKETS[key];
+  if (!ids) throw new Error("Unknown basket.");
+  return getCoinsByIds(ids, currency);
 }
 
 // Current price of any coins (CoinGecko ids) in one display currency -> Map(id -> number). Missing
@@ -1217,6 +1253,9 @@ if (typeof self !== "undefined") {
     getCurrencyStablecoins,
     getTopCoins,
     getTrendingCoins,
+    getCoinsByIds,
+    getBasketCoins,
+    BASKETS,
     getCoinPrices,
     trendingIdsFrom,
     TOP_COINS,
