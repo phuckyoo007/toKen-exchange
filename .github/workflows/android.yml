@@ -99,10 +99,11 @@ jobs:
           ls -l "$AAB"
           jarsigner -verify "$AAB" | head -3
           keytool -printcert -jarfile "$AAB" | grep -E "SHA1|SHA256|Owner" | head -4
-          cp "$AAB" TokenExchange-v2.1-code13.aab
+          unzip -p "$AAB" base/manifest/AndroidManifest.xml | strings | grep -c tokenexchange || true
+          cp "$AAB" TokenExchange-v2.2-code14.aab
 
       - uses: actions/upload-artifact@v4
         with:
-          name: TokenExchange-v2.1-code13-aab
-          path: TokenExchange-v2.1-code13.aab
+          name: TokenExchange-v2.2-code14-aab
+          path: TokenExchange-v2.2-code14.aab
           retention-days: 14
