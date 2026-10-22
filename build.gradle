@@ -10,10 +10,10 @@ android {
         applicationId "com.tokenexchange.wallet"
         minSdk 24
         targetSdk 36
-        // Play rejects a versionCode it has already seen: 3 (2.0), and 4, 10, 11, 12
+        // Play rejects a versionCode it has already seen: 3 (2.0), and 4, 10, 11, 12, 13
         // were used or tried for earlier 2.1 builds. Always go up, never reuse.
-        versionCode 13
-        versionName "2.1"
+        versionCode 14
+        versionName "2.2"
     }
 
     // Signing comes from environment variables so the keystore and its
