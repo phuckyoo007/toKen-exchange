@@ -647,6 +647,38 @@ function shortDescription(text, maxLen) {
   return (lastStop > maxLen * 0.5 ? cut.slice(0, lastStop + 1) : cut.replace(/\s+\S*$/, "") + "...").trim();
 }
 
+
+// ---- Coin-page extras: tidy, safe versions of what CoinGecko says about a coin ----
+// One "% change over <period>" figure in the display currency (CoinGecko nests the per-currency
+// ones under *_in_currency; the plain 14d/60d/1y numbers are in USD terms, so only the nested ones are used).
+function pickChg(md, period, vs) {
+  const per = md && md["price_change_percentage_" + period + "_in_currency"];
+  const v = per && typeof per === "object" ? per[vs] : null;
+  return typeof v === "number" && isFinite(v) ? v : null;
+}
+function safeCategories(json) {
+  const list = json && Array.isArray(json.categories) ? json.categories : [];
+  return list.filter((c) => typeof c === "string" && c.trim()).map((c) => c.trim().slice(0, 40)).slice(0, 5);
+}
+// Only https links, only well-known shapes. Twitter/Reddit/GitHub are built from handles/paths, never copied raw.
+function safeLinks(json) {
+  const l = json && json.links ? json.links : {};
+  const https = (u) => (typeof u === "string" && /^https:\/\/[^\s"'<>]{3,300}$/i.test(u.trim()) ? u.trim() : null);
+  const first = (arr) => (Array.isArray(arr) ? arr.map(https).find(Boolean) || null : null);
+  const handle = typeof l.twitter_screen_name === "string" && /^[A-Za-z0-9_]{1,15}$/.test(l.twitter_screen_name) ? l.twitter_screen_name : null;
+  const reddit = https(l.subreddit_url);
+  const redditOk = reddit && /^https:\/\/(www\.)?reddit\.com\/r\/[A-Za-z0-9_]{2,40}\/?$/i.test(reddit) ? reddit : null;
+  const gh = first(l.repos_url && l.repos_url.github);
+  const ghOk = gh && /^https:\/\/github\.com\/[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)?\/?$/i.test(gh) ? gh : null;
+  return {
+    website: first(l.homepage),
+    twitter: handle ? "https://x.com/" + handle : null,
+    reddit: redditOk,
+    github: ghOk,
+    explorer: first(l.blockchain_site),
+  };
+}
+
 async function getCoinDetail(symbol, currency, idOverride) {
   const id = idOverride || COINGECKO_IDS[symbol];
   if (!id) throw new Error("Unknown coin.");
@@ -693,6 +725,13 @@ async function getCoinDetail(symbol, currency, idOverride) {
       ath: pick(md.ath),
       athChange: pick(md.ath_change_percentage),
       circulatingSupply: typeof md.circulating_supply === "number" ? md.circulating_supply : null,
+      change1h: pickChg(md, "1h", vs), change14d: pickChg(md, "14d", vs), change60d: pickChg(md, "60d", vs), change1y: pickChg(md, "1y", vs),
+      fdv: pick(md.fully_diluted_valuation),
+      maxSupply: typeof md.max_supply === "number" && md.max_supply > 0 ? md.max_supply : null,
+      totalSupply: typeof md.total_supply === "number" && md.total_supply > 0 ? md.total_supply : null,
+      atl: pick(md.atl),
+      categories: safeCategories(json),
+      links: safeLinks(json),
       description: shortDescription(plainTextFromHtml(json.description && json.description.en), 420),
       homepage,
       source: "coingecko",
@@ -1096,12 +1135,12 @@ async function getTopCoins(currency) {
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
   const byId = {};
   try {
-    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids.join(","))}&per_page=50&price_change_percentage=24h`);
+    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids.join(","))}&per_page=50&price_change_percentage=1h,24h,7d&sparkline=true`);
     if (res.ok) {
       const rows = await res.json();
       (Array.isArray(rows) ? rows : []).forEach((r) => {
         if (!r || typeof r.id !== "string" || num(r.current_price) == null) return;
-        byId[r.id] = { price: r.current_price, change24h: num(r.price_change_percentage_24h), volume: num(r.total_volume), marketCap: num(r.market_cap), rank: num(r.market_cap_rank), image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null };
+        byId[r.id] = { price: r.current_price, change24h: num(r.price_change_percentage_24h), change1h: num(r.price_change_percentage_1h_in_currency), change7d: num(r.price_change_percentage_7d_in_currency), spark: sparkPoints(r), volume: num(r.total_volume), marketCap: num(r.market_cap), rank: num(r.market_cap_rank), image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null };
       });
     }
   } catch (e) { /* DefiLlama below */ }
@@ -1157,7 +1196,7 @@ async function getCoinsByIds(ids, currency) {
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
   const byId = {};
   try {
-    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(clean.join(","))}&per_page=50&price_change_percentage=24h`);
+    const res = await cgFetch(`/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(clean.join(","))}&per_page=50&price_change_percentage=1h,24h,7d&sparkline=true`);
     if (res.ok) {
       const rows = await res.json();
       (Array.isArray(rows) ? rows : []).forEach((r) => {
@@ -1172,7 +1211,7 @@ async function getCoinsByIds(ids, currency) {
       id, cgId: id, symbol: String(r.symbol || "").toUpperCase().slice(0, 12), name: String(r.name || id).slice(0, 60),
       fiat: info.label, fiatName: info.name || info.label, peg: null,
       url: `https://www.coingecko.com/en/coins/${encodeURIComponent(id)}`,
-      price: r.current_price, change24h: num(r.price_change_percentage_24h), volume: num(r.total_volume),
+      price: r.current_price, change24h: num(r.price_change_percentage_24h), change1h: num(r.price_change_percentage_1h_in_currency), change7d: num(r.price_change_percentage_7d_in_currency), spark: sparkPoints(r), volume: num(r.total_volume),
       marketCap: num(r.market_cap), rank: num(r.market_cap_rank),
       image: typeof r.image === "string" && /^https:\/\//.test(r.image) ? r.image : null,
     };
@@ -1199,6 +1238,41 @@ async function getTrendingCoins(currency) {
   try { data = await getCoinsByIds(ids, vs); } catch (e) { throw fail(); }
   trendingCache.fetchedAt = now; trendingCache.key = vs; trendingCache.data = data;
   return data;
+}
+
+
+// ---- Search every coin CoinGecko knows (the counterpart of Crypto.com's search box) ----
+// CoinGecko's /search gives matching ids; a second call prices up to 8 of them in the display currency
+// so a result looks exactly like a list row. Returns [] when nothing matches; throws when the lookup fails.
+const searchCache = new Map();
+async function searchCoins(query, currency) {
+  const q = String(query || "").trim().replace(/\s+/g, " ").slice(0, 40);
+  if (q.length < 2 || !/^[\p{L}\p{N} ._-]+$/u.test(q)) return [];
+  const vs = SUPPORTED_CURRENCIES[currency] ? currency : DEFAULT_CURRENCY;
+  const key = vs + "|" + q.toLowerCase();
+  const hit = searchCache.get(key);
+  if (hit && Date.now() - hit.at < 2 * 60 * 1000) return hit.data;
+  const fail = () => new Error("Couldn't search right now. Check your internet connection.");
+  let ids = [];
+  try {
+    const res = await cgFetch(`/search?query=${encodeURIComponent(q)}`);
+    if (!res.ok) throw fail();
+    ids = searchIdsFrom(await res.json());
+  } catch (e) { throw fail(); }
+  if (!ids.length) return [];
+  let data;
+  try { data = await getCoinsByIds(ids, vs); } catch (e) { return []; }
+  searchCache.set(key, { at: Date.now(), data });
+  if (searchCache.size > 30) searchCache.delete(searchCache.keys().next().value);
+  return data;
+}
+function searchIdsFrom(json) {
+  const out = [];
+  (json && Array.isArray(json.coins) ? json.coins : []).forEach((c) => {
+    const id = c && c.id;
+    if (typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,99}$/.test(id) && !out.includes(id)) out.push(id);
+  });
+  return out.slice(0, 8);
 }
 
 // ---- Coin baskets: hand-picked themed groups (the counterpart of Crypto.com's "Crypto Baskets") ----
@@ -1254,6 +1328,11 @@ if (typeof self !== "undefined") {
     getTopCoins,
     getTrendingCoins,
     getCoinsByIds,
+    searchCoins,
+    searchIdsFrom,
+    safeLinks,
+    safeCategories,
+    pickChg,
     getBasketCoins,
     BASKETS,
     getCoinPrices,

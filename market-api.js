@@ -49,6 +49,7 @@ const ROUTES = [
   [/^\/exchange_rates$/, 5 * 60 * 1000],
   [/^\/exchanges$/, 10 * 60 * 1000],
   [/^\/search\/trending$/, 2 * 60 * 1000],
+  [/^\/search$/, 5 * 60 * 1000],
   [new RegExp("^/simple/token_price/" + ID_RE + "$"), 60 * 1000],
   // DefiLlama current prices: /llama/prices/current/<chain:address-or-coingecko:id,...> (max 60 coins)
   [/^\/llama\/prices\/current\/[A-Za-z0-9._:-]{1,80}(,[A-Za-z0-9._:-]{1,80}){0,59}$/, 30 * 1000],
@@ -62,7 +63,7 @@ const ROUTES = [
 const ALLOWED_PARAMS = new Set([
   "vs_currency", "vs_currencies", "ids", "order", "per_page", "page", "price_change_percentage",
   "include_24hr_change", "contract_addresses", "days", "localization", "tickers", "market_data",
-  "community_data", "developer_data", "sparkline",
+  "community_data", "developer_data", "sparkline", "query",
   // DefiLlama (chart / percentage):
   "start", "end", "span", "period", "searchWidth", "timestamp", "lookForward",
 ]);
@@ -87,7 +88,10 @@ function cleanQuery(search) {
   const params = new URLSearchParams(search || "");
   const kept = [];
   for (const [k, v] of params) {
-    if (!ALLOWED_PARAMS.has(k) || !VALUE_RE.test(v)) return null;
+    if (!ALLOWED_PARAMS.has(k)) return null;
+    // A coin-search term: letters (any language), digits, spaces and . _ - only, 2-60 characters.
+    if (k === "query") { if (!/^[\p{L}\p{N} ._-]{2,60}$/u.test(v)) return null; }
+    else if (!VALUE_RE.test(v)) return null;
     if (k === "per_page" && !(parseInt(v, 10) >= 1 && parseInt(v, 10) <= 250)) return null;
     if (k === "page" && !(parseInt(v, 10) >= 1 && parseInt(v, 10) <= 5)) return null;
     if (k === "span" && !(parseInt(v, 10) >= 1 && parseInt(v, 10) <= 500)) return null;

@@ -2163,3 +2163,46 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .tm-sort { gap: 6px; }
 .tm-sort .quick-add-chip { padding: 4px 8px; font-size: 12px; }
 .tm-range-bar, .tm-range-ends { direction: ltr; }
+/* ---- v11: polish -- full-width main buttons on every form screen, no empty boxes while a list is loading */
+#btn-backup-done, #btn-account-create, #btn-buy-open, #btn-sell-open { width: 100%; margin-top: 10px; }
+#prices-list:empty, #predictions-list:empty, #support-log:empty, #tm-req-qr:empty { display: none; }
+/* ---- v12: search, 1h/24h/7d switch, recently viewed, updated line, performance table, supply, tags, share */
+.tm-coin-search { width: 100%; margin: 8px 0 0; }
+.tm-search-results { margin: 8px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.tm-search-results.hidden { display: none; }
+.tm-searching #predictions-list, .tm-searching #tm-sort-chips, .tm-searching #tm-pulse, .tm-searching .tm-updated, .tm-searching .tm-win { display: none; }
+.tm-win { display: flex; gap: 6px; margin: 8px 0 0; }
+.tm-win .quick-add-chip { flex: 1 1 0; justify-content: center; }
+.tm-win .quick-add-chip.active { background: var(--gold); color: var(--gold-ink); border-color: transparent; }
+.tm-updated { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 6px; }
+.tm-updated .link { padding: 4px 2px; }
+.tm-coin-actions { flex-wrap: wrap; }
+.tm-coin-actions .tm-coin-share { flex: 0 0 auto; }
+.tm-perf { margin: 0 0 14px; }
+.tm-perf.hidden { display: none; }
+.tm-perf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tm-perf-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.tm-perf-value { font-size: 12px; font-variant-numeric: tabular-nums; }
+.tm-perf-value.up { color: #3fb97a; }
+.tm-perf-value.down { color: #e0625a; }
+.tm-coin-extra { margin: 0 0 14px; }
+.tm-coin-extra.hidden { display: none; }
+.tm-coin-extra .tm-range-title { margin: 10px 0 6px; }
+.tm-supply-bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 4px 0 6px; }
+.tm-supply-fill { display: block; height: 100%; background: var(--gold); border-radius: 999px; }
+.tm-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tm-tag { display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--text); text-decoration: none; }
+a.tm-link-tag { color: var(--gold-bright); }
+a.tm-link-tag:focus-visible { outline: 2px solid var(--gold-deep, #ddac4d); outline-offset: 2px; }
+/* v12b: compact controls -- picker and search share a row; 1h/24h/7d sits on the "Updated" line */
+.tm-coll-row { display: flex; gap: 8px; align-items: stretch; }
+.tm-coll-row select { width: auto; flex: 0 0 46%; min-width: 0; }
+.tm-coll-row .tm-coin-search { width: auto; flex: 1 1 0; min-width: 0; margin: 0; }
+.tm-updated { flex-wrap: nowrap; gap: 6px; }
+.tm-updated .tm-win { display: none; margin: 0; flex: 0 1 auto; gap: 4px; }
+.tm-updated.on-top .tm-win { display: flex; }
+.tm-updated .tm-win .quick-add-chip { flex: 0 0 auto; min-height: 28px; padding: 2px 10px; font-size: 12px; }
+.tm-updated .tm-updated-text { margin-inline-start: auto; white-space: nowrap; }
+.tm-updated .tm-refresh { font-size: 17px; line-height: 1; padding: 4px 6px; min-width: 32px; min-height: 32px; text-decoration: none; }
+.tm-perf-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.tm-perf-cell { flex: 1 1 calc(25% - 6px); }

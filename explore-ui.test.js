@@ -70,7 +70,7 @@ test("every explore.* key the module asks for exists in all nine languages with 
   const keys = new Set([...src.matchAll(/\btr\(\s*"(explore\.[\w.]+)"/g)].map((m) => m[1]).filter((k) => !k.endsWith(".")));
   for (const m of src.matchAll(/"(explore\.cat\.)" \+ a\[2\]/g)) ["swap", "lending", "staking", "nft", "names", "bridge", "explorer"].forEach((c) => keys.add(m[1] + c));
   // Keys chosen by variable (frequency titles, activity lines) rather than a literal tr("...") call.
-  for (const m of src.matchAll(/"(explore\.(?:rem|sum|alert|pulse|coll|fav|range)[A-Za-z]+)"/g)) keys.add(m[1]);
+  for (const m of src.matchAll(/"(explore\.(?:rem|sum|alert|pulse|coll|fav|range|search|recent|win|updated|refresh|perf|stat|categories|links|link|share)[A-Za-z]+)"/g)) keys.add(m[1]);
   keys.add("predictions.tabTrending");
   assert.ok(keys.size > 80, "found the keys the module uses");
   const ph = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(",");
@@ -363,4 +363,113 @@ test("the coin hooks are wired in both scripts and the collection UI is in both 
     assert.ok(t.includes("TM_EXPLORE.onCoinOpen") && t.includes("TM_EXPLORE.onCoinInfo") && t.includes("TM_EXPLORE.topSource"), f);
   }
   for (const f of ["app.css", "popup.css"]) assert.ok(read(f).includes(".tm-range-bar") && read(f).includes(".tm-collection"), f);
+});
+
+function loadPrices(fetchImpl) {
+  const vm2 = require("node:vm");
+  const ctx = vm2.createContext({ self: {}, console, AbortController, setTimeout, clearTimeout, fetch: fetchImpl || (async () => ({ ok: false })) });
+  vm2.runInContext(read("prices.js"), ctx, { filename: "prices.js" });
+  return ctx.self.TM_PRICES;
+}
+
+test("list rows now carry a 7-day sparkline and 1h / 7d changes", async () => {
+  const hours = Array.from({ length: 168 }, (_, i) => 100 + i);
+  const P = loadPrices(async (url) => ({ ok: true, json: async () => [{ id: "uniswap", symbol: "uni", name: "Uniswap", current_price: 7, market_cap: 5, market_cap_rank: 30, price_change_percentage_24h: 1, price_change_percentage_1h_in_currency: 0.2, price_change_percentage_7d_in_currency: -3, sparkline_in_7d: { price: hours } }] }));
+  const rows = await P.getCoinsByIds(["uniswap"], "usd");
+  assert.equal(rows[0].change1h, 0.2);
+  assert.equal(rows[0].change7d, -3);
+  assert.ok(Array.isArray(rows[0].spark) && rows[0].spark.length >= 8 && rows[0].spark.length <= 40, "a short trend line");
+});
+
+test("searchIdsFrom keeps clean unique ids, capped at 8; searchCoins ignores junk without calling out", async () => {
+  const P = loadPrices();
+  const ids = P.searchIdsFrom({ coins: [{ id: "bitcoin" }, { id: "bad id" }, { id: "bitcoin" }, null, ...Array.from({ length: 20 }, (_, i) => ({ id: "c-" + i }))] });
+  assert.equal(ids[0], "bitcoin");
+  assert.equal(ids.length, 8);
+  let calls = 0;
+  const Q = loadPrices(async () => { calls++; return { ok: true, json: async () => ({ coins: [] }) }; });
+  assert.deepEqual(JSON.parse(JSON.stringify(await Q.searchCoins("a", "usd"))), [], "one letter is too short");
+  assert.deepEqual(JSON.parse(JSON.stringify(await Q.searchCoins("<script>", "usd"))), [], "markup is refused");
+  assert.equal(calls, 0, "nothing was sent for those");
+  assert.deepEqual(JSON.parse(JSON.stringify(await Q.searchCoins("bitcoin", "usd"))), [], "no match is an empty list");
+  assert.equal(calls, 1);
+  const bad = loadPrices(async () => ({ ok: false }));
+  await assert.rejects(() => bad.searchCoins("bitcoin", "usd"));
+});
+
+test("safeLinks and safeCategories only let tidy https links and short tags through", () => {
+  const P = loadPrices();
+  const L = P.safeLinks({ links: {
+    homepage: ["", "javascript:alert(1)", "http://insecure.example", "https://example.org/"],
+    twitter_screen_name: "ethereum", subreddit_url: "https://www.reddit.com/r/ethereum/",
+    repos_url: { github: ["https://github.com/ethereum/go-ethereum"] }, blockchain_site: ["", "https://etherscan.io/"],
+  } });
+  assert.equal(L.website, "https://example.org/");
+  assert.equal(L.twitter, "https://x.com/ethereum");
+  assert.equal(L.reddit, "https://www.reddit.com/r/ethereum/");
+  assert.equal(L.github, "https://github.com/ethereum/go-ethereum");
+  assert.equal(L.explorer, "https://etherscan.io/");
+  const B = P.safeLinks({ links: { twitter_screen_name: "bad handle!", subreddit_url: "https://evil.example/r/x", repos_url: { github: ["https://evil.example/x"] }, homepage: ["data:text/html,hi"] } });
+  assert.deepEqual(JSON.parse(JSON.stringify(B)), { website: null, twitter: null, reddit: null, github: null, explorer: null });
+  assert.deepEqual(JSON.parse(JSON.stringify(P.safeLinks(null))), { website: null, twitter: null, reddit: null, github: null, explorer: null });
+  const cats = P.safeCategories({ categories: ["Smart Contract Platform", "", 5, "x".repeat(80), "a", "b", "c", "d"] });
+  assert.equal(cats.length, 5);
+  assert.ok(cats.every((c) => typeof c === "string" && c.length <= 40));
+  assert.equal(P.pickChg({ price_change_percentage_1h_in_currency: { usd: 0.5 } }, "1h", "usd"), 0.5);
+  assert.equal(P.pickChg({ price_change_percentage_1h_in_currency: { usd: "x" } }, "1h", "usd"), null);
+  assert.equal(P.pickChg({}, "1h", "usd"), null);
+});
+
+test("row change follows the 1h / 24h / 7d switch on the Top tab only; gainers sort by the chosen period", () => {
+  const C = { symbol: "A", change1h: 1, change24h: 2, change7d: 3 };
+  const { api, ctx } = load({ predictionsTab: "top" });
+  assert.equal(api.rowChange(C), 2);
+  api.setChangeWindow("1h"); assert.equal(api.rowChange(C), 1);
+  api.setChangeWindow("7d"); assert.equal(api.rowChange(C), 3);
+  assert.equal(api.rowChange({ symbol: "B", change24h: 5 }), null, "no 7d figure, no number");
+  ctx.predictionsTab = "trending";
+  assert.equal(api.rowChange(C), 2, "other tabs always show 24h");
+  ctx.predictionsTab = "top";
+  api.setSortMode("gainers");
+  const out = api.sortMarkets([{ symbol: "X", change24h: 9, change7d: 1 }, { symbol: "Y", change24h: 1, change7d: 8 }, { symbol: "Z", change24h: 5, change7d: null }]);
+  assert.deepEqual(out.map((m) => m.symbol), ["Y", "X", "Z"]);
+  api.setChangeWindow("bogus"); api.setChangeWindow("24h");
+});
+
+test("pushRecent keeps newest first, no repeats, clean ids, capped at 20; supplyShare is a 0-100 figure", () => {
+  const { api } = load();
+  assert.deepEqual(JSON.parse(JSON.stringify(api.pushRecent(["a", "b", "c"], "b"))), ["b", "a", "c"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.pushRecent(["a"], "bad id!"))), ["a"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.pushRecent(null, "x"))), ["x"]);
+  assert.equal(api.pushRecent(Array.from({ length: 40 }, (_, i) => "c-" + i), "new").length, 20);
+  assert.equal(api.supplyShare(50, 200), 25);
+  assert.equal(api.supplyShare(300, 200), 100);
+  assert.equal(api.supplyShare(50, null), null);
+  assert.equal(api.supplyShare(-1, 10), null);
+});
+
+test("the coin list rows use the switch, rank and sparkline in both scripts; the relay allows /search with a safe term", async () => {
+  for (const f of ["app.js", "popup.js"]) {
+    const t = read(f);
+    assert.ok(t.includes("TM_EXPLORE.rowChange") && t.includes("sparklineSvg(c.spark") && t.includes("rankText"), f);
+  }
+  const http = require("node:http");
+  const seen = [];
+  const upstream = http.createServer((q, r) => { seen.push(q.url); r.setHeader("content-type", "application/json"); r.end(JSON.stringify({ coins: [{ id: "bitcoin" }] })); });
+  await new Promise((res) => upstream.listen(0, "127.0.0.1", res));
+  process.env.COINGECKO_BASE = "http://127.0.0.1:" + upstream.address().port;
+  delete require.cache[require.resolve(path.join(ROOT, "market-api.js"))];
+  const { handleMarketApi } = require(path.join(ROOT, "market-api.js"));
+  const app = http.createServer((q, r) => { if (!handleMarketApi(q, r)) { r.statusCode = 404; r.end(); } });
+  await new Promise((res) => app.listen(0, "127.0.0.1", res));
+  const get = (u) => new Promise((resolve, reject) => http.get("http://127.0.0.1:" + app.address().port + u, (r) => { r.resume(); r.on("end", () => resolve(r.statusCode)); }).on("error", reject));
+  try {
+    assert.equal(await get("/api/market/search?query=bitcoin"), 200);
+    assert.equal(await get("/api/market/search?query=" + encodeURIComponent("ethéreum classic")), 200);
+    assert.equal(await get("/api/market/search?query=a"), 400, "too short");
+    assert.equal(await get("/api/market/search?query=" + encodeURIComponent("<script>")), 400, "markup refused");
+    assert.equal(await get("/api/market/search?query=" + "x".repeat(61)), 400, "too long");
+    assert.equal(await get("/api/market/search?foo=bar"), 400, "unknown parameter");
+    assert.ok(seen.some((u) => u.startsWith("/search?query=bitcoin")), "forwarded upstream: " + seen.join(","));
+  } finally { app.close(); upstream.close(); delete process.env.COINGECKO_BASE; delete require.cache[require.resolve(path.join(ROOT, "market-api.js"))]; }
 });

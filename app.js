@@ -2414,13 +2414,17 @@ function renderStablecoinRow(c) {
       : TM_PRICES.formatMoney(c.price, currentCurrency, { price: true });
   // 24-hour move, green when up (or flat) and red when down, with an arrow and the percentage.
   let changeHtml = "";
-  if (typeof c.change24h === "number" && isFinite(c.change24h)) {
-    const up = c.change24h >= 0;
-    changeHtml = `<span class="price-change plain ${up ? "up" : "down"}">${up ? "\u2197" : "\u2198"} ${Math.abs(c.change24h).toFixed(2)}%</span>`;
+  // The figure follows the 1h / 24h / 7d switch on the Top-coins list (TM_EXPLORE.rowChange); elsewhere it is the 24h move.
+  const shownChange = window.TM_EXPLORE && TM_EXPLORE.rowChange ? TM_EXPLORE.rowChange(c) : c.change24h;
+  if (typeof shownChange === "number" && isFinite(shownChange)) {
+    const up = shownChange >= 0;
+    changeHtml = `<span class="price-change plain ${up ? "up" : "down"}">${up ? "\u2197" : "\u2198"} ${Math.abs(shownChange).toFixed(2)}%</span>`;
   }
+  const sparkHtml = TM_PRICES.sparklineSvg && Array.isArray(c.spark) ? TM_PRICES.sparklineSvg(c.spark, TM_I18N.t("prices.sparkTitle")) : "";
+  const rankText = typeof c.rank === "number" && c.rank > 0 ? `#${c.rank} \u00b7 ` : "";
   const volText = typeof c.volume === "number" && c.volume > 0 ? `${TM_I18N.t("prices.volShort")} ${TM_PRICES.formatMoneyCompact(c.volume, currentCurrency)}` : "";
   const linkLabel = escapeHtml(TM_I18N.t("prices.viewCoin", { name: c.name }));
-  row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${escapeHtml(c.symbol)} &middot; ${escapeHtml(c.fiat)}</span>${volText ? `<span class="price-symbol price-vol">${escapeHtml(volText)}</span>` : ""}</span></span><span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>`;
+  row.innerHTML = `<button type="button" class="price-link" aria-label="${linkLabel}" title="${linkLabel}"><span class="price-left">${tokenIconHtml(c.symbol, c.image)}<span class="price-id"><span class="price-name">${escapeHtml(c.name)}</span><span class="price-symbol">${rankText}${escapeHtml(c.symbol)} &middot; ${escapeHtml(c.fiat)}</span>${volText ? `<span class="price-symbol price-vol">${escapeHtml(volText)}</span>` : ""}</span></span>${sparkHtml}<span class="price-quote"><span class="price-usd">${priceText}</span>${changeHtml}</span></button>`;
   row.querySelector(".price-link").addEventListener("click", () => {
     openCoinDetail(c, $("screen-predictions").classList.contains("hidden") ? "screen-main" : "screen-predictions");
   });
