@@ -1,0 +1,58 @@
+TOKEN EXCHANGE - CHROME WEB STORE FIELDS
+Copy each block into the matching field. Version in the zip: 1.11.18.
+
+=== STORE LISTING TAB ===
+
+CATEGORY
+Productivity (or "Tools" if your dropdown shows it).
+
+DETAILED DESCRIPTION
+Token Exchange is a self-custody crypto wallet for Ethereum and other EVM networks. Your keys are created and encrypted on your device and never leave it.
+
+What you can do
+- Create a new wallet or import one with a recovery phrase or private key
+- Send and receive tokens on Ethereum, Base and other supported EVM networks
+- Swap tokens inside the wallet
+- Connect to decentralized apps (dApps) on the web and approve each request yourself
+- Browse live prices: top coins with 7-day sparklines, rank, and 1H / 24H / 7D change
+- Search any coin, keep favourites, see recently viewed coins, and set price alerts
+- Open detailed coin pages with charts, 24h range, supply stats, categories and links
+- Scan your wallet for tokens, manage a contact list, and view your activity
+- Choose from several languages and a light or dark theme
+
+Privacy first
+- Non-custodial: we never hold your funds or see your keys
+- Market data is informational only and nothing about your wallet is sent to look it up
+- Every connection, signature and transaction needs your explicit approval
+
+Token Exchange is not financial advice. Crypto assets carry risk; back up your recovery phrase and never share it with anyone.
+
+Website and support: https://www.tokenswaphub.org
+
+ICON (128x128): icon-128.png (in this zip)
+SCREENSHOTS (1280x800): screenshot-1.png to screenshot-4.png (in this zip)
+Note: the screenshots use sample market data, not a real wallet.
+
+=== PRIVACY PRACTICES TAB ===
+
+SINGLE PURPOSE DESCRIPTION
+Token Exchange is a self-custody cryptocurrency wallet. It lets users create or import a wallet, view balances and market prices, send and swap tokens on EVM networks, and connect to decentralized apps.
+
+PERMISSION JUSTIFICATION - storage
+The storage permission keeps the user's encrypted wallet vault, account list, contacts, settings, favourites, watchlist and price alerts in chrome.storage.local on the user's own device. Without it the wallet could not remember the user's accounts or settings between sessions. This data is not sent to us or to any server.
+
+HOST PERMISSION JUSTIFICATION (http://*/* and https://*/*)
+Token Exchange injects a standard EIP-1193 wallet provider (window.ethereum) into web pages so that decentralized apps can ask the user to connect, sign messages or approve transactions. A dApp can live on any website, so the provider must be available on any http(s) page. The content script only passes the dApp's wallet requests to the extension; it does not read, collect or transmit page content, browsing history or form data. Every connection, signature and transaction still requires the user's explicit approval in the extension popup.
+
+REMOTE CODE JUSTIFICATION
+The extension does not use remote code. All JavaScript, including the bundled ethers and WalletConnect libraries, is packaged inside the extension. The manifest sets script-src 'self' and the extension does not load, evaluate or execute any code from the network. It only fetches data (JSON) such as market prices and blockchain RPC responses.
+(If the form asks "Are you using remote code?", answer No.)
+
+PRIVACY POLICY URL
+https://www.tokenswaphub.org/privacy.html
+
+DATA USAGE CERTIFICATION
+Tick the certification that your use of data complies with the Developer Program Policies. Review it honestly before ticking. Facts to base your answers on:
+- Wallet keys, recovery phrase and settings are stored only on the user's device.
+- The extension sends public wallet addresses to blockchain RPC providers to read balances, and requests market prices from CoinGecko. If the form's data-type list asks about these, disclose them; when unsure, disclose rather than leave out.
+- No data is sold, and none is used for unrelated purposes or credit decisions.
